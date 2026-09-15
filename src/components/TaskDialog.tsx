@@ -14,6 +14,7 @@ import {
 import { parseQuickAdd } from "@/lib/quickparse";
 import { formatDate, relativeLabel } from "@/lib/dates";
 import { Button, Field, Input, Modal, Select, Textarea } from "./ui";
+import { TimeField } from "./TimeField";
 
 interface Draft {
   title: string;
@@ -237,11 +238,10 @@ export function TaskDialog({
             // this one was being reported.
             hint={draft.dueDate === "" ? "Set a deadline first." : undefined}
           >
-            <Input
-              type="time"
+            <TimeField
               value={draft.dueTime}
               disabled={draft.dueDate === ""}
-              onChange={(e) => set("dueTime", e.target.value)}
+              onChange={(v) => set("dueTime", v)}
             />
           </Field>
         </div>

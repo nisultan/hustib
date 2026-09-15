@@ -4,6 +4,7 @@ import { ReactNode, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useMounted } from "@/lib/useMounted";
 import { LogoMark } from "./Logo";
+import { Choice } from "./Choice";
 import {
   Priority,
   PRIORITY_LABEL,
@@ -144,39 +145,38 @@ export function Textarea(props: React.TextareaHTMLAttributes<HTMLTextAreaElement
 }
 
 /**
- * A native select, with the platform arrow replaced by one of ours.
+ * Dropdown.
  *
- * The menu it opens is still drawn by the operating system, which is the
- * point: it is the only dropdown that behaves correctly with a keyboard, a
- * screen reader and a touch keyboard without reimplementing all three. The
- * root declares `color-scheme`, so that menu now follows the app theme
- * instead of arriving white over a dark form.
+ * Keeps the props a native select took — `value`, `onChange` with an event,
+ * `<option>` children — while rendering the app's own listbox, so the
+ * thirteen existing call sites did not have to change. See Choice.tsx for why
+ * the native one had to go.
  */
-export function Select(props: React.SelectHTMLAttributes<HTMLSelectElement>) {
-  const { className = "", ...rest } = props;
+export function Select({
+  value,
+  onChange,
+  children,
+  className = "",
+  disabled,
+  "aria-label": ariaLabel,
+}: {
+  value?: string;
+  onChange?: (e: { target: { value: string } }) => void;
+  children?: ReactNode;
+  className?: string;
+  disabled?: boolean;
+  "aria-label"?: string;
+}) {
   return (
-    <span className="relative inline-grid w-full items-center">
-      <select
-        {...rest}
-        className={`${fieldClass} w-full cursor-pointer appearance-none pr-8 ${className}`}
-      >
-        {props.children}
-      </select>
-      <svg
-        viewBox="0 0 16 16"
-        aria-hidden
-        className="pointer-events-none absolute right-2.5 size-3.5 justify-self-end text-ink-3"
-      >
-        <path
-          d="M4 6.5 L8 10.5 L12 6.5"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="1.75"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-      </svg>
-    </span>
+    <Choice
+      value={value ?? ""}
+      onChange={(v) => onChange?.({ target: { value: v } })}
+      className={className}
+      disabled={disabled}
+      aria-label={ariaLabel}
+    >
+      {children}
+    </Choice>
   );
 }
 
