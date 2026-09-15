@@ -1,0 +1,303 @@
+@import "tailwindcss";
+
+/*
+ * Palette: a near-neutral canvas with one indigo accent, so the only saturated
+ * colour on screen is signal — priority, trend, application status. Tokens are
+ * defined once and redefined for dark, never defined only inside the dark block.
+ */
+:root {
+  --bg: #fbfbfc;
+  --panel: #ffffff;
+  --panel-2: #f7f7f9;
+  --border: #e6e6ea;
+  --border-strong: #d6d6dd;
+  --text: #17171a;
+  --text-2: #5d5d68;
+  --text-3: #8b8b96;
+  --accent: #5b5bd6;
+  --accent-soft: #eeeefc;
+  --accent-text: #4a4ac4;
+
+  --urgent: #d64545;
+  --high: #d97706;
+  --medium: #3b82f6;
+  --low: #64748b;
+
+  --up: #059669;
+  --down: #dc2626;
+  --flat: #7c7c88;
+
+  --shadow: 0 1px 2px rgba(20, 20, 30, 0.04), 0 1px 3px rgba(20, 20, 30, 0.03);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0b0b0e;
+    --panel: #131317;
+    --panel-2: #1a1a20;
+    --border: #26262e;
+    --border-strong: #35353f;
+    --text: #f2f2f5;
+    --text-2: #a0a0ad;
+    --text-3: #70707d;
+    --accent: #7b7bf0;
+    --accent-soft: #1e1e35;
+    --accent-text: #a5a5f7;
+
+    --urgent: #f27171;
+    --high: #f0a23c;
+    --medium: #6ba5f8;
+    --low: #94a3b8;
+
+    --up: #34d399;
+    --down: #f87171;
+    --flat: #8b8b98;
+
+    --shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+  }
+}
+
+:root[data-theme="dark"] {
+  --bg: #0b0b0e;
+  --panel: #131317;
+  --panel-2: #1a1a20;
+  --border: #26262e;
+  --border-strong: #35353f;
+  --text: #f2f2f5;
+  --text-2: #a0a0ad;
+  --text-3: #70707d;
+  --accent: #7b7bf0;
+  --accent-soft: #1e1e35;
+  --accent-text: #a5a5f7;
+
+  --urgent: #f27171;
+  --high: #f0a23c;
+  --medium: #6ba5f8;
+  --low: #94a3b8;
+
+  --up: #34d399;
+  --down: #f87171;
+  --flat: #8b8b98;
+
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-panel: var(--panel);
+  --color-panel-2: var(--panel-2);
+  --color-line: var(--border);
+  --color-line-strong: var(--border-strong);
+  --color-ink: var(--text);
+  --color-ink-2: var(--text-2);
+  --color-ink-3: var(--text-3);
+  --color-accent: var(--accent);
+  --color-accent-soft: var(--accent-soft);
+  --color-accent-text: var(--accent-text);
+  --color-urgent: var(--urgent);
+  --color-high: var(--high);
+  --color-medium: var(--medium);
+  --color-low: var(--low);
+  --color-up: var(--up);
+  --color-down: var(--down);
+  --color-flat: var(--flat);
+}
+
+html,
+body {
+  background: var(--bg);
+  color: var(--text);
+}
+
+body {
+  font-family:
+    ui-sans-serif,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    Inter,
+    Roboto,
+    "Helvetica Neue",
+    Arial,
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  font-feature-settings: "cv02", "cv03", "cv04";
+}
+
+/* Tabular figures keep grade columns and percentages from jittering. */
+.nums {
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+}
+
+::selection {
+  background: var(--accent-soft);
+  color: var(--accent-text);
+}
+
+/* Focus ring: visible for keyboards, absent for mouse clicks. */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+input,
+textarea,
+select,
+button {
+  font: inherit;
+  color: inherit;
+}
+
+/* Thin, unobtrusive scrollbars that follow the theme. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-strong) transparent;
+}
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+*::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+  border-radius: 999px;
+  border: 3px solid transparent;
+  background-clip: content-box;
+}
+
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.fade-up {
+  animation: fade-up 0.18s ease-out both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   Tour animations
+   ---------------------------------------------------------------------------
+   Used only by the onboarding tour. Each step remounts its illustration, so
+   these run once on entry rather than looping — motion that explains, then
+   settles. Everything here is disabled by the reduced-motion rule above.
+--------------------------------------------------------------------------- */
+
+@keyframes tour-enter {
+  from { opacity: 0; transform: translateX(14px); }
+  to   { opacity: 1; transform: none; }
+}
+@keyframes tour-enter-back {
+  from { opacity: 0; transform: translateX(-14px); }
+  to   { opacity: 1; transform: none; }
+}
+.tour-enter      { animation: tour-enter 0.34s cubic-bezier(0.22, 1, 0.36, 1) both; }
+.tour-enter-back { animation: tour-enter-back 0.34s cubic-bezier(0.22, 1, 0.36, 1) both; }
+
+/* Rows and cards easing upward in sequence. Stagger via --d. */
+@keyframes rise {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: none; }
+}
+.rise {
+  animation: rise 0.42s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation-delay: var(--d, 0ms);
+}
+
+/* Something arriving with a little weight to it. */
+@keyframes pop {
+  0%   { opacity: 0; transform: scale(0.82); }
+  60%  { opacity: 1; transform: scale(1.04); }
+  100% { opacity: 1; transform: scale(1); }
+}
+.pop {
+  animation: pop 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation-delay: var(--d, 0ms);
+}
+
+/* Line chart drawing itself left to right. Pair with pathLength="1". */
+@keyframes draw {
+  to { stroke-dashoffset: 0; }
+}
+.draw {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  animation: draw 1.1s cubic-bezier(0.4, 0, 0.2, 1) both;
+  animation-delay: var(--d, 0ms);
+}
+
+/* Progress bars filling to their value, held in --w. */
+@keyframes grow-x {
+  from { transform: scaleX(0); }
+  to   { transform: scaleX(1); }
+}
+.grow-x {
+  transform-origin: left;
+  animation: grow-x 0.8s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation-delay: var(--d, 0ms);
+}
+
+/* A fill sweeping upward, for the area under the chart. */
+@keyframes reveal-up {
+  from { clip-path: inset(100% 0 0 0); }
+  to   { clip-path: inset(0 0 0 0); }
+}
+.reveal-up {
+  animation: reveal-up 0.9s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation-delay: var(--d, 0ms);
+}
+
+/* Text appearing a character at a time, for the quick-add demo. */
+@keyframes typing {
+  from { width: 0; }
+  to   { width: 100%; }
+}
+.typing {
+  display: inline-block;
+  overflow: hidden;
+  white-space: nowrap;
+  vertical-align: bottom;
+  animation: typing 1.5s steps(44, end) both;
+  animation-delay: var(--d, 0ms);
+}
+
+@keyframes caret {
+  50% { opacity: 0; }
+}
+.caret {
+  animation: caret 0.9s step-end infinite;
+  animation-delay: var(--d, 0ms);
+}
+
+/* Attention ring that fires once, then stops. */
+@keyframes halo {
+  0%   { box-shadow: 0 0 0 0 var(--accent-soft); }
+  70%  { box-shadow: 0 0 0 8px transparent; }
+  100% { box-shadow: 0 0 0 0 transparent; }
+}
+.halo {
+  animation: halo 1.4s ease-out 2 both;
+  animation-delay: var(--d, 0ms);
+}
+
+/* Reduced motion: the rules above are neutralised by the global override, but
+   these two need their end state restored explicitly, since the animation's
+   `from` is what the element would otherwise be stuck at. */
+@media (prefers-reduced-motion: reduce) {
+  .draw   { stroke-dasharray: none; stroke-dashoffset: 0; }
+  .typing { width: 100%; }
+}
