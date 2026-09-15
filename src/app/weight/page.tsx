@@ -27,7 +27,7 @@ export default function WeightPage() {
   const current = byDate.get(date)?.weight ?? null;
 
   return (
-    <div className="fade-up">
+    <div className="page-in">
       <PageHeader
         title="Weight"
         subtitle="A number a morning. The trend is what matters, not any one of them."

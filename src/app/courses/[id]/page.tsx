@@ -54,7 +54,7 @@ export default function CoursePage({ params }: { params: Promise<{ id: string }>
   const notes = tasks.filter((x) => x.notes.trim().length > 0);
 
   return (
-    <div className="fade-up">
+    <div className="page-in">
       <Link
         href="/courses"
         className="mb-4 inline-flex items-center gap-1 text-xs text-ink-3 hover:text-ink"

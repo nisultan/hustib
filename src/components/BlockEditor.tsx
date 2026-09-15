@@ -52,6 +52,20 @@ export function BlockEditor({
     focusNext.current = { id: block.id, at: "start" };
   };
 
+  const append = () => {
+    const last = list[list.length - 1];
+    // Landing in the trailing empty block rather than stacking another one
+    // on top of it — clicking + twice should not leave a blank behind.
+    if (last && last.text === "" && last.type === "text") {
+      focusNext.current = null;
+      refs.current.get(last.id)?.focus();
+      return;
+    }
+    const block = empty();
+    onChange([...list, block]);
+    focusNext.current = { id: block.id, at: "start" };
+  };
+
   const remove = (id: string) => {
     const i = list.findIndex((b) => b.id === id);
     if (list.length === 1) {
@@ -149,8 +163,32 @@ export function BlockEditor({
           }}
           onToggle={() => replace(block.id, { done: !block.done })}
           onDelete={() => remove(block.id)}
+          onInsertBelow={() => insertAfter(block.id, empty())}
         />
       ))}
+
+      {/*
+        The gutter + only appears on hover, which is fine once you know it is
+        there and useless before. This one is always visible, and the padded
+        area under it means clicking the empty space below the last line does
+        what clicking empty space in a document should.
+      */}
+      <button
+        type="button"
+        onClick={append}
+        className="mt-1 flex items-center gap-1.5 rounded-lg py-2 pl-7 pr-3 text-left text-sm text-ink-3 transition-colors hover:text-ink"
+      >
+        <svg viewBox="0 0 16 16" aria-hidden className="size-3.5">
+          <path
+            d="M8 3.5v9M3.5 8h9"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.7"
+            strokeLinecap="round"
+          />
+        </svg>
+        Add a block
+      </button>
     </div>
   );
 }
@@ -181,6 +219,7 @@ function BlockRow({
   onType,
   onToggle,
   onDelete,
+  onInsertBelow,
 }: {
   block: Block;
   placeholder: string;
@@ -195,6 +234,7 @@ function BlockRow({
   onType: (type: BlockType) => void;
   onToggle: () => void;
   onDelete: () => void;
+  onInsertBelow: () => void;
 }) {
   const ref = useRef<HTMLTextAreaElement>(null);
 
@@ -209,8 +249,13 @@ function BlockRow({
 
   if (block.type === "divider") {
     return (
-      <div className="group relative flex items-center gap-1 py-2 pl-7">
-        <Handle onDelete={onDelete} onMove={onMove} onMenu={() => setMenuOpen(!menuOpen)} />
+      <div className="group relative flex items-center gap-1 py-2 pl-14">
+        <Handle
+          onDelete={onDelete}
+          onMove={onMove}
+          onMenu={() => setMenuOpen(!menuOpen)}
+          onInsertBelow={onInsertBelow}
+        />
         <hr className="w-full border-t border-line" />
         {menuOpen && (
           <TypeMenu current={block.type} onPick={onType} onClose={() => setMenuOpen(false)} />
@@ -220,8 +265,13 @@ function BlockRow({
   }
 
   return (
-    <div className="group relative flex items-start gap-1.5 pl-7">
-      <Handle onDelete={onDelete} onMove={onMove} onMenu={() => setMenuOpen(!menuOpen)} />
+    <div className="group relative flex items-start gap-1.5 pl-14">
+      <Handle
+        onDelete={onDelete}
+        onMove={onMove}
+        onMenu={() => setMenuOpen(!menuOpen)}
+        onInsertBelow={onInsertBelow}
+      />
 
       {block.type === "todo" && (
         <button
@@ -324,18 +374,45 @@ const STYLE: Record<BlockType, string> = {
   divider: "",
 };
 
-/** The grip that appears on hover: change type, reorder, delete. */
+/**
+ * The gutter controls, revealed on hover or focus.
+ *
+ * Two buttons, matching what each is for: + puts a block below this one, and
+ * the grip opens the type menu. Both stay hidden until the row is under the
+ * cursor, so a page of writing is not fringed with chrome.
+ */
 function Handle({
   onDelete,
   onMove,
   onMenu,
+  onInsertBelow,
 }: {
   onDelete: () => void;
   onMove: (delta: number) => void;
   onMenu: () => void;
+  onInsertBelow: () => void;
 }) {
   return (
-    <span className="absolute left-0 top-1 flex opacity-0 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100">
+    <span className="absolute left-0 top-1 flex gap-0.5 opacity-0 transition-opacity focus-within:opacity-100 group-focus-within:opacity-100 group-hover:opacity-100">
+      <button
+        type="button"
+        aria-label="Add a block below"
+        title="Add a block below"
+        onMouseDown={(e) => e.preventDefault()}
+        onClick={onInsertBelow}
+        className="grid size-6 place-items-center rounded text-ink-3 transition-colors hover:bg-panel-2 hover:text-ink"
+      >
+        <svg viewBox="0 0 16 16" aria-hidden className="size-4">
+          <path
+            d="M8 3.5v9M3.5 8h9"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.7"
+            strokeLinecap="round"
+          />
+        </svg>
+      </button>
+
       <button
         type="button"
         aria-label="Change block type"
@@ -350,7 +427,7 @@ function Handle({
           if (e.altKey && e.key === "ArrowDown") onMove(1);
         }}
         title="Change type — right-click to delete"
-        className="grid size-5 place-items-center rounded text-ink-3 transition-colors hover:bg-panel-2 hover:text-ink"
+        className="grid size-6 place-items-center rounded text-ink-3 transition-colors hover:bg-panel-2 hover:text-ink"
       >
         <svg viewBox="0 0 16 16" aria-hidden className="size-3.5">
           <path
@@ -394,7 +471,7 @@ function TypeMenu({
   return (
     <div
       ref={ref}
-      className="fade-up absolute left-6 top-7 z-50 w-48 rounded-xl border border-line bg-panel p-1 shadow-[var(--shadow-lg),var(--edge)]"
+      className="fade-up absolute left-14 top-7 z-50 w-48 rounded-xl border border-line bg-panel p-1 shadow-[var(--shadow-lg),var(--edge)]"
     >
       {MENU_TYPES.map((type) => (
         <button

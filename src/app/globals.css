@@ -207,6 +207,23 @@ h3 {
   color: var(--accent-text);
 }
 
+/*
+ * Anything that lifts, presses or highlights settles on the same curve as
+ * anything that enters. Consistency in easing is most of what separates an
+ * interface that feels considered from one that feels assembled.
+ */
+a,
+button,
+[role="button"],
+[role="tab"],
+[role="option"],
+input,
+textarea,
+select,
+summary {
+  transition-timing-function: var(--ease-out);
+}
+
 /* Focus ring: visible for keyboards, absent for mouse clicks. */
 :focus-visible {
   outline: 2px solid var(--accent);
@@ -265,10 +282,23 @@ h3 {
   background-clip: content-box;
 }
 
+/*
+ * Motion
+ *
+ * One easing for everything that enters — a fast start that settles rather
+ * than braking, which is what reads as "smooth" instead of "slow". Durations
+ * stay short: this is a tool someone opens twenty times a day, and animation
+ * they have to wait through stops being charming on about the fourth visit.
+ */
+:root {
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-spring: cubic-bezier(0.34, 1.4, 0.5, 1);
+}
+
 @keyframes fade-up {
   from {
     opacity: 0;
-    transform: translateY(4px);
+    transform: translateY(6px);
   }
   to {
     opacity: 1;
@@ -276,7 +306,79 @@ h3 {
   }
 }
 .fade-up {
-  animation: fade-up 0.18s ease-out both;
+  animation: fade-up 0.26s var(--ease-out) both;
+}
+
+/*
+ * Page entrance.
+ *
+ * Children of a page stagger in rather than the page appearing as one slab,
+ * so the eye is led down the layout in the order it should read it. The
+ * delays are capped at six: past that the last thing on a long page would be
+ * waiting on an animation nobody is watching.
+ */
+@keyframes page-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.page-in > * {
+  animation: page-in 0.38s var(--ease-out) both;
+}
+.page-in > *:nth-child(1) {
+  animation-delay: 0ms;
+}
+.page-in > *:nth-child(2) {
+  animation-delay: 45ms;
+}
+.page-in > *:nth-child(3) {
+  animation-delay: 90ms;
+}
+.page-in > *:nth-child(4) {
+  animation-delay: 130ms;
+}
+.page-in > *:nth-child(5) {
+  animation-delay: 165ms;
+}
+.page-in > *:nth-child(n + 6) {
+  animation-delay: 195ms;
+}
+
+/* A row arriving in a list. Stagger via --d, same as the tour art. */
+@keyframes slide-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.slide-in {
+  animation: slide-in 0.34s var(--ease-out) both;
+  animation-delay: var(--d, 0ms);
+}
+
+/* Something the student just created, with a little overshoot to notice it. */
+@keyframes spring-in {
+  from {
+    opacity: 0;
+    transform: scale(0.94);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.spring-in {
+  animation: spring-in 0.32s var(--ease-spring) both;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -285,6 +387,14 @@ h3 {
   *::after {
     animation-duration: 0.01ms !important;
     transition-duration: 0.01ms !important;
+    /*
+     * Delays too, not just durations. A staggered entrance fills backwards
+     * during its delay, so zeroing only the duration would leave the later
+     * items invisible for the length of the stagger — the animation removed
+     * but the waiting kept.
+     */
+    animation-delay: 0.01ms !important;
+    transition-delay: 0.01ms !important;
   }
 }
 

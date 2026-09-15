@@ -100,7 +100,7 @@ function UniversitiesInner() {
   if (!store.ready) return <div className="h-64" aria-busy="true" />;
 
   return (
-    <div className="fade-up">
+    <div className="page-in">
       <PageHeader
         title="Universities"
         subtitle="Your application list, with the deadlines that matter."

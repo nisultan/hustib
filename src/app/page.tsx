@@ -56,7 +56,7 @@ export default function HomePage() {
   ).length;
 
   return (
-    <div className="fade-up">
+    <div className="page-in">
       <header className="mb-8">
         <h1 className="text-2xl font-semibold tracking-tight">
           {greeting()}, {store.profile.name} <span aria-hidden>👋</span>

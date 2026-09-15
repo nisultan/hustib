@@ -33,7 +33,7 @@ export default function SettingsPage() {
   if (!store.ready) return <div className="h-64" aria-busy="true" />;
 
   return (
-    <div className="fade-up max-w-2xl">
+    <div className="page-in max-w-2xl">
       <PageHeader title="Settings" />
 
       <section className="mb-8">

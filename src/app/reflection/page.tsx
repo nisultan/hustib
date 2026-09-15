@@ -28,7 +28,7 @@ export default function ReflectionPage() {
   const reflection = byDate.get(date)?.reflection ?? [];
 
   return (
-    <div className="fade-up">
+    <div className="page-in">
       <PageHeader
         title="Reflection"
         subtitle="A page a day. What happened, what it felt like, what to do about it."

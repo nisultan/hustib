@@ -92,7 +92,7 @@ function TasksInner() {
   if (!store.ready) return <div className="h-64" aria-busy="true" />;
 
   return (
-    <div className="fade-up">
+    <div className="page-in">
       <PageHeader
         title="Tasks & Notes"
         subtitle="Everything you need to do, with the notes attached to it."

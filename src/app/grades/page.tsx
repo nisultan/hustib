@@ -66,7 +66,7 @@ function GradesInner() {
   if (!store.ready) return <div className="h-64" aria-busy="true" />;
 
   return (
-    <div className="fade-up">
+    <div className="page-in">
       <PageHeader
         title="Grades"
         subtitle="Every assessment, with the averages worked out for you."

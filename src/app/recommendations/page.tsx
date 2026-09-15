@@ -24,7 +24,7 @@ export default function RecommendationsPage() {
   if (!store.ready) return <div className="h-64" aria-busy="true" />;
 
   return (
-    <div className="fade-up">
+    <div className="page-in">
       <PageHeader
         title="Recommendations"
         subtitle="What your deadlines, priorities and grades add up to."
