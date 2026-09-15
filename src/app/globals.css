@@ -193,12 +193,39 @@ h3 {
   border-radius: 6px;
 }
 
-input,
-textarea,
-select,
-button {
-  font: inherit;
-  color: inherit;
+/*
+ * In @layer, because Tailwind v4 puts its utilities in one. Unlayered rules
+ * beat layered ones whatever their specificity, so leaving this bare meant
+ * `color: inherit` quietly won over every `text-*` utility — which is how
+ * primary buttons ended up with body-coloured text on an accent fill.
+ */
+@layer base {
+  input,
+  textarea,
+  select,
+  button {
+    font: inherit;
+    color: inherit;
+  }
+
+  /*
+   * Tailwind's reset sets `cursor: default` on buttons, following the HTML
+   * spec. That is right for a native form control and wrong for an app, where
+   * everything clickable should say so — including the anchors styled as
+   * buttons and the summary/label rows that toggle things.
+   */
+  button:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]),
+  summary,
+  label:has(input[type="checkbox"]),
+  label:has(input[type="radio"]) {
+    cursor: pointer;
+  }
+
+  button:disabled,
+  [aria-disabled="true"] {
+    cursor: not-allowed;
+  }
 }
 
 /* Thin, unobtrusive scrollbars that follow the theme. */
