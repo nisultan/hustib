@@ -3,17 +3,33 @@
 import { useState } from "react";
 import { useStore } from "@/lib/store";
 import { cryptoAvailable, ratePassword } from "@/lib/vault";
+import { AuthScreen } from "./Auth";
 import { Button, Input, Panel } from "./ui";
 
 /**
  * The door.
  *
- * Renders instead of the app in two situations: this device has encrypted data
- * and needs the password, or this is a first visit and we have not yet asked
- * whether the student wants one. Everything else renders the app normally.
+ * Which door depends on where the data lives. With Supabase configured the
+ * hub is behind an account, so this waits for the session and shows the sign
+ * in form; without it the hub is local to the device and the old vault
+ * password is the only thing between a shared browser and the data.
  */
 export function Lock({ children }: { children: React.ReactNode }) {
   const store = useStore();
+
+  if (store.backend === "cloud") {
+    // Blank rather than a spinner: the session is usually restored from
+    // storage within a frame or two, and a flashing spinner reads worse than
+    // a beat of nothing.
+    if (store.authState === "loading") {
+      return <div className="min-h-screen" aria-busy="true" />;
+    }
+    if (store.authState === "signed-out") return <AuthScreen />;
+    if (store.lockState !== "ready") {
+      return <div className="min-h-screen" aria-busy="true" />;
+    }
+    return <>{children}</>;
+  }
 
   if (store.lockState === "loading") {
     return <div className="min-h-screen" aria-busy="true" />;

@@ -7,6 +7,7 @@ import { AddTaskButton } from "@/components/TaskDialog";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { TourHost } from "@/components/Tour";
 import { Lock } from "@/components/Lock";
+import { SyncBanner } from "@/components/SyncBanner";
 import { APPEARANCE_INIT_SCRIPT } from "@/lib/appearance";
 
 export const metadata: Metadata = {
@@ -49,6 +50,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                   <AddTaskButton compact />
                 </div>
               </header>
+
+              <SyncBanner />
 
               <main className="mx-auto w-full max-w-5xl px-4 pb-24 pt-6 md:px-8 md:pb-16 md:pt-8">
                 {children}

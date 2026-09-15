@@ -1,6 +1,7 @@
 "use client";
 
 import { AppData, Course, Grade, Task, University } from "../types";
+import type { User } from "@supabase/supabase-js";
 import { getSupabase } from "./client";
 import { CourseRow, GradeRow, LessonRow, TaskRow, UniversityRow } from "./types";
 
@@ -49,9 +50,49 @@ export async function signIn(email: string, password: string) {
   return data;
 }
 
+/**
+ * Starts the Google redirect flow.
+ *
+ * Returning to the page it left from means a student who signs in from
+ * /grades lands back on /grades. The browser client has detectSessionInUrl
+ * on, so the tokens in the returned URL become a session without a callback
+ * route of our own.
+ */
+export async function signInWithGoogle(redirectTo?: string) {
+  const { error } = await client().auth.signInWithOAuth({
+    provider: "google",
+    options: {
+      redirectTo: redirectTo ?? (typeof window !== "undefined" ? window.location.href : undefined),
+      queryParams: {
+        // Without this Google skips the account chooser once a session
+        // exists, which makes switching accounts impossible.
+        prompt: "select_account",
+      },
+    },
+  });
+  if (error) throw error;
+}
+
 export async function signOut() {
   const { error } = await client().auth.signOut();
   if (error) throw error;
+}
+
+/** The session restored from storage on load, or null when signed out. */
+export async function currentSession() {
+  const { data } = await client().auth.getSession();
+  return data.session;
+}
+
+/**
+ * Subscribes to sign-in and sign-out, including the token refresh that keeps
+ * a remembered session alive. Returns the unsubscribe.
+ */
+export function onAuthChange(fn: (user: User | null) => void): () => void {
+  const { data } = client().auth.onAuthStateChange((_event, session) => {
+    fn(session?.user ?? null);
+  });
+  return () => data.subscription.unsubscribe();
 }
 
 export async function currentUser() {

@@ -12,6 +12,8 @@ import {
 } from "react";
 import { AppData, Course, Grade, Task, University, Profile, ID } from "./types";
 import { seedData } from "./seed";
+import { isSupabaseConfigured } from "./supabase/client";
+import * as repo from "./supabase/repository";
 import {
   PASSWORD_CHOICE_KEY,
   PLAIN_KEY,
@@ -36,13 +38,30 @@ const STORAGE_KEY = PLAIN_KEY;
 export type LockState = "loading" | "locked" | "ready";
 
 /**
- * Local-first data layer.
+ * Which storage the hub is talking to.
+ *
+ * Decided once, by whether the Supabase keys are present at build time. Local
+ * mode is the original device-password build and still works with no backend
+ * at all; cloud mode puts every row behind an account.
+ */
+export type Backend = "local" | "cloud";
+
+/** Only meaningful in cloud mode; local mode reports "signed-out" forever. */
+export type AuthState = "loading" | "signed-out" | "signed-in";
+
+export interface AuthUser {
+  id: string;
+  email: string | null;
+}
+
+/**
+ * Data layer for the hub.
  *
  * Everything the UI touches goes through this one interface so the storage
- * behind it can change without the pages changing. Swapping to Supabase means
- * reimplementing the mutators as awaited queries (the schema in
- * `supabase/schema.sql` mirrors these shapes) and making the actions async —
- * the components already treat every mutation as fire-and-forget.
+ * behind it can change without the pages changing. Both backends present the
+ * same synchronous read model and the same fire-and-forget mutators — the
+ * cloud one just also sends the change to Postgres and surfaces a failure
+ * through `syncError` rather than throwing into a component.
  */
 export interface Store extends AppData {
   ready: boolean;
@@ -51,6 +70,19 @@ export interface Store extends AppData {
   hasPassword: boolean;
   /** Whether we have already asked the student to choose a password. */
   passwordAsked: boolean;
+
+  backend: Backend;
+  authState: AuthState;
+  user: AuthUser | null;
+  /** A write that did not reach the server, for the UI to surface. */
+  syncError: string | null;
+  clearSyncError(): void;
+
+  /** Throws with a readable message so the form can show it. */
+  signIn(email: string, password: string): Promise<void>;
+  /** Resolves true when the account still needs an emailed confirmation. */
+  signUp(email: string, password: string, name: string): Promise<boolean>;
+  signOut(): Promise<void>;
 
   addTask(t: Omit<Task, "id" | "createdAt" | "completedAt">): void;
   updateTask(id: ID, patch: Partial<Task>): void;
@@ -97,6 +129,15 @@ function emptyData(): AppData {
   return { profile: { name: "there" }, courses: [], tasks: [], grades: [], universities: [] };
 }
 
+function isEmpty(d: AppData): boolean {
+  return (
+    d.courses.length === 0 &&
+    d.tasks.length === 0 &&
+    d.grades.length === 0 &&
+    d.universities.length === 0
+  );
+}
+
 /**
  * A new student starts with an empty hub — this is their platform, not a demo.
  * Sample data is available on request from Settings and from the tour.
@@ -128,11 +169,23 @@ function loadPlain(): AppData {
   }
 }
 
+function message(e: unknown): string {
+  return e instanceof Error ? e.message : String(e);
+}
+
 export function StoreProvider({ children }: { children: ReactNode }) {
+  // Fixed for the life of the page: the keys are compiled in, so this cannot
+  // change between renders and never needs to be state.
+  const cloud = isSupabaseConfigured();
+
   const [data, setData] = useState<AppData>(emptyData);
   const [lockState, setLockState] = useState<LockState>("loading");
   const [hasPassword, setHasPassword] = useState(false);
   const [passwordAsked, setPasswordAsked] = useState(true);
+
+  const [authState, setAuthState] = useState<AuthState>(cloud ? "loading" : "signed-out");
+  const [user, setUser] = useState<AuthUser | null>(null);
+  const [syncError, setSyncError] = useState<string | null>(null);
 
   // The derived key and its salt, held only in memory. Losing them on reload
   // is the point: the password has to be re-entered to get back in.
@@ -140,9 +193,15 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   const ready = lockState === "ready";
 
+  /* ---------------------------------------------------------------------- */
+  /* Load                                                                   */
+  /* ---------------------------------------------------------------------- */
+
   // Loading in an effect rather than in useState keeps the server render and
   // the first client render identical, avoiding a hydration mismatch.
   useEffect(() => {
+    if (cloud) return;
+
     let asked = true;
     try {
       asked = localStorage.getItem(PASSWORD_CHOICE_KEY) != null;
@@ -159,7 +218,86 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
     setData(loadPlain());
     setLockState("ready");
-  }, []);
+  }, [cloud]);
+
+  /**
+   * Cloud mode: follow the session.
+   *
+   * supabase-js restores a saved session from storage before firing its first
+   * event, so a returning student is signed in without touching the form —
+   * and the same subscription catches the silent token refresh that keeps
+   * that true for as long as the refresh token lives.
+   */
+  useEffect(() => {
+    if (!cloud) return;
+
+    let live = true;
+
+    const apply = (u: { id: string; email?: string | null } | null) => {
+      if (!live) return;
+      if (u) {
+        setUser({ id: u.id, email: u.email ?? null });
+        setAuthState("signed-in");
+      } else {
+        setUser(null);
+        setAuthState("signed-out");
+        setData(emptyData());
+        setLockState("loading");
+      }
+    };
+
+    void repo
+      .currentSession()
+      .then((session) => apply(session?.user ?? null))
+      .catch(() => apply(null));
+
+    const unsubscribe = repo.onAuthChange(apply);
+
+    return () => {
+      live = false;
+      unsubscribe();
+    };
+  }, [cloud]);
+
+  /** Pull the account's rows once signed in, migrating a local hub on first run. */
+  useEffect(() => {
+    if (!cloud || authState !== "signed-in" || user == null) return;
+
+    let live = true;
+
+    void (async () => {
+      try {
+        let remote = await repo.fetchAll();
+
+        // First sign-in on a device that was used offline: carry that work up
+        // rather than stranding it. Only when the account is still untouched,
+        // so a second device cannot duplicate rows it already synced.
+        if (isEmpty(remote)) {
+          const local = loadPlain();
+          if (!isEmpty(local)) {
+            await repo.migrateLocalData(local);
+            remote = await repo.fetchAll();
+          }
+        }
+
+        if (!live) return;
+        setData(remote);
+        setLockState("ready");
+      } catch (e) {
+        if (!live) return;
+        setSyncError(message(e));
+        setLockState("ready");
+      }
+    })();
+
+    return () => {
+      live = false;
+    };
+  }, [cloud, authState, user]);
+
+  /* ---------------------------------------------------------------------- */
+  /* Persist (local mode only)                                              */
+  /* ---------------------------------------------------------------------- */
 
   // Persisting is async once a password is set, so writes are sequenced
   // through a ref: a fast edit must never let an older blob land last and
@@ -167,7 +305,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const writeSeq = useRef(0);
 
   useEffect(() => {
-    if (lockState !== "ready") return;
+    if (cloud || lockState !== "ready") return;
 
     const serialised = JSON.stringify(data);
     const vaultKey = cryptoRef.current;
@@ -192,9 +330,20 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         // Encryption or storage failed. Better to keep the last good
         // ciphertext than to write something unreadable over it.
       });
-  }, [data, lockState]);
+  }, [cloud, data, lockState]);
 
   const mutate = useCallback((fn: (d: AppData) => AppData) => setData(fn), []);
+
+  /**
+   * Sends a write to the server behind a fire-and-forget mutator.
+   *
+   * Local state has already moved by the time this runs, so a failure leaves
+   * the screen ahead of the database. Surfacing it beats silently diverging —
+   * the banner tells the student to reload.
+   */
+  const push = useCallback((work: Promise<unknown>) => {
+    void work.catch((e) => setSyncError(message(e)));
+  }, []);
 
   const store = useMemo<Store>(() => {
     const upsert = <T extends { id: ID }>(list: T[], id: ID, patch: Partial<T>) =>
@@ -203,61 +352,159 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     return {
       ...data,
       ready,
+      backend: cloud ? "cloud" : "local",
+      authState,
+      user,
+      syncError,
+      clearSyncError: () => setSyncError(null),
 
-      addTask: (t) =>
+      signIn: async (email, password) => {
+        await repo.signIn(email, password);
+      },
+
+      signUp: async (email, password, name) => {
+        const result = await repo.signUp(email, password, name);
+        // With email confirmation on, Supabase returns a user but no session.
+        // The caller shows "check your inbox" rather than a blank hub.
+        return result.session == null;
+      },
+
+      signOut: async () => {
+        await repo.signOut();
+      },
+
+      addTask: (t) => {
+        if (cloud) {
+          // The id is assigned by Postgres, so the row is appended once it
+          // comes back rather than invented here and reconciled later.
+          push(
+            repo
+              .createTask(t)
+              .then((task) => mutate((d) => ({ ...d, tasks: [...d.tasks, task] }))),
+          );
+          return;
+        }
         mutate((d) => ({
           ...d,
           tasks: [
             ...d.tasks,
             { ...t, id: uid(), createdAt: new Date().toISOString(), completedAt: null },
           ],
-        })),
-      updateTask: (id, patch) => mutate((d) => ({ ...d, tasks: upsert(d.tasks, id, patch) })),
-      deleteTask: (id) => mutate((d) => ({ ...d, tasks: d.tasks.filter((t) => t.id !== id) })),
-      toggleTask: (id) =>
-        mutate((d) => ({
-          ...d,
-          tasks: d.tasks.map((t) => {
-            if (t.id !== id) return t;
-            const done = t.status === "completed";
-            return {
-              ...t,
-              status: done ? "not_started" : "completed",
-              completedAt: done ? null : new Date().toISOString().slice(0, 10),
-            };
-          }),
-        })),
+        }));
+      },
+      updateTask: (id, patch) => {
+        mutate((d) => ({ ...d, tasks: upsert(d.tasks, id, patch) }));
+        if (cloud) push(repo.updateTask(id, patch));
+      },
+      deleteTask: (id) => {
+        mutate((d) => ({ ...d, tasks: d.tasks.filter((t) => t.id !== id) }));
+        if (cloud) push(repo.deleteTask(id));
+      },
+      toggleTask: (id) => {
+        const current = data.tasks.find((t) => t.id === id);
+        if (!current) return;
+        const done = current.status === "completed";
+        const patch: Partial<Task> = {
+          status: done ? "not_started" : "completed",
+          completedAt: done ? null : new Date().toISOString().slice(0, 10),
+        };
+        mutate((d) => ({ ...d, tasks: upsert(d.tasks, id, patch) }));
+        if (cloud) push(repo.updateTask(id, patch));
+      },
 
-      addCourse: (c) => mutate((d) => ({ ...d, courses: [...d.courses, { ...c, id: uid() }] })),
-      updateCourse: (id, patch) =>
-        mutate((d) => ({ ...d, courses: upsert(d.courses, id, patch) })),
+      addCourse: (c) => {
+        if (cloud) {
+          push(
+            repo
+              .createCourse(c)
+              .then((course) => mutate((d) => ({ ...d, courses: [...d.courses, course] }))),
+          );
+          return;
+        }
+        mutate((d) => ({ ...d, courses: [...d.courses, { ...c, id: uid() }] }));
+      },
+      updateCourse: (id, patch) => {
+        mutate((d) => ({ ...d, courses: upsert(d.courses, id, patch) }));
+        if (cloud) push(repo.updateCourse(id, patch));
+      },
       // Deleting a course would orphan its tasks and grades, so those go too —
       // matching the ON DELETE CASCADE in the SQL schema.
-      deleteCourse: (id) =>
+      deleteCourse: (id) => {
         mutate((d) => ({
           ...d,
           courses: d.courses.filter((c) => c.id !== id),
           tasks: d.tasks.filter((t) => t.courseId !== id),
           grades: d.grades.filter((g) => g.courseId !== id),
-        })),
+        }));
+        if (cloud) push(repo.deleteCourse(id));
+      },
 
-      addGrade: (g) => mutate((d) => ({ ...d, grades: [...d.grades, { ...g, id: uid() }] })),
-      updateGrade: (id, patch) =>
-        mutate((d) => ({ ...d, grades: upsert(d.grades, id, patch) })),
-      deleteGrade: (id) =>
-        mutate((d) => ({ ...d, grades: d.grades.filter((g) => g.id !== id) })),
+      addGrade: (g) => {
+        if (cloud) {
+          push(
+            repo
+              .createGrade(g)
+              .then((grade) => mutate((d) => ({ ...d, grades: [...d.grades, grade] }))),
+          );
+          return;
+        }
+        mutate((d) => ({ ...d, grades: [...d.grades, { ...g, id: uid() }] }));
+      },
+      updateGrade: (id, patch) => {
+        mutate((d) => ({ ...d, grades: upsert(d.grades, id, patch) }));
+        if (cloud) push(repo.updateGrade(id, patch));
+      },
+      deleteGrade: (id) => {
+        mutate((d) => ({ ...d, grades: d.grades.filter((g) => g.id !== id) }));
+        if (cloud) push(repo.deleteGrade(id));
+      },
 
-      addUniversity: (u) =>
-        mutate((d) => ({ ...d, universities: [...d.universities, { ...u, id: uid() }] })),
-      updateUniversity: (id, patch) =>
-        mutate((d) => ({ ...d, universities: upsert(d.universities, id, patch) })),
-      deleteUniversity: (id) =>
-        mutate((d) => ({ ...d, universities: d.universities.filter((u) => u.id !== id) })),
+      addUniversity: (u) => {
+        if (cloud) {
+          push(
+            repo
+              .createUniversity(u)
+              .then((uni) => mutate((d) => ({ ...d, universities: [...d.universities, uni] }))),
+          );
+          return;
+        }
+        mutate((d) => ({ ...d, universities: [...d.universities, { ...u, id: uid() }] }));
+      },
+      updateUniversity: (id, patch) => {
+        mutate((d) => ({ ...d, universities: upsert(d.universities, id, patch) }));
+        if (cloud) push(repo.updateUniversity(id, patch));
+      },
+      deleteUniversity: (id) => {
+        mutate((d) => ({ ...d, universities: d.universities.filter((u) => u.id !== id) }));
+        if (cloud) push(repo.deleteUniversity(id));
+      },
 
-      updateProfile: (patch) => mutate((d) => ({ ...d, profile: { ...d.profile, ...patch } })),
+      updateProfile: (patch) => {
+        mutate((d) => ({ ...d, profile: { ...d.profile, ...patch } }));
+        if (cloud && patch.name !== undefined) push(repo.updateProfileName(patch.name));
+      },
 
-      resetToSample: () => setData(seedData()),
-      clearAll: () => setData(emptyData()),
+      resetToSample: () => {
+        const sample = seedData();
+        if (cloud) {
+          // Wipe first, or the sample lands on top of whatever is there.
+          push(
+            wipeCloud(data)
+              .then(() => repo.migrateLocalData(sample))
+              .then(() => repo.fetchAll())
+              .then(setData),
+          );
+          return;
+        }
+        setData(sample);
+      },
+      clearAll: () => {
+        if (cloud) {
+          push(wipeCloud(data).then(() => setData(emptyData())));
+          return;
+        }
+        setData(emptyData());
+      },
       exportJSON: () => JSON.stringify(data, null, 2),
 
       lockState,
@@ -347,9 +594,36 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         setLockState("ready");
       },
     };
-  }, [data, ready, mutate, lockState, hasPassword, passwordAsked]);
+  }, [
+    data,
+    ready,
+    mutate,
+    push,
+    cloud,
+    authState,
+    user,
+    syncError,
+    lockState,
+    hasPassword,
+    passwordAsked,
+  ]);
 
   return <StoreContext.Provider value={store}>{children}</StoreContext.Provider>;
+}
+
+/**
+ * Removes every row the account owns.
+ *
+ * Courses go last: tasks and grades hang off them by foreign key, and letting
+ * the cascade take them would race the explicit deletes already in flight.
+ */
+async function wipeCloud(current: AppData): Promise<void> {
+  await Promise.all([
+    ...current.tasks.map((t) => repo.deleteTask(t.id)),
+    ...current.grades.map((g) => repo.deleteGrade(g.id)),
+    ...current.universities.map((u) => repo.deleteUniversity(u.id)),
+  ]);
+  await Promise.all(current.courses.map((c) => repo.deleteCourse(c.id)));
 }
 
 export function useStore(): Store {

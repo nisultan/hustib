@@ -7,9 +7,11 @@ import { ACCENTS, DENSITIES, THEMES, Theme } from "@/lib/appearance";
 import { useAppearance } from "@/lib/use-appearance";
 import { openTour } from "@/components/Tour";
 import { PasswordSection } from "@/components/PasswordSection";
+import { AccountSection } from "@/components/AccountSection";
 
 export default function SettingsPage() {
   const store = useStore();
+  const cloud = store.backend === "cloud";
   const [name, setName] = useState("");
   const { theme, setTheme, accent, setAccent, density, setDensity } = useAppearance();
   const [confirmClear, setConfirmClear] = useState(false);
@@ -144,16 +146,17 @@ export default function SettingsPage() {
       </section>
 
       <section className="mb-8">
-        <SectionTitle>Password</SectionTitle>
-        <PasswordSection />
+        <SectionTitle>{cloud ? "Account" : "Password"}</SectionTitle>
+        {cloud ? <AccountSection /> : <PasswordSection />}
       </section>
 
       <section className="mb-8">
         <SectionTitle>Your data</SectionTitle>
         <Panel className="px-4 py-4">
           <p className="text-sm text-ink-2">
-            Everything lives in this browser — nothing is uploaded. That means it is private,
-            but it also means clearing site data removes it, so export a copy if it matters.
+            {cloud
+              ? "Everything is stored in your account, so it survives clearing this browser and follows you to any device you sign in on."
+              : "Everything lives in this browser — nothing is uploaded. That means it is private, but it also means clearing site data removes it, so export a copy if it matters."}
           </p>
           <p className="nums mt-3 text-xs text-ink-3">
             {store.courses.length} courses · {store.tasks.length} tasks · {store.grades.length}{" "}
@@ -196,17 +199,29 @@ export default function SettingsPage() {
       <section>
         <SectionTitle>Syncing across devices</SectionTitle>
         <Panel className="px-4 py-4 text-sm leading-relaxed text-ink-2">
-          <p>
-            This version stores data locally. The Postgres schema for multi-device sync —
-            tables, relationships and row-level security so every record belongs to its own user
-            — is in{" "}
-            <code className="rounded bg-panel-2 px-1 py-0.5 text-xs">supabase/schema.sql</code>.
-            Running it against a Supabase project and swapping the mutators in{" "}
-            <code className="rounded bg-panel-2 px-1 py-0.5 text-xs">src/lib/store.tsx</code>{" "}
-            for queries is the only change the rest of the app needs.
-          </p>
+          {cloud ? (
+            <p>
+              Sync is on. Every change is written to your account as you make it, so opening the
+              hub on a phone or another laptop and signing in shows the same courses, tasks and
+              grades.
+            </p>
+          ) : (
+            <p>
+              This build stores data in the browser only. Adding{" "}
+              <code className="rounded bg-panel-2 px-1 py-0.5 text-xs">
+                NEXT_PUBLIC_SUPABASE_URL
+              </code>{" "}
+              and{" "}
+              <code className="rounded bg-panel-2 px-1 py-0.5 text-xs">
+                NEXT_PUBLIC_SUPABASE_ANON_KEY
+              </code>{" "}
+              turns on accounts and multi-device sync, and whatever is already in this browser is
+              carried up on your first sign in.
+            </p>
+          )}
         </Panel>
       </section>
+
     </div>
   );
 }
