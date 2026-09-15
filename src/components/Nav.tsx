@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { ReactNode } from "react";
 import { Logo } from "./Logo";
+import { useNavCollapsed } from "@/lib/use-nav";
 
 interface NavItem {
   href: string;
@@ -118,6 +119,7 @@ function isActive(pathname: string, href: string): boolean {
 
 export function Sidebar() {
   const pathname = usePathname();
+  const [collapsed, toggle] = useNavCollapsed();
 
   const link = (item: NavItem) => {
     const active = isActive(pathname, item.href);
@@ -126,23 +128,48 @@ export function Sidebar() {
         key={item.href}
         href={item.href}
         aria-current={active ? "page" : undefined}
-        className={`relative flex items-center gap-2.5 rounded-lg px-2.5 py-[7px] text-[13px] font-medium transition-[background-color,color] duration-150 ${
+        // The label stays in the DOM when collapsed rather than being removed:
+        // it is what screen readers announce, and animating its width is what
+        // makes the collapse a movement instead of a jump.
+        title={collapsed ? item.label : undefined}
+        className={`relative flex items-center gap-2.5 rounded-lg py-[7px] text-[13px] font-medium transition-[background-color,color,padding] duration-200 ${
+          collapsed ? "justify-center px-0" : "px-2.5"
+        } ${
           active
             ? "bg-accent-soft text-accent-text before:absolute before:inset-y-1.5 before:left-0 before:w-[3px] before:rounded-full before:bg-accent"
             : "text-ink-2 hover:bg-panel-2 hover:text-ink"
         }`}
       >
         {item.icon}
-        {item.label}
+        <span
+          className={`overflow-hidden whitespace-nowrap transition-[max-width,opacity] duration-200 ${
+            collapsed ? "max-w-0 opacity-0" : "max-w-[140px] opacity-100"
+          }`}
+        >
+          {item.label}
+        </span>
       </Link>
     );
   };
 
   return (
-    <aside className="fixed inset-y-0 left-0 z-40 hidden w-[232px] flex-col border-r border-line bg-panel px-3 py-4 shadow-[var(--shadow)] md:flex">
-      <Link href="/" className="mb-6 flex items-center gap-2 px-2.5">
+    <aside
+      className={`fixed inset-y-0 left-0 z-40 hidden w-[var(--nav-w)] flex-col overflow-hidden border-r border-line bg-panel py-4 shadow-[var(--shadow)] transition-[width,padding] duration-200 md:flex ${
+        collapsed ? "px-2" : "px-3"
+      }`}
+    >
+      <Link
+        href="/"
+        className={`mb-6 flex items-center gap-2 ${collapsed ? "justify-center" : "px-2.5"}`}
+      >
         <Logo />
-        <span className="text-[13px] font-semibold tracking-tight">IB Learner</span>
+        <span
+          className={`overflow-hidden whitespace-nowrap text-[13px] font-semibold tracking-tight transition-[max-width,opacity] duration-200 ${
+            collapsed ? "max-w-0 opacity-0" : "max-w-[140px] opacity-100"
+          }`}
+        >
+          IB Learner
+        </span>
       </Link>
 
       <nav className="flex flex-col gap-0.5">{PRIMARY.map(link)}</nav>
@@ -152,6 +179,40 @@ export function Sidebar() {
 
       <div className="mt-auto border-t border-line pt-3">
         <nav className="flex flex-col gap-0.5">{TERTIARY.map(link)}</nav>
+
+        <button
+          onClick={toggle}
+          aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+          title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+          aria-expanded={!collapsed}
+          className={`mt-1 flex w-full items-center gap-2.5 rounded-lg py-[7px] text-[13px] font-medium text-ink-3 transition-colors hover:bg-panel-2 hover:text-ink ${
+            collapsed ? "justify-center px-0" : "px-2.5"
+          }`}
+        >
+          <svg
+            viewBox="0 0 16 16"
+            aria-hidden
+            className={`size-4 shrink-0 transition-transform duration-200 ${
+              collapsed ? "rotate-180" : ""
+            }`}
+          >
+            <path
+              d="M10 3.5 L5.5 8 L10 12.5"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.6"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+          <span
+            className={`overflow-hidden whitespace-nowrap transition-[max-width,opacity] duration-200 ${
+              collapsed ? "max-w-0 opacity-0" : "max-w-[140px] opacity-100"
+            }`}
+          >
+            Collapse
+          </span>
+        </button>
       </div>
     </aside>
   );

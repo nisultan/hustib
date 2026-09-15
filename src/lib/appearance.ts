@@ -143,6 +143,9 @@ function read<T extends string>(key: string, allowed: T[], fallback: T): T {
  * light, a green accent or large blocks would see the defaults flash first
  * while the bundle loads. Kept as a string because it has to be inlined.
  */
+/** Whether the sidebar is collapsed to icons. Read before first paint. */
+export const NAV_KEY = "iblearner.navCollapsed";
+
 export const APPEARANCE_INIT_SCRIPT = `
 (function () {
   try {
@@ -156,6 +159,7 @@ export const APPEARANCE_INIT_SCRIPT = `
     if (a) d.setAttribute("data-accent", a);
     var s = localStorage.getItem("${DENSITY_KEY}");
     if (s) d.setAttribute("data-density", s);
+    if (localStorage.getItem("${NAV_KEY}") === "1") d.setAttribute("data-nav", "collapsed");
   } catch (e) {}
 })();
 `;

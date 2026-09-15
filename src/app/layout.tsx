@@ -37,7 +37,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <Lock>
             <Sidebar />
 
-            <div className="md:pl-[232px]">
+            <div className="transition-[padding] duration-200 md:pl-[var(--nav-w)]">
               <header className="sticky top-0 z-30 flex items-center gap-3 border-b border-line bg-bg/85 px-4 py-2.5 backdrop-blur-md md:px-8">
                 <Logo className="md:hidden" />
                 <div className="flex-1 md:flex-none">

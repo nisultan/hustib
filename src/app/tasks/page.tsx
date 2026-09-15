@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useStore } from "@/lib/store";
 import { todayISO } from "@/lib/dates";
 import { PRIORITIES, PRIORITY_LABEL, Priority, Task } from "@/lib/types";
-import { EmptyState, Input, PageHeader, SectionTitle } from "@/components/ui";
+import { EmptyState, Input, PageHeader, SectionTitle, Segmented } from "@/components/ui";
 import { TaskList } from "@/components/TaskItem";
 import { AddTaskButton } from "@/components/TaskDialog";
 
@@ -100,27 +100,7 @@ function TasksInner() {
       />
 
       <div className="mb-5 flex flex-wrap items-center gap-2">
-        <div
-          role="tablist"
-          aria-label="Task views"
-          className="flex flex-wrap gap-1 rounded-lg border border-line bg-panel p-1"
-        >
-          {VIEWS.map((v) => (
-            <button
-              key={v.id}
-              role="tab"
-              aria-selected={view === v.id}
-              onClick={() => setView(v.id)}
-              className={`rounded-md px-2.5 py-1.5 text-[13px] font-medium transition-colors ${
-                view === v.id
-                  ? "bg-accent-soft text-accent-text"
-                  : "text-ink-2 hover:bg-panel-2 hover:text-ink"
-              }`}
-            >
-              {v.label}
-            </button>
-          ))}
-        </div>
+        <Segmented options={VIEWS} value={view} onChange={setView} label="Task views" />
 
         <Input
           value={query}

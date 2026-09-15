@@ -231,7 +231,12 @@ export function TaskDialog({
             />
           </Field>
 
-          <Field label="Time (optional)">
+          <Field
+            label="Time (optional)"
+            // Disabled without explanation just reads as broken, which is how
+            // this one was being reported.
+            hint={draft.dueDate === "" ? "Set a deadline first." : undefined}
+          >
             <Input
               type="time"
               value={draft.dueTime}

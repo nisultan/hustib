@@ -3,6 +3,7 @@
 import { ReactNode, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useMounted } from "@/lib/useMounted";
+import { LogoMark } from "./Logo";
 import {
   Priority,
   PRIORITY_LABEL,
@@ -142,11 +143,87 @@ export function Textarea(props: React.TextareaHTMLAttributes<HTMLTextAreaElement
   );
 }
 
+/**
+ * A native select, with the platform arrow replaced by one of ours.
+ *
+ * The menu it opens is still drawn by the operating system, which is the
+ * point: it is the only dropdown that behaves correctly with a keyboard, a
+ * screen reader and a touch keyboard without reimplementing all three. The
+ * root declares `color-scheme`, so that menu now follows the app theme
+ * instead of arriving white over a dark form.
+ */
 export function Select(props: React.SelectHTMLAttributes<HTMLSelectElement>) {
+  const { className = "", ...rest } = props;
   return (
-    <select {...props} className={`${fieldClass} cursor-pointer ${props.className ?? ""}`}>
-      {props.children}
-    </select>
+    <span className="relative inline-grid w-full items-center">
+      <select
+        {...rest}
+        className={`${fieldClass} w-full cursor-pointer appearance-none pr-8 ${className}`}
+      >
+        {props.children}
+      </select>
+      <svg
+        viewBox="0 0 16 16"
+        aria-hidden
+        className="pointer-events-none absolute right-2.5 size-3.5 justify-self-end text-ink-3"
+      >
+        <path
+          d="M4 6.5 L8 10.5 L12 6.5"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.75"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      </svg>
+    </span>
+  );
+}
+
+/**
+ * Segmented control.
+ *
+ * The selected segment is a raised solid surface rather than a tint, because a
+ * tint at these sizes reads as "slightly different text" — which was the
+ * complaint about the old filter bar. A real fill and a shadow make the
+ * selection the first thing the eye lands on.
+ */
+export function Segmented<T extends string>({
+  options,
+  value,
+  onChange,
+  label,
+}: {
+  options: readonly { id: T; label: string }[];
+  value: T;
+  onChange: (id: T) => void;
+  label: string;
+}) {
+  return (
+    <div
+      role="tablist"
+      aria-label={label}
+      className="inline-flex flex-wrap gap-0.5 rounded-xl border border-line bg-panel-2 p-1"
+    >
+      {options.map((o) => {
+        const selected = value === o.id;
+        return (
+          <button
+            key={o.id}
+            role="tab"
+            aria-selected={selected}
+            onClick={() => onChange(o.id)}
+            className={`rounded-lg px-3 py-1.5 text-[13px] font-medium transition-[background-color,color,box-shadow] duration-150 ${
+              selected
+                ? "bg-panel text-ink shadow-[var(--shadow),var(--edge)]"
+                : "text-ink-2 hover:text-ink"
+            }`}
+          >
+            {o.label}
+          </button>
+        );
+      })}
+    </div>
   );
 }
 
@@ -250,10 +327,13 @@ export function EmptyState({
   action?: ReactNode;
 }) {
   return (
-    <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-line bg-panel-2/40 px-6 py-12 text-center">
-      <p className="text-sm font-medium text-ink-2">{title}</p>
-      {hint && <p className="mt-1 max-w-sm text-sm text-ink-3">{hint}</p>}
-      {action && <div className="mt-4">{action}</div>}
+    <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-line bg-panel-2/50 px-6 py-8 text-center">
+      <span className="mb-2.5 grid size-8 place-items-center rounded-lg bg-accent-soft text-accent-text">
+        <LogoMark className="size-4" />
+      </span>
+      <p className="text-sm font-medium text-ink">{title}</p>
+      {hint && <p className="mt-1 max-w-xs text-[13px] leading-relaxed text-ink-2">{hint}</p>}
+      {action && <div className="mt-3.5">{action}</div>}
     </div>
   );
 }

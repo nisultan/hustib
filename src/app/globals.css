@@ -9,11 +9,11 @@
   --bg: #faf9f7;
   --panel: #ffffff;
   --panel-2: #f5f4f1;
-  --border: #e8e6e0;
-  --border-strong: #d7d4cb;
-  --text: #1b1a18;
-  --text-2: #5f5d57;
-  --text-3: #8c8a82;
+  --border: #e0ddd5;
+  --border-strong: #c9c5ba;
+  --text: #171614;
+  --text-2: #4f4d47;
+  --text-3: #7a776f;
   --accent: #5b5bd6;
   --accent-soft: #eeeefc;
   --accent-text: #4a4ac4;
@@ -34,6 +34,23 @@
      second border, but only where a real one would be lit. */
   --edge: inset 0 1px 0 rgba(255, 255, 255, 0.7);
   --sheen: linear-gradient(180deg, rgba(255, 255, 255, 0.6), rgba(255, 255, 255, 0));
+
+  /*
+   * The select popup, the date and time pickers and the scrollbars are drawn
+   * by the operating system, not by us. Without this it paints them light
+   * over a dark app, which is the white menu on the dark form.
+   */
+  color-scheme: light;
+
+  /*
+   * Sidebar width, read by both the sidebar and the content beside it so the
+   * two can never disagree. Set before first paint from the saved choice.
+   */
+  --nav-w: 232px;
+}
+
+:root[data-nav="collapsed"] {
+  --nav-w: 60px;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -41,11 +58,11 @@
     --bg: #0c0c0e;
     --panel: #151517;
     --panel-2: #1c1c1f;
-    --border: #28282c;
-    --border-strong: #3a3a40;
-    --text: #f3f2f0;
-    --text-2: #a3a19c;
-    --text-3: #73716c;
+    --border: #2e2e33;
+    --border-strong: #45454c;
+    --text: #f5f4f2;
+    --text-2: #b0aea8;
+    --text-3: #85837d;
     --accent: #7b7bf0;
     --accent-soft: #1e1e35;
     --accent-text: #a5a5f7;
@@ -64,6 +81,8 @@
     --shadow-lg: 0 4px 10px rgba(0, 0, 0, 0.5), 0 20px 48px -12px rgba(0, 0, 0, 0.7);
     --edge: inset 0 1px 0 rgba(255, 255, 255, 0.05);
     --sheen: linear-gradient(180deg, rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0));
+
+    color-scheme: dark;
   }
 }
 
@@ -71,11 +90,11 @@
   --bg: #0c0c0e;
   --panel: #151517;
   --panel-2: #1c1c1f;
-  --border: #28282c;
-  --border-strong: #3a3a40;
-  --text: #f3f2f0;
-  --text-2: #a3a19c;
-  --text-3: #73716c;
+  --border: #2e2e33;
+  --border-strong: #45454c;
+  --text: #f5f4f2;
+  --text-2: #b0aea8;
+  --text-3: #85837d;
   --accent: #7b7bf0;
   --accent-soft: #1e1e35;
   --accent-text: #a5a5f7;
@@ -94,6 +113,8 @@
   --shadow-lg: 0 4px 10px rgba(0, 0, 0, 0.5), 0 20px 48px -12px rgba(0, 0, 0, 0.7);
   --edge: inset 0 1px 0 rgba(255, 255, 255, 0.05);
   --sheen: linear-gradient(180deg, rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0));
+
+  color-scheme: dark;
 }
 
 @theme inline {
