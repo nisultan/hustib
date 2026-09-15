@@ -1,8 +1,13 @@
--- IB Learner — Postgres schema for Supabase.
+-- LifeOS — Postgres schema for Supabase.
 --
--- Run this in the Supabase SQL editor to create the multi-device backend.
--- Every table carries a user_id and is closed by row-level security, so a
--- student can only ever read or write their own rows.
+-- Run this in the Supabase SQL editor to create the multi-device backend from
+-- nothing. It is not re-runnable: a second run fails on the enum types below,
+-- which is the right behaviour for a file that means "build the database".
+-- To add something to a database that already exists, use supabase/migrations
+-- rather than editing and re-running this.
+--
+-- Every table carries a user_id and is closed by row-level security, so one
+-- account can only ever read or write its own rows.
 
 -- ---------------------------------------------------------------------------
 -- Enums
