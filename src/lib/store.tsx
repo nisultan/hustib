@@ -10,7 +10,7 @@ import {
   useCallback,
   ReactNode,
 } from "react";
-import { AppData, Course, Grade, Task, University, Profile, ID } from "./types";
+import { AppData, Course, Day, Grade, Task, University, Profile, ID } from "./types";
 import { seedData } from "./seed";
 import { isSupabaseConfigured } from "./supabase/client";
 import * as repo from "./supabase/repository";
@@ -101,6 +101,16 @@ export interface Store extends AppData {
   updateUniversity(id: ID, patch: Partial<University>): void;
   deleteUniversity(id: ID): void;
 
+  /**
+   * Creates or edits the entry for a date.
+   *
+   * One upsert rather than add/update, because the journal never asks whether
+   * a day exists — you type into 15 September and it either was there or it
+   * is now.
+   */
+  setDay(date: string, patch: Partial<Omit<Day, "date">>): void;
+  deleteDay(date: string): void;
+
   updateProfile(patch: Partial<Profile>): void;
 
   resetToSample(): void;
@@ -126,7 +136,14 @@ export interface Store extends AppData {
 const StoreContext = createContext<Store | null>(null);
 
 function emptyData(): AppData {
-  return { profile: { name: "there" }, courses: [], tasks: [], grades: [], universities: [] };
+  return {
+    profile: { name: "there" },
+    courses: [],
+    tasks: [],
+    grades: [],
+    universities: [],
+    days: [],
+  };
 }
 
 function isEmpty(d: AppData): boolean {
@@ -134,7 +151,8 @@ function isEmpty(d: AppData): boolean {
     d.courses.length === 0 &&
     d.tasks.length === 0 &&
     d.grades.length === 0 &&
-    d.universities.length === 0
+    d.universities.length === 0 &&
+    d.days.length === 0
   );
 }
 
@@ -479,6 +497,26 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         if (cloud) push(repo.deleteUniversity(id));
       },
 
+      setDay: (date, patch) => {
+        mutate((d) => {
+          const existing = d.days.find((x) => x.date === date);
+          const next: Day = existing
+            ? { ...existing, ...patch }
+            : { date, weight: null, reflection: [], ...patch };
+          const days = existing
+            ? d.days.map((x) => (x.date === date ? next : x))
+            : [...d.days, next];
+          // Newest first, which is the order the journal reads in.
+          days.sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0));
+          return { ...d, days };
+        });
+        if (cloud) push(repo.upsertDay(date, patch));
+      },
+      deleteDay: (date) => {
+        mutate((d) => ({ ...d, days: d.days.filter((x) => x.date !== date) }));
+        if (cloud) push(repo.deleteDay(date));
+      },
+
       updateProfile: (patch) => {
         mutate((d) => ({ ...d, profile: { ...d.profile, ...patch } }));
         if (cloud && patch.name !== undefined) push(repo.updateProfileName(patch.name));
@@ -622,6 +660,7 @@ async function wipeCloud(current: AppData): Promise<void> {
     ...current.tasks.map((t) => repo.deleteTask(t.id)),
     ...current.grades.map((g) => repo.deleteGrade(g.id)),
     ...current.universities.map((u) => repo.deleteUniversity(u.id)),
+    ...current.days.map((d) => repo.deleteDay(d.date)),
   ]);
   await Promise.all(current.courses.map((c) => repo.deleteCourse(c.id)));
 }

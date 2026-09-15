@@ -67,6 +67,26 @@ export function relativeLabel(iso: string): string {
 }
 
 /**
+ * Like `relativeLabel`, but for dates that have simply happened.
+ *
+ * A deadline three days ago is overdue; a journal entry three days ago is
+ * just Saturday. Same arithmetic, different vocabulary — and using the
+ * deadline wording in the journal made every past entry read as a failure.
+ */
+export function pastLabel(iso: string): string {
+  const n = daysUntil(iso);
+  if (n === 0) return "Today";
+  if (n === 1) return "Tomorrow";
+  if (n === -1) return "Yesterday";
+  if (n > 1) return `In ${n} days`;
+  const ago = Math.abs(n);
+  if (ago < 7) return `${ago} days ago`;
+  if (ago < 14) return "Last week";
+  if (ago < 61) return `${Math.round(ago / 7)} weeks ago`;
+  return formatDate(iso);
+}
+
+/**
  * How far away a date is, in words, for use *alongside* the date itself.
  * `relativeLabel` falls back to printing the date once it is more than a week
  * out, which would read as "Jan 5, 2027 (Jan 5, 2027)" next to a date; this

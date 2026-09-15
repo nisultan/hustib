@@ -85,6 +85,17 @@ const PRIMARY: NavItem[] = [
 
 const SECONDARY: NavItem[] = [
   {
+    href: "/journal",
+    label: "Journal",
+    icon: (
+      <Icon>
+        <path d="M5 3.5h9a1 1 0 0 1 1 1v11a1 1 0 0 1-1 1H5z" {...stroke} />
+        <path d="M5 3.5a1.5 1.5 0 0 0 0 3h1.5v-3z" {...stroke} />
+        <path d="M8.5 8h3.5M8.5 11h3.5" {...stroke} />
+      </Icon>
+    ),
+  },
+  {
     href: "/recommendations",
     label: "Recommendations",
     icon: (
@@ -168,7 +179,7 @@ export function Sidebar() {
             collapsed ? "max-w-0 opacity-0" : "max-w-[140px] opacity-100"
           }`}
         >
-          IB Learner
+          LifeOS
         </span>
       </Link>
 

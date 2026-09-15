@@ -174,6 +174,30 @@ create table recommendations (
 );
 
 -- ---------------------------------------------------------------------------
+-- Journal
+--
+-- One row per calendar day, keyed by (user, date) rather than by a surrogate
+-- id: there is exactly one 15 September, and making that a unique constraint
+-- means a second weigh-in updates the morning rather than competing with it.
+--
+-- The reflection is jsonb because it is a list of typed blocks the client
+-- owns end to end — nothing in SQL ever queries inside it, so giving each
+-- block a row would buy ordering headaches and no reads.
+-- ---------------------------------------------------------------------------
+
+create table days (
+  user_id     uuid not null references auth.users on delete cascade,
+  date        date not null,
+  -- Kilograms. numeric, not float: 72.4 should come back as 72.4.
+  weight      numeric(5, 2),
+  reflection  jsonb not null default '[]'::jsonb,
+  created_at  timestamptz not null default now(),
+  updated_at  timestamptz not null default now(),
+  primary key (user_id, date),
+  constraint weight_is_plausible check (weight is null or (weight > 0 and weight < 700))
+);
+
+-- ---------------------------------------------------------------------------
 -- Indexes
 --
 -- Every query the app makes is scoped to one user, and the hot paths are
@@ -190,6 +214,8 @@ create index on grade_categories (user_id, course_id);
 create index on universities (user_id, deadline);
 create index on university_notes (user_id, university_id);
 create index on recommendations (user_id) where dismissed_at is null;
+-- The journal always reads newest first, and weight charts scan a range.
+create index on days (user_id, date desc);
 
 -- ---------------------------------------------------------------------------
 -- Row-level security
@@ -206,7 +232,8 @@ begin
   foreach t in array array[
     'courses', 'lessons', 'tasks', 'task_notes',
     'grades', 'grade_categories',
-    'universities', 'university_notes', 'recommendations'
+    'universities', 'university_notes', 'recommendations',
+    'days'
   ]
   loop
     execute format('alter table %I enable row level security', t);
@@ -245,6 +272,7 @@ alter table grade_categories alter column user_id set default auth.uid();
 alter table universities     alter column user_id set default auth.uid();
 alter table university_notes alter column user_id set default auth.uid();
 alter table recommendations  alter column user_id set default auth.uid();
+alter table days             alter column user_id set default auth.uid();
 
 -- ---------------------------------------------------------------------------
 -- Create a profile row whenever someone signs up.

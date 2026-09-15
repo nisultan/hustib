@@ -25,7 +25,7 @@ export default function SettingsPage() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `iblearner-${new Date().toISOString().slice(0, 10)}.json`;
+    a.download = `lifeos-${new Date().toISOString().slice(0, 10)}.json`;
     a.click();
     URL.revokeObjectURL(url);
   };

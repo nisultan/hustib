@@ -133,10 +133,54 @@ export interface Profile {
   name: string;
 }
 
+/**
+ * A block in a day's reflection.
+ *
+ * Reflection is stored as a list of blocks rather than one string because
+ * that is what makes the editor feel like a document: a heading, a bullet and
+ * a checkbox each know what they are, so Enter, Backspace and the checkbox
+ * can behave differently in each without parsing prose on every keystroke.
+ */
+export type BlockType = "text" | "h2" | "h3" | "bullet" | "todo" | "quote" | "divider";
+
+export const BLOCK_LABEL: Record<BlockType, string> = {
+  text: "Text",
+  h2: "Heading",
+  h3: "Subheading",
+  bullet: "Bulleted list",
+  todo: "To-do",
+  quote: "Quote",
+  divider: "Divider",
+};
+
+export interface Block {
+  id: ID;
+  type: BlockType;
+  text: string;
+  /** Only meaningful for "todo". */
+  done: boolean;
+}
+
+/**
+ * One day of the journal.
+ *
+ * Keyed by date rather than by id: there is exactly one 15 September, and
+ * making that structural means logging a weight twice cannot produce two
+ * competing rows for the same morning.
+ */
+export interface Day {
+  /** "YYYY-MM-DD". Unique across the collection. */
+  date: string;
+  /** Kilograms. Null when the day has a reflection but no weigh-in. */
+  weight: number | null;
+  reflection: Block[];
+}
+
 export interface AppData {
   profile: Profile;
   courses: Course[];
   tasks: Task[];
   grades: Grade[];
   universities: University[];
+  days: Day[];
 }

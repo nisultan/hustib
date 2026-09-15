@@ -1,4 +1,4 @@
-import { AppData } from "./types";
+import { AppData, Block, Day } from "./types";
 import { addDays, todayISO } from "./dates";
 
 /**
@@ -247,7 +247,45 @@ export function seedData(): AppData {
         "https://nu.edu.kz",
       ),
     ],
+    // A fortnight of weigh-ins, so the trend line and the table have
+    // something to demonstrate, with reflections on only some days —
+    // which is how a journal actually gets kept.
+    days: [
+      day(t, 72.4, [
+        block("h2", "Today"),
+        block(
+          "text",
+          "Steady week. The physics backlog is the thing hanging over everything else.",
+        ),
+        block("todo", "Finish integration exercises", true),
+        block("todo", "Read one university essay prompt"),
+      ]),
+      day(addDays(t, -1), 72.6, []),
+      day(addDays(t, -2), 72.5, [
+        block("quote", "Consistency beats intensity."),
+        block("text", "Slept badly, still trained. Counting that."),
+      ]),
+      day(addDays(t, -3), 72.9, []),
+      day(addDays(t, -4), 73.1, []),
+      day(addDays(t, -6), 73.4, [block("text", "Rest day. Ate more than planned, no guilt.")]),
+      day(addDays(t, -8), 73.2, []),
+      day(addDays(t, -10), 73.8, []),
+      day(addDays(t, -13), 74.1, [
+        block("h2", "Starting point"),
+        block("text", "Writing the number down so there is something to compare against."),
+      ]),
+    ],
   };
+}
+
+let blockSeq = 0;
+
+function block(type: Block["type"], text: string, done = false): Block {
+  return { id: `b-${++blockSeq}`, type, text, done };
+}
+
+function day(date: string, weight: number | null, reflection: Block[]): Day {
+  return { date, weight, reflection };
 }
 
 function task(

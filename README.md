@@ -1,6 +1,6 @@
-# IB Learner
+# LifeOS
 
-A student productivity hub. One place for tasks, notes, grades and university
+A personal operating system. One place for tasks, notes, grades and university
 applications — and, more to the point, a clear answer to *what should I work on next*.
 
 The dashboard is the product. Everything else feeds it.

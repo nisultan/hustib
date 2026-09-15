@@ -1,9 +1,9 @@
 "use client";
 
-import { AppData, Course, Grade, Task, University } from "../types";
+import { AppData, Block, BlockType, Course, Day, Grade, Task, University } from "../types";
 import type { User } from "@supabase/supabase-js";
 import { getSupabase } from "./client";
-import { CourseRow, GradeRow, LessonRow, TaskRow, UniversityRow } from "./types";
+import { CourseRow, DayRow, GradeRow, LessonRow, TaskRow, UniversityRow } from "./types";
 
 /**
  * The Supabase implementation of the same operations `store.tsx` performs
@@ -115,13 +115,14 @@ export async function currentUser() {
 export async function fetchAll(): Promise<AppData> {
   const supabase = client();
 
-  const [profile, courses, lessons, tasks, grades, universities] = await Promise.all([
+  const [profile, courses, lessons, tasks, grades, universities, days] = await Promise.all([
     supabase.from("profiles").select("*").maybeSingle(),
     supabase.from("courses").select("*").order("created_at"),
     supabase.from("lessons").select("*").order("position"),
     supabase.from("tasks").select("*").order("due_date", { nullsFirst: false }),
     supabase.from("grades").select("*").order("date", { ascending: false }),
     supabase.from("universities").select("*").order("deadline", { nullsFirst: false }),
+    supabase.from("days").select("*").order("date", { ascending: false }),
   ]);
 
   const firstError =
@@ -130,7 +131,8 @@ export async function fetchAll(): Promise<AppData> {
     lessons.error ??
     tasks.error ??
     grades.error ??
-    universities.error;
+    universities.error ??
+    days.error;
   if (firstError) throw firstError;
 
   const lessonsByCourse = new Map<string, string[]>();
@@ -148,6 +150,7 @@ export async function fetchAll(): Promise<AppData> {
     tasks: ((tasks.data ?? []) as TaskRow[]).map(toTask),
     grades: ((grades.data ?? []) as GradeRow[]).map(toGrade),
     universities: ((universities.data ?? []) as UniversityRow[]).map(toUniversity),
+    days: ((days.data ?? []) as DayRow[]).map(toDay),
   };
 }
 
@@ -352,6 +355,42 @@ export async function deleteUniversity(id: string): Promise<void> {
 }
 
 /* -------------------------------------------------------------------------- */
+/* Journal                                                                    */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Creates or edits the row for a date.
+ *
+ * Upsert on the (user_id, date) key rather than select-then-insert: two
+ * devices logging the same morning should converge on one row instead of
+ * racing to create two.
+ */
+export async function upsertDay(
+  date: string,
+  patch: Partial<Omit<Day, "date">>,
+): Promise<void> {
+  const supabase = client();
+  const { data } = await supabase.auth.getUser();
+  if (!data.user) throw new Error("Not signed in.");
+
+  const row: Record<string, unknown> = {
+    user_id: data.user.id,
+    date,
+    updated_at: new Date().toISOString(),
+  };
+  if (patch.weight !== undefined) row.weight = patch.weight;
+  if (patch.reflection !== undefined) row.reflection = patch.reflection;
+
+  const { error } = await supabase.from("days").upsert(row, { onConflict: "user_id,date" });
+  if (error) throw error;
+}
+
+export async function deleteDay(date: string): Promise<void> {
+  const { error } = await client().from("days").delete().eq("date", date);
+  if (error) throw error;
+}
+
+/* -------------------------------------------------------------------------- */
 /* Profile                                                                    */
 /* -------------------------------------------------------------------------- */
 
@@ -406,6 +445,10 @@ export async function migrateLocalData(local: AppData): Promise<void> {
     await createUniversity(uni);
   }
 
+  for (const day of local.days) {
+    await upsertDay(day.date, { weight: day.weight, reflection: day.reflection });
+  }
+
   if (local.profile.name && local.profile.name !== "there") {
     await updateProfileName(local.profile.name);
   }
@@ -446,6 +489,24 @@ function toGrade(row: GradeRow): Grade {
     score: Number(row.score),
     weight: row.weight == null ? null : Number(row.weight),
     date: row.date,
+  };
+}
+
+const BLOCK_TYPES = ["text", "h2", "h3", "bullet", "todo", "quote", "divider"];
+
+function toDay(row: DayRow): Day {
+  return {
+    date: row.date,
+    weight: row.weight == null ? null : Number(row.weight),
+    // jsonb is whatever was written to it, and an older client may have
+    // written a type this build does not know. Falling back to plain text
+    // keeps the words rather than dropping the block.
+    reflection: (Array.isArray(row.reflection) ? row.reflection : []).map((b): Block => ({
+      id: String(b?.id ?? Math.random().toString(36).slice(2)),
+      type: (BLOCK_TYPES.includes(b?.type) ? b.type : "text") as BlockType,
+      text: String(b?.text ?? ""),
+      done: Boolean(b?.done),
+    })),
   };
 }
 

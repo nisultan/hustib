@@ -91,6 +91,25 @@ export type UniversityRow = {
   created_at: string;
 };
 
+export type DayRow = {
+  user_id: string;
+  /** "YYYY-MM-DD". Together with user_id this is the primary key. */
+  date: string;
+  /** numeric over the wire, so it can arrive as a string. */
+  weight: number | string | null;
+  reflection: BlockJson[];
+  created_at: string;
+  updated_at: string;
+};
+
+/** The reflection blocks as they sit in the jsonb column. */
+export type BlockJson = {
+  id: string;
+  type: string;
+  text: string;
+  done: boolean;
+};
+
 // Declared as type aliases, not interfaces, on purpose: supabase-js constrains
 // every Row/Insert/Update to `Record<string, unknown>`, and an interface has no
 // implicit index signature to satisfy that. Using `interface` here makes every
@@ -124,6 +143,7 @@ export interface Database {
       tasks: Table<TaskRow>;
       grades: Table<GradeRow>;
       universities: Table<UniversityRow>;
+      days: Table<DayRow>;
     };
     Views: { [_ in never]: never };
     Functions: { [_ in never]: never };

@@ -12,9 +12,9 @@ import { APPEARANCE_INIT_SCRIPT } from "@/lib/appearance";
 import { Logo } from "@/components/Logo";
 
 export const metadata: Metadata = {
-  title: "IB Learner — Student Productivity Hub",
+  title: "LifeOS",
   description:
-    "One place for tasks, notes, grades and university applications — and a clear answer to what to work on next.",
+    "One place for tasks, grades, university applications, daily weight and reflection — and a clear answer to what to work on next.",
 };
 
 export const viewport: Viewport = {
