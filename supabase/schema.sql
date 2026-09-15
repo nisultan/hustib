@@ -236,15 +236,15 @@ create policy profiles_owner on profiles
 -- check above still rejects anything that tries to override it.
 -- ---------------------------------------------------------------------------
 
-alter table courses          alter column user_id set default (select auth.uid());
-alter table lessons          alter column user_id set default (select auth.uid());
-alter table tasks            alter column user_id set default (select auth.uid());
-alter table task_notes       alter column user_id set default (select auth.uid());
-alter table grades           alter column user_id set default (select auth.uid());
-alter table grade_categories alter column user_id set default (select auth.uid());
-alter table universities     alter column user_id set default (select auth.uid());
-alter table university_notes alter column user_id set default (select auth.uid());
-alter table recommendations  alter column user_id set default (select auth.uid());
+alter table courses          alter column user_id set default auth.uid();
+alter table lessons          alter column user_id set default auth.uid();
+alter table tasks            alter column user_id set default auth.uid();
+alter table task_notes       alter column user_id set default auth.uid();
+alter table grades           alter column user_id set default auth.uid();
+alter table grade_categories alter column user_id set default auth.uid();
+alter table universities     alter column user_id set default auth.uid();
+alter table university_notes alter column user_id set default auth.uid();
+alter table recommendations  alter column user_id set default auth.uid();
 
 -- ---------------------------------------------------------------------------
 -- Create a profile row whenever someone signs up.
