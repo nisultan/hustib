@@ -1,7 +1,7 @@
 "use client";
 
-import { Theme } from "@/lib/theme";
-import { useTheme } from "@/lib/use-theme";
+import { Theme } from "@/lib/appearance";
+import { useAppearance } from "@/lib/use-appearance";
 
 const NEXT: Record<Theme, Theme> = {
   system: "light",
@@ -21,7 +21,7 @@ const LABEL: Record<Theme, string> = {
  * control. Settings has the explicit three-way picker.
  */
 export function ThemeToggle() {
-  const { theme, setTheme, loaded } = useTheme();
+  const { theme, setTheme, loaded } = useAppearance();
 
   return (
     <button

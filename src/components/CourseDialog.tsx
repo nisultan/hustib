@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useStore } from "@/lib/store";
 import { Course } from "@/lib/types";
+import { COURSE_COLORS } from "@/lib/appearance";
 import { Button, Field, Input, Modal } from "@/components/ui";
 
 export function CourseDialog({
@@ -18,6 +19,7 @@ export function CourseDialog({
   const [name, setName] = useState("");
   const [code, setCode] = useState("");
   const [lessons, setLessons] = useState("");
+  const [color, setColor] = useState<string>(COURSE_COLORS[0].id);
 
   // Seed the fields each time the dialog opens.
   const [seededFor, setSeededFor] = useState<string | null>(null);
@@ -27,6 +29,7 @@ export function CourseDialog({
     setName(course?.name ?? "");
     setCode(course?.code ?? "");
     setLessons((course?.lessons ?? []).join(", "));
+    setColor(course?.color ?? COURSE_COLORS[0].id);
   }
 
   const save = () => {
@@ -36,7 +39,7 @@ export function CourseDialog({
       name: trimmed,
       // Default the short code to the first word, uppercased.
       code: (code.trim() || trimmed.split(/\s+/)[0]).toUpperCase().slice(0, 6),
-      color: course?.color ?? "violet",
+      color,
       lessons: lessons
         .split(",")
         .map((l) => l.trim())
@@ -60,6 +63,30 @@ export function CourseDialog({
         <Field label="Short code" hint="Shown in tight spaces. Defaults to the first word.">
           <Input value={code} onChange={(e) => setCode(e.target.value)} placeholder="MATH" />
         </Field>
+        <div>
+          <span className="mb-1.5 block text-xs font-medium text-ink-2">Colour</span>
+          <div className="flex flex-wrap gap-2">
+            {COURSE_COLORS.map((c) => (
+              <button
+                key={c.id}
+                type="button"
+                onClick={() => setColor(c.id)}
+                aria-pressed={color === c.id}
+                title={c.label}
+                aria-label={c.label}
+                className={`grid size-8 place-items-center rounded-lg border transition-colors ${
+                  color === c.id ? "border-accent" : "border-line hover:bg-panel-2"
+                }`}
+              >
+                <span className="block size-4 rounded-full" style={{ background: c.value }} />
+              </button>
+            ))}
+          </div>
+          <span className="mt-1 block text-xs text-ink-3">
+            Used to identify the course across lists and charts.
+          </span>
+        </div>
+
         <Field label="Lessons / topics" hint="Comma separated.">
           <Input
             value={lessons}

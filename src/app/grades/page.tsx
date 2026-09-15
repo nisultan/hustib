@@ -26,6 +26,7 @@ import {
   SectionTitle,
   Select,
   TrendLabel,
+  ConfirmDeleteButton,
 } from "@/components/ui";
 import { GradeChart } from "@/components/GradeChart";
 
@@ -227,13 +228,19 @@ function GradesInner() {
                           <td className="nums px-3.5 py-2.5 text-right text-ink-2">
                             {formatDate(g.date)}
                           </td>
-                          <td className="px-3.5 py-2.5 text-right">
-                            <button
-                              onClick={() => setEditing(g)}
-                              className="rounded-md px-1.5 py-0.5 text-xs text-ink-3 hover:bg-panel-2 hover:text-ink"
-                            >
-                              Edit
-                            </button>
+                          <td className="px-3.5 py-2.5">
+                            <div className="flex items-center justify-end gap-1">
+                              <button
+                                onClick={() => setEditing(g)}
+                                className="rounded-md px-1.5 py-0.5 text-xs text-ink-3 hover:bg-panel-2 hover:text-ink"
+                              >
+                                Edit
+                              </button>
+                              <ConfirmDeleteButton
+                                label={`Delete ${g.assessment}`}
+                                onConfirm={() => store.deleteGrade(g.id)}
+                              />
+                            </div>
                           </td>
                         </tr>
                       ))}

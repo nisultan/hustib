@@ -25,6 +25,7 @@ import {
   Textarea,
   UniPriorityBadge,
   UniStatusBadge,
+  ConfirmDeleteButton,
 } from "@/components/ui";
 
 type SortKey = "deadline" | "priority" | "country" | "status" | "name";
@@ -212,6 +213,7 @@ function UniversitiesInner() {
 }
 
 function UniCard({ uni, onEdit }: { uni: University; onEdit: () => void }) {
+  const store = useStore();
   const [openNotes, setOpenNotes] = useState(false);
   const days = uni.deadline ? daysUntil(uni.deadline) : null;
   const urgent = days != null && days >= 0 && days <= 14;
@@ -262,6 +264,11 @@ function UniCard({ uni, onEdit }: { uni: University; onEdit: () => void }) {
             Website ↗
           </a>
         )}
+        <ConfirmDeleteButton
+          label={`Delete ${uni.name}`}
+          onConfirm={() => store.deleteUniversity(uni.id)}
+          className="ml-auto"
+        />
       </div>
 
       {openNotes && uni.notes.trim().length > 0 && (

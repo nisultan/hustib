@@ -1,6 +1,6 @@
 "use client";
 
-import { ReactNode, useEffect, useRef } from "react";
+import { ReactNode, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useMounted } from "@/lib/useMounted";
 import {
@@ -317,6 +317,78 @@ export function Modal({
       </div>
     </div>,
     document.body,
+  );
+}
+
+/**
+ * Delete control that asks once before acting.
+ *
+ * Two clicks rather than a modal: deleting a single row is cheap to redo and a
+ * dialog for each one would be heavier than the action deserves. The armed
+ * state resets on blur and after a few seconds, so a stray first click cannot
+ * leave a live delete button sitting under the cursor.
+ */
+export function ConfirmDeleteButton({
+  onConfirm,
+  label,
+  className = "",
+  size = "sm",
+}: {
+  onConfirm: () => void;
+  label: string;
+  className?: string;
+  size?: "sm" | "md";
+}) {
+  const [armed, setArmed] = useState(false);
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    if (!armed) return;
+    timer.current = setTimeout(() => setArmed(false), 3500);
+    return () => {
+      if (timer.current) clearTimeout(timer.current);
+    };
+  }, [armed]);
+
+  const dimension = size === "sm" ? "size-7" : "size-9";
+
+  if (armed) {
+    return (
+      <button
+        onClick={(e) => {
+          e.stopPropagation();
+          onConfirm();
+        }}
+        onBlur={() => setArmed(false)}
+        aria-label={`Confirm: ${label}`}
+        className={`shrink-0 self-start rounded-md px-2 py-1 text-[11px] font-medium text-white ${className}`}
+        style={{ background: "var(--urgent)" }}
+      >
+        Delete?
+      </button>
+    );
+  }
+
+  return (
+    <button
+      onClick={(e) => {
+        e.stopPropagation();
+        setArmed(true);
+      }}
+      aria-label={label}
+      title={label}
+      className={`grid ${dimension} shrink-0 self-start place-items-center rounded-md text-ink-3 transition-colors hover:bg-panel-2 hover:text-[var(--urgent)] ${className}`}
+    >
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden>
+        <path
+          d="M2.8 4.3h10.4M6.4 4.3V3.1a.8.8 0 0 1 .8-.8h1.6a.8.8 0 0 1 .8.8v1.2M12.2 4.3l-.5 8.4a1 1 0 0 1-1 .95H5.3a1 1 0 0 1-1-.95l-.5-8.4"
+          stroke="currentColor"
+          strokeWidth="1.3"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      </svg>
+    </button>
   );
 }
 

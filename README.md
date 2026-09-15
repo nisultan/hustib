@@ -54,6 +54,16 @@ load sample data. Everything it animates is disabled under `prefers-reduced-moti
 **Light and dark** both ship as first-class themes, with a third "match system" option.
 The header has a one-click cycle; Settings has the explicit picker.
 
+**Make it yours** — eight accent colours and three block sizes (Small / Medium / Large),
+plus a colour per course. Block size is one lever: Tailwind v4 multiplies `--spacing` for
+every padding, margin and gap, so changing it resizes every card, row and gutter at once.
+Only the accent moves — priority, trend and application-status colours stay put, because
+those carry meaning rather than taste.
+
+**Delete anything** — every task row, grade row and university card has an inline delete
+that arms on the first click and acts on the second, disarming on blur or after a few
+seconds. Courses delete from their edit dialog, taking their tasks and grades with them.
+
 ## Where things live
 
 | Path | What's in it |
@@ -66,8 +76,27 @@ The header has a one-click cycle; Settings has the explicit picker.
 | `src/components/` | UI primitives, nav, dialogs, chart |
 | `src/components/Tour.tsx` | Tour shell: steps, transitions, first-run gating |
 | `src/components/TourArt.tsx` | The animated mini-mockup per step |
-| `src/lib/theme.ts` | Theme constants and the pre-paint init script |
+| `src/lib/appearance.ts` | Theme, accent and block-size constants + pre-paint init script |
+| `src/lib/vault.ts` | PBKDF2 + AES-GCM encryption for the local store |
+| `src/lib/supabase/` | Client, row types and the full CRUD repository |
 | `supabase/schema.sql` | Postgres schema, indexes and RLS policies |
+
+## Password
+
+On first entry you're asked to set a password (skippable, and changeable later in
+Settings). It isn't a cosmetic gate: the password is stretched with PBKDF2-HMAC-SHA256
+(310k iterations) into an AES-GCM key, and the whole data blob is encrypted with it before
+it reaches `localStorage`. The plaintext copy is deleted when you set one.
+
+The password itself is stored nowhere — not even hashed. That's what makes it meaningful,
+and also why **there is no recovery**: forget it and the data is unreadable. The UI says so
+before you commit, and pushes an export.
+
+Honest about scope: this protects against someone with access to your browser reading your
+grades and application notes out of storage. It does not protect against code running in
+the page while the hub is unlocked, since the key has to be in memory then. A lock on a
+drawer, not a safe. `crypto.subtle` needs a secure origin, so over plain HTTP the app says
+so rather than offering encryption it can't perform.
 
 ## Data and storage
 
@@ -75,12 +104,36 @@ This version stores everything in the browser via `localStorage`. That makes it 
 and instant, but it is per-device, and clearing site data removes it — Settings has a
 JSON export.
 
-`src/lib/store.tsx` is the only module that touches storage. Moving to multi-device sync
-means running `supabase/schema.sql` against a Supabase project and reimplementing that
-file's mutators as queries; the pages already treat every mutation as fire-and-forget, so
-they don't change. The schema carries a `user_id` on every table, enables *and forces*
+`src/lib/store.tsx` is the only module that touches storage, which is what keeps the swap
+to Supabase contained.
+
+## Connecting Supabase
+
+The backend code is written and compiles; it just needs a project.
+
+1. Create a project at supabase.com.
+2. Run `supabase/schema.sql` in the SQL editor. It creates every table, index, enum and
+   RLS policy, plus a trigger that makes a profile row on sign-up.
+3. `cp .env.example .env.local` and fill in the URL and anon key from
+   Project Settings → API.
+
+| File | What it gives you |
+| --- | --- |
+| `src/lib/supabase/client.ts` | The browser client. Returns `null` when unconfigured, so the app keeps working locally until you add keys |
+| `src/lib/supabase/types.ts` | Row types matching the schema (regenerable with `supabase gen types`) |
+| `src/lib/supabase/repository.ts` | Auth, a one-round-trip `fetchAll`, and full CRUD — one function per store mutator |
+
+`repository.ts` also has `migrateLocalData`, which pushes an existing local hub into a
+freshly signed-in account so nothing entered before the switch is lost.
+
+Switching over means having `StoreProvider` call those functions instead of writing to
+localStorage. The component tree doesn't change: it already treats every mutation as
+fire-and-forget and reads one `AppData` object.
+
+Security-wise, the schema carries a `user_id` on every table, enables *and forces*
 row-level security with `using` **and** `with check`, and defaults `user_id` to
-`auth.uid()` so clients never send it.
+`auth.uid()` — so the client never sends it and cannot write into another account even if
+it tried. The anon key is public by design; RLS is what protects the data, not the key.
 
 ## AI
 
@@ -111,9 +164,17 @@ npm run typecheck  # tsc --noEmit
   regardless of class order.
 - Pages wait on `store.ready` before rendering. Without it the first paint shows an empty
   state before saved data arrives.
-- `src/lib/theme.ts` is deliberately hook-free and has no `"use client"`: the server layout
-  imports `THEME_INIT_SCRIPT` from it to inline into `<head>`, which a module containing
-  hooks cannot do. The hook lives in `src/lib/use-theme.ts`.
+- `src/lib/appearance.ts` is deliberately hook-free and has no `"use client"`: the server
+  layout imports `APPEARANCE_INIT_SCRIPT` from it to inline into `<head>`, and a module
+  containing hooks cannot be imported from a server component at all. The hook lives in
+  `src/lib/use-appearance.ts`.
+- Row types in `src/lib/supabase/types.ts` are `type` aliases, not `interface`s. supabase-js
+  constrains every Row/Insert/Update to `Record<string, unknown>`, and an interface has no
+  implicit index signature to satisfy that — using `interface` makes every query in the app
+  silently resolve to `never`. Each table also needs a `Relationships` key for the same
+  reason.
+- Encrypted writes are sequenced through a counter in `store.tsx`. Encryption is async, so
+  without it a fast edit could let an older ciphertext land last and overwrite a newer one.
 - Tour animations are driven by a `--d` custom property for per-element delay, with the
   keyframes at the bottom of `globals.css`. Each step remounts its illustration (it is
   keyed on the step id), so the animation replays every time you return to a step.

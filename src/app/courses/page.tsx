@@ -6,6 +6,7 @@ import { useStore } from "@/lib/store";
 import { courseAverage, series, trend } from "@/lib/grades";
 import { todayISO } from "@/lib/dates";
 import { Course } from "@/lib/types";
+import { courseColor } from "@/lib/appearance";
 import { Button, EmptyState, PageHeader, Panel, TrendLabel } from "@/components/ui";
 import { Sparkline } from "@/components/GradeChart";
 import { CourseDialog } from "@/components/CourseDialog";
@@ -55,7 +56,14 @@ export default function CoursesPage() {
                 <Panel className="h-full px-4 py-4 transition-colors hover:border-line-strong">
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
-                      <h2 className="truncate text-sm font-semibold">{c.name}</h2>
+                      <h2 className="flex items-center gap-2 truncate text-sm font-semibold">
+                        <span
+                          aria-hidden
+                          className="size-2.5 shrink-0 rounded-full"
+                          style={{ background: courseColor(c.color) }}
+                        />
+                        {c.name}
+                      </h2>
                       <p className="mt-0.5 text-xs text-ink-3">
                         {tasks.length} {tasks.length === 1 ? "task" : "tasks"} · {upcoming}{" "}
                         upcoming · {c.lessons.length}{" "}

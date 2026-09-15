@@ -3,14 +3,15 @@
 import { useEffect, useState } from "react";
 import { useStore } from "@/lib/store";
 import { Button, Field, Input, PageHeader, Panel, SectionTitle } from "@/components/ui";
-import { THEMES, Theme } from "@/lib/theme";
-import { useTheme } from "@/lib/use-theme";
+import { ACCENTS, DENSITIES, THEMES, Theme } from "@/lib/appearance";
+import { useAppearance } from "@/lib/use-appearance";
 import { openTour } from "@/components/Tour";
+import { PasswordSection } from "@/components/PasswordSection";
 
 export default function SettingsPage() {
   const store = useStore();
   const [name, setName] = useState("");
-  const { theme, setTheme } = useTheme();
+  const { theme, setTheme, accent, setAccent, density, setDensity } = useAppearance();
   const [confirmClear, setConfirmClear] = useState(false);
 
   useEffect(() => {
@@ -49,27 +50,86 @@ export default function SettingsPage() {
 
       <section className="mb-8">
         <SectionTitle>Appearance</SectionTitle>
-        <Panel className="px-4 py-4">
-          <div className="flex gap-2">
-            {THEMES.map((t: Theme) => (
-              <button
-                key={t}
-                onClick={() => setTheme(t)}
-                aria-pressed={theme === t}
-                className={`flex-1 rounded-lg border px-3 py-2 text-sm font-medium capitalize transition-colors ${
-                  theme === t
-                    ? "border-accent bg-accent-soft text-accent-text"
-                    : "border-line text-ink-2 hover:bg-panel-2"
-                }`}
-              >
-                {t === "system" ? "Match system" : t}
-              </button>
-            ))}
+        <Panel className="grid gap-5 px-4 py-4">
+          <div>
+            <p className="mb-2 text-xs font-medium text-ink-2">Theme</p>
+            <div className="flex gap-2">
+              {THEMES.map((t: Theme) => (
+                <button
+                  key={t}
+                  onClick={() => setTheme(t)}
+                  aria-pressed={theme === t}
+                  className={`flex-1 rounded-lg border px-3 py-2 text-sm font-medium capitalize transition-colors ${
+                    theme === t
+                      ? "border-accent bg-accent-soft text-accent-text"
+                      : "border-line text-ink-2 hover:bg-panel-2"
+                  }`}
+                >
+                  {t === "system" ? "Match system" : t}
+                </button>
+              ))}
+            </div>
+            <p className="mt-1.5 text-xs text-ink-3">
+              &ldquo;Match system&rdquo; follows your device. The header has a quick toggle too.
+            </p>
           </div>
-          <p className="mt-2.5 text-xs text-ink-3">
-            &ldquo;Match system&rdquo; follows your device&apos;s light or dark setting. The
-            header has a quick toggle too.
-          </p>
+
+          <div>
+            <p className="mb-2 text-xs font-medium text-ink-2">Accent colour</p>
+            <div className="flex flex-wrap gap-2">
+              {ACCENTS.map((a) => (
+                <button
+                  key={a.id}
+                  onClick={() => setAccent(a.id)}
+                  aria-pressed={accent === a.id}
+                  title={a.label}
+                  aria-label={a.label}
+                  className={`grid size-9 place-items-center rounded-lg border transition-colors ${
+                    accent === a.id ? "border-accent" : "border-line hover:bg-panel-2"
+                  }`}
+                >
+                  <span
+                    className="block size-5 rounded-full"
+                    style={{ background: a.light[0] }}
+                  />
+                </button>
+              ))}
+            </div>
+            <p className="mt-1.5 text-xs text-ink-3">
+              Only the accent changes. Priority, trend and status keep their own colours,
+              because those carry meaning.
+            </p>
+          </div>
+
+          <div>
+            <p className="mb-2 text-xs font-medium text-ink-2">Block size</p>
+            <div className="flex gap-2">
+              {DENSITIES.map((d) => (
+                <button
+                  key={d.id}
+                  onClick={() => setDensity(d.id)}
+                  aria-pressed={density === d.id}
+                  className={`flex-1 rounded-lg border px-3 py-2 text-left transition-colors ${
+                    density === d.id
+                      ? "border-accent bg-accent-soft"
+                      : "border-line hover:bg-panel-2"
+                  }`}
+                >
+                  <span
+                    className={`block text-sm font-medium ${
+                      density === d.id ? "text-accent-text" : "text-ink-2"
+                    }`}
+                  >
+                    {d.label}
+                  </span>
+                  <span className="block text-xs text-ink-3">{d.hint}</span>
+                </button>
+              ))}
+            </div>
+            <p className="mt-1.5 text-xs text-ink-3">
+              Resizes every card, row and gutter in the app at once.
+            </p>
+          </div>
         </Panel>
       </section>
 
@@ -81,6 +141,11 @@ export default function SettingsPage() {
           </p>
           <Button onClick={openTour}>Replay the tour</Button>
         </Panel>
+      </section>
+
+      <section className="mb-8">
+        <SectionTitle>Password</SectionTitle>
+        <PasswordSection />
       </section>
 
       <section className="mb-8">

@@ -6,7 +6,8 @@ import { GlobalSearch } from "@/components/Search";
 import { AddTaskButton } from "@/components/TaskDialog";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { TourHost } from "@/components/Tour";
-import { THEME_INIT_SCRIPT } from "@/lib/theme";
+import { Lock } from "@/components/Lock";
+import { APPEARANCE_INIT_SCRIPT } from "@/lib/appearance";
 
 export const metadata: Metadata = {
   title: "IB Learner — Student Productivity Hub",
@@ -25,36 +26,38 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
-        {/* Applies the saved theme before first paint, so choosing light does
-            not mean a dark flash on every page load. */}
-        <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
+        {/* Applies the saved theme, accent and block size before first paint,
+            so the defaults never flash before the student's choices load. */}
+        <script dangerouslySetInnerHTML={{ __html: APPEARANCE_INIT_SCRIPT }} />
       </head>
       <body>
         <StoreProvider>
-          <Sidebar />
+          <Lock>
+            <Sidebar />
 
-          <div className="md:pl-[232px]">
-            <header className="sticky top-0 z-30 flex items-center gap-3 border-b border-line bg-bg/85 px-4 py-2.5 backdrop-blur-md md:px-8">
-              <span className="grid size-7 shrink-0 place-items-center rounded-lg bg-accent text-[13px] font-bold text-white md:hidden">
-                IB
-              </span>
-              <div className="flex-1 md:flex-none">
-                <GlobalSearch />
-              </div>
-              <div className="ml-auto flex items-center gap-1.5">
-                <ThemeToggle />
-                <MobileHeaderLinks />
-                <AddTaskButton compact />
-              </div>
-            </header>
+            <div className="md:pl-[232px]">
+              <header className="sticky top-0 z-30 flex items-center gap-3 border-b border-line bg-bg/85 px-4 py-2.5 backdrop-blur-md md:px-8">
+                <span className="grid size-7 shrink-0 place-items-center rounded-lg bg-accent text-[13px] font-bold text-white md:hidden">
+                  IB
+                </span>
+                <div className="flex-1 md:flex-none">
+                  <GlobalSearch />
+                </div>
+                <div className="ml-auto flex items-center gap-1.5">
+                  <ThemeToggle />
+                  <MobileHeaderLinks />
+                  <AddTaskButton compact />
+                </div>
+              </header>
 
-            <main className="mx-auto w-full max-w-5xl px-4 pb-24 pt-6 md:px-8 md:pb-16 md:pt-8">
-              {children}
-            </main>
-          </div>
+              <main className="mx-auto w-full max-w-5xl px-4 pb-24 pt-6 md:px-8 md:pb-16 md:pt-8">
+                {children}
+              </main>
+            </div>
 
-          <MobileNav />
-          <TourHost />
+            <MobileNav />
+            <TourHost />
+          </Lock>
         </StoreProvider>
       </body>
     </html>

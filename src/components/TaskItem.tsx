@@ -4,7 +4,8 @@ import { useState } from "react";
 import { Task, PRIORITY_LABEL, PRIORITY_RANK } from "@/lib/types";
 import { useCourseMap, useStore } from "@/lib/store";
 import { daysUntil, formatTime, relativeLabel } from "@/lib/dates";
-import { PriorityDot } from "./ui";
+import { PriorityDot, ConfirmDeleteButton } from "./ui";
+import { courseColor } from "@/lib/appearance";
 import { TaskDialog } from "./TaskDialog";
 
 /** Sort: overdue first, then soonest deadline, then priority, then title. */
@@ -85,6 +86,13 @@ export function TaskItem({ task, showCourse = true }: { task: Task; showCourse?:
           </span>
 
           <span className="mt-1 flex flex-wrap items-center gap-x-1.5 text-xs text-ink-3">
+            {showCourse && course && (
+              <span
+                aria-hidden
+                className="mr-0.5 inline-block size-1.5 shrink-0 rounded-full"
+                style={{ background: courseColor(course.color) }}
+              />
+            )}
             {meta.map((m, i) => (
               <span key={`${m}-${i}`} className="flex items-center gap-1.5">
                 {i > 0 && <span aria-hidden>·</span>}
@@ -105,6 +113,14 @@ export function TaskItem({ task, showCourse = true }: { task: Task; showCourse?:
             <span className="mt-1 block truncate text-xs text-ink-3">{task.notes}</span>
           )}
         </button>
+
+        {/* Revealed on hover on a pointer device, and always present for
+            keyboard and touch users, who have no hover to reveal it. */}
+        <ConfirmDeleteButton
+          label={`Delete "${task.title}"`}
+          onConfirm={() => store.deleteTask(task.id)}
+          className="opacity-100 transition-opacity md:opacity-0 md:group-focus-within:opacity-100 md:group-hover:opacity-100"
+        />
       </div>
 
       <TaskDialog open={editing} onClose={() => setEditing(false)} task={task} />
