@@ -1,6 +1,6 @@
 "use client";
 
-import { ReactNode, useEffect, useRef, useState } from "react";
+import { CSSProperties, ReactNode, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useMounted } from "@/lib/useMounted";
 import { LogoMark } from "./Logo";
@@ -18,15 +18,19 @@ export function Panel({
   className = "",
   as: Tag = "div",
   interactive = false,
+  style,
 }: {
   children: ReactNode;
   className?: string;
   as?: "div" | "section";
   /** Lifts on hover. For cards that are themselves a link or a button. */
   interactive?: boolean;
+  /** For values a class cannot carry, such as a per-course tint. */
+  style?: CSSProperties;
 }) {
   return (
     <Tag
+      style={style}
       className={`rounded-xl border border-line bg-panel shadow-[var(--shadow),var(--edge)] ${
         interactive
           ? "transition-[box-shadow,transform,border-color] duration-200 hover:-translate-y-px hover:border-line-strong hover:shadow-[var(--shadow-md),var(--edge)]"
