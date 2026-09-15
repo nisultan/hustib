@@ -77,9 +77,11 @@ export default function RecommendationsPage() {
       )}
 
       <p className="mt-6 text-xs leading-relaxed text-ink-3">
-        These come from rules over your own data — overdue work, approaching assessments, the
-        gap between your weakest course and the rest, and how full the next couple of days look.
-        Nothing is sent anywhere.
+        Fourteen rules read your own data and each produces at most one line: overdue work,
+        assessments bunching up, a course sliding while its average still looks fine, an average
+        resting on a single mark, work aging with no deadline, how this week compares with your
+        last, gaps in the journal, and a weight trend once there is enough of one to call. The
+        strongest few are shown. Nothing is sent anywhere.
       </p>
     </div>
   );

@@ -1,9 +1,23 @@
-import { AppData, Course, Task, PRIORITY_RANK } from "./types";
-import { courseAverage, overallAverage } from "./grades";
-import { daysUntil, todayISO, relativeLabel, formatDate } from "./dates";
+import { AppData, Course, Day, Task, PRIORITY_RANK } from "./types";
+import { courseAverage, overallAverage, trend } from "./grades";
+import { daysUntil, todayISO, relativeLabel, formatDate, fromISO } from "./dates";
 
 export type RecKind =
-  "overdue" | "focus" | "test" | "deadline" | "university" | "ahead" | "clear";
+  | "overdue"
+  | "focus"
+  | "test"
+  | "deadline"
+  | "university"
+  | "ahead"
+  | "clear"
+  | "declining"
+  | "cluster"
+  | "thin"
+  | "stale"
+  | "untested"
+  | "momentum"
+  | "journal"
+  | "weight";
 
 export interface Recommendation {
   id: string;
@@ -22,7 +36,7 @@ export interface Recommendation {
  * much stronger prompt than any of those alone, so that rule outranks the rest.
  */
 export function recommend(data: AppData, limit = 4): Recommendation[] {
-  const { tasks, courses, grades, universities } = data;
+  const { tasks, courses, grades, universities, days } = data;
   const open = tasks.filter((t) => t.status !== "completed");
   const recs: Recommendation[] = [];
 
@@ -139,6 +153,130 @@ export function recommend(data: AppData, limit = 4): Recommendation[] {
     }
   }
 
+  // 7. A course going the wrong way, which an average alone hides: a term
+  //    that slipped from 80 to 70 still averages 75 and looks fine.
+  for (const course of courses) {
+    const t = trend(grades.filter((g) => g.courseId === course.id));
+    if (t && t.direction === "declining" && t.delta >= 4) {
+      recs.push({
+        id: `declining-${course.id}`,
+        kind: "declining",
+        weight: 70,
+        href: `/courses/${course.id}`,
+        text: `${course.name} is down ${t.delta.toFixed(1)} points over the last month. Worth working out which topic is costing you before the next assessment.`,
+      });
+      break;
+    }
+  }
+
+  // 8. Assessments bunched together. Each is manageable; three in a week is
+  //    not, and now is the last point at which anything can be done about it.
+  const cluster = open
+    .filter((t) => t.dueDate && daysUntil(t.dueDate) >= 0 && daysUntil(t.dueDate) <= 7)
+    .filter((t) => /\b(test|exam|quiz|assessment|mock)\b/i.test(t.title));
+  if (cluster.length >= 3) {
+    recs.push({
+      id: "cluster",
+      kind: "cluster",
+      weight: 78,
+      href: "/tasks?view=upcoming",
+      text: `${cluster.length} assessments land in the next 7 days. Start the earliest now — this is the last week where spreading the work is still possible.`,
+    });
+  }
+
+  // 9. A course with tasks but no grades has no average to reason about,
+  //    which is exactly why it appears in none of the rules above.
+  const untested = courses.find(
+    (c) => grades.every((g) => g.courseId !== c.id) && tasks.some((t) => t.courseId === c.id),
+  );
+  if (untested) {
+    recs.push({
+      id: `untested-${untested.id}`,
+      kind: "untested",
+      weight: 32,
+      href: "/grades",
+      text: `${untested.name} has no grades recorded, so it is missing from your average and from every suggestion here. Add one when a mark comes back.`,
+    });
+  }
+
+  // 10. An average resting on almost nothing. Showing 93% from a single mark
+  //     with the same confidence as 93% from ten is the misleading part.
+  const thin = courses
+    .map((c) => ({ course: c, n: grades.filter((g) => g.courseId === c.id).length }))
+    .find((x) => x.n === 1);
+  if (thin) {
+    recs.push({
+      id: `thin-${thin.course.id}`,
+      kind: "thin",
+      weight: 25,
+      href: `/courses/${thin.course.id}`,
+      text: `${thin.course.name} has one grade, so its average is really just that mark. A second makes it mean something.`,
+    });
+  }
+
+  // 11. Work with no deadline ages quietly out of view, because every list in
+  //     the app sorts by a date it does not have.
+  const stale = open
+    .filter((t) => t.dueDate == null && daysUntil(t.createdAt.slice(0, 10)) <= -14)
+    .sort((a, b) => a.createdAt.localeCompare(b.createdAt))[0];
+  if (stale) {
+    const age = Math.abs(daysUntil(stale.createdAt.slice(0, 10)));
+    recs.push({
+      id: `stale-${stale.id}`,
+      kind: "stale",
+      weight: 35,
+      href: "/tasks?view=all",
+      text: `"${stale.title}" has been open ${age} days with no deadline. Give it one or drop it — it will not surface on its own.`,
+    });
+  }
+
+  // 12. Momentum, measured against your own last week rather than a target.
+  const doneThisWeek = completedWithin(tasks, 7);
+  const doneLastWeek = completedWithin(tasks, 14) - doneThisWeek;
+  if (doneThisWeek + doneLastWeek >= 4 && doneLastWeek > 0) {
+    recs.push({
+      id: "momentum",
+      kind: "momentum",
+      weight: 22,
+      href: "/tasks?view=completed",
+      text:
+        doneThisWeek > doneLastWeek
+          ? `You finished ${doneThisWeek} ${plural(doneThisWeek, "task")} this week against ${doneLastWeek} last week. Whatever changed, keep it.`
+          : `You finished ${doneThisWeek} ${plural(doneThisWeek, "task")} this week against ${doneLastWeek} last week. Worth a look at what got in the way.`,
+    });
+  }
+
+  // 13. The journal only works if it is kept, and the app is the only thing
+  //     in a position to notice that it has not been.
+  const lastWritten = days
+    .filter((d) => d.reflection.some((b) => b.text.trim() !== ""))
+    .sort((a, b) => b.date.localeCompare(a.date))[0];
+  if (lastWritten) {
+    const gap = Math.abs(daysUntil(lastWritten.date));
+    if (gap >= 5) {
+      recs.push({
+        id: "journal-gap",
+        kind: "journal",
+        weight: 28,
+        href: "/reflection",
+        text: `Nothing in the journal for ${gap} days. A couple of lines about this week is usually enough to see the pattern later.`,
+      });
+    }
+  }
+
+  // 14. A weight trend needs a fortnight before it is a trend at all, which
+  //     is exactly why it is worth saying once it is one.
+  const shift = weightShift(days);
+  if (shift) {
+    recs.push({
+      id: "weight-trend",
+      kind: "weight",
+      weight: 26,
+      href: "/weight",
+      text: `Your weight is ${shift.direction} ${Math.abs(shift.delta).toFixed(1)} kg over the last fortnight, measured week against week rather than day to day.`,
+    });
+  }
+
   // 7. Nothing to say is worth saying explicitly.
   if (recs.length === 0) {
     recs.push({
@@ -215,6 +353,42 @@ export function nextUniDeadline(data: AppData) {
 }
 
 export { relativeLabel };
+
+/** Tasks completed within the last `days` days. */
+function completedWithin(tasks: Task[], days: number): number {
+  return tasks.filter((t) => t.completedAt != null && Math.abs(daysUntil(t.completedAt)) < days)
+    .length;
+}
+
+/**
+ * The change between this week's mean weight and the previous week's.
+ *
+ * Both weeks need readings, and the gap has to clear 300g — below that it is
+ * inside the noise a glass of water produces, and calling it a direction
+ * would be inventing the trend rather than reporting one.
+ */
+function weightShift(days: Day[]): { direction: "down" | "up"; delta: number } | null {
+  const weighed = days.filter((d): d is Day & { weight: number } => d.weight != null);
+  if (weighed.length < 4) return null;
+
+  const now = Date.now();
+  const within = (from: number, to: number) =>
+    weighed.filter((d) => {
+      const age = (now - fromISO(d.date).getTime()) / 86400000;
+      return age >= from && age < to;
+    });
+
+  const recent = within(0, 7);
+  const before = within(7, 14);
+  if (recent.length === 0 || before.length === 0) return null;
+
+  const mean = (list: typeof weighed) =>
+    list.reduce((sum, d) => sum + d.weight, 0) / list.length;
+  const delta = mean(recent) - mean(before);
+  if (Math.abs(delta) < 0.3) return null;
+
+  return { direction: delta < 0 ? "down" : "up", delta };
+}
 
 function plural(n: number, word: string): string {
   return n === 1 ? word : `${word}s`;
