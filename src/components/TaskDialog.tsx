@@ -15,6 +15,7 @@ import { parseQuickAdd } from "@/lib/quickparse";
 import { formatDate, relativeLabel } from "@/lib/dates";
 import { Button, Field, Input, Modal, Select, Textarea } from "./ui";
 import { TimeField } from "./TimeField";
+import { DateField } from "./DateField";
 
 interface Draft {
   title: string;
@@ -225,11 +226,7 @@ export function TaskDialog({
 
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="Deadline">
-            <Input
-              type="date"
-              value={draft.dueDate}
-              onChange={(e) => set("dueDate", e.target.value)}
-            />
+            <DateField value={draft.dueDate} onChange={(v) => set("dueDate", v)} />
           </Field>
 
           <Field

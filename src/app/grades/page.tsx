@@ -29,6 +29,7 @@ import {
   ConfirmDeleteButton,
 } from "@/components/ui";
 import { GradeChart } from "@/components/GradeChart";
+import { DateField } from "@/components/DateField";
 
 export default function GradesPage() {
   return (
@@ -446,7 +447,7 @@ function GradeDialog({
             </Select>
           </Field>
           <Field label="Date">
-            <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+            <DateField value={date} onChange={setDate} />
           </Field>
         </div>
 

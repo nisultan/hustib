@@ -4,6 +4,7 @@ import { Suspense, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { useStore } from "@/lib/store";
 import { formatDate, countdownLabel, daysUntil } from "@/lib/dates";
+import { DateField } from "@/components/DateField";
 import {
   UNI_PRIORITIES,
   UNI_PRIORITY_LABEL,
@@ -361,10 +362,9 @@ function UniDialog({
 
         <div className="grid gap-4 sm:grid-cols-3">
           <Field label="Application deadline">
-            <Input
-              type="date"
+            <DateField
               value={form.deadline ?? ""}
-              onChange={(e) => set("deadline", e.target.value || null)}
+              onChange={(v) => set("deadline", v || null)}
             />
           </Field>
           <Field label="Status">
