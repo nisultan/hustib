@@ -9,6 +9,7 @@ import { TourHost } from "@/components/Tour";
 import { Lock } from "@/components/Lock";
 import { SyncBanner } from "@/components/SyncBanner";
 import { APPEARANCE_INIT_SCRIPT } from "@/lib/appearance";
+import { Logo } from "@/components/Logo";
 
 export const metadata: Metadata = {
   title: "IB Learner — Student Productivity Hub",
@@ -38,9 +39,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 
             <div className="md:pl-[232px]">
               <header className="sticky top-0 z-30 flex items-center gap-3 border-b border-line bg-bg/85 px-4 py-2.5 backdrop-blur-md md:px-8">
-                <span className="grid size-7 shrink-0 place-items-center rounded-lg bg-accent text-[13px] font-bold text-white md:hidden">
-                  IB
-                </span>
+                <Logo className="md:hidden" />
                 <div className="flex-1 md:flex-none">
                   <GlobalSearch />
                 </div>

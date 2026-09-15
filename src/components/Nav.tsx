@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { ReactNode } from "react";
+import { Logo } from "./Logo";
 
 interface NavItem {
   href: string;
@@ -140,9 +141,7 @@ export function Sidebar() {
   return (
     <aside className="fixed inset-y-0 left-0 z-40 hidden w-[232px] flex-col border-r border-line bg-panel px-3 py-4 shadow-[var(--shadow)] md:flex">
       <Link href="/" className="mb-6 flex items-center gap-2 px-2.5">
-        <span className="grid size-7 place-items-center rounded-lg bg-accent text-[13px] font-bold text-white">
-          IB
-        </span>
+        <Logo />
         <span className="text-[13px] font-semibold tracking-tight">IB Learner</span>
       </Link>
 

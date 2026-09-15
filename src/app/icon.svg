@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <!-- The tab icon, drawn to match components/Logo.tsx. The accent is fixed
+       here because a favicon renders outside the page and cannot read the
+       student's chosen accent variable. -->
+  <rect width="32" height="32" rx="8" fill="#5b5bd6" />
+  <g transform="translate(4 4) scale(1)" fill="none">
+    <path d="M3.5 15.4 L9 9.9 L13.6 13 L20.5 5.6 V20 H3.5 Z" fill="#fff" opacity="0.26" />
+    <path
+      d="M3.5 15.4 L9 9.9 L13.6 13 L20.5 5.6"
+      stroke="#fff"
+      stroke-width="2.6"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+    />
+    <circle cx="20.5" cy="5.6" r="3" fill="#fff" />
+  </g>
+</svg>

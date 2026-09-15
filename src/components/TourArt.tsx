@@ -1,6 +1,7 @@
 "use client";
 
 import { ReactNode } from "react";
+import { LogoMark } from "./Logo";
 
 /**
  * Animated mini-mockups for the onboarding tour — one per step.
@@ -87,10 +88,10 @@ export function ArtWelcome() {
     <Frame label="Four areas — tasks, grades, courses and universities — feeding one hub">
       <div className="flex h-full flex-col items-center justify-center gap-3">
         <div
-          className="pop grid size-12 place-items-center rounded-xl bg-accent text-sm font-bold text-white"
+          className="pop grid size-12 place-items-center rounded-xl bg-accent text-white shadow-[var(--shadow),inset_0_1px_0_rgba(255,255,255,0.22)]"
           style={{ "--d": "80ms" } as React.CSSProperties}
         >
-          IB
+          <LogoMark className="size-7" />
         </div>
 
         <svg viewBox="0 0 200 26" className="w-full max-w-[280px]" aria-hidden>

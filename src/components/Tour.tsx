@@ -16,6 +16,7 @@ import {
   ArtUniversities,
   ArtWelcome,
 } from "./TourArt";
+import { Logo } from "./Logo";
 
 export const TOUR_SEEN_KEY = "iblearner.tourSeen";
 
@@ -191,9 +192,7 @@ export function Tour({ open, onClose }: { open: boolean; onClose: () => void }) 
         {/* Header: progress and an always-available exit. */}
         <div className="flex items-center justify-between gap-3 border-b border-line px-4 py-3 sm:px-6">
           <div className="flex items-center gap-2">
-            <span className="grid size-6 place-items-center rounded-md bg-accent text-[10px] font-bold text-white">
-              IB
-            </span>
+            <Logo size="sm" />
             <span className="nums text-[11px] text-ink-3">
               {index + 1} of {STEPS.length}
             </span>

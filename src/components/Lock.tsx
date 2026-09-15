@@ -5,6 +5,7 @@ import { useStore } from "@/lib/store";
 import { cryptoAvailable, ratePassword } from "@/lib/vault";
 import { AuthScreen } from "./Auth";
 import { Button, Input, Panel } from "./ui";
+import { Logo } from "./Logo";
 
 /**
  * The door.
@@ -56,9 +57,7 @@ function Shell({
     <div className="flex min-h-screen items-center justify-center bg-bg px-4 py-10">
       <div className="fade-up w-full max-w-md">
         <div className="mb-6 flex flex-col items-center text-center">
-          <span className="mb-4 grid size-11 place-items-center rounded-xl bg-accent text-sm font-bold text-white">
-            IB
-          </span>
+          <Logo size="lg" className="mb-4" />
           <h1 className="text-xl font-semibold tracking-tight">{title}</h1>
           <p className="mt-1.5 max-w-sm text-sm text-ink-2">{subtitle}</p>
         </div>
