@@ -15,14 +15,21 @@ export function Panel({
   children,
   className = "",
   as: Tag = "div",
+  interactive = false,
 }: {
   children: ReactNode;
   className?: string;
   as?: "div" | "section";
+  /** Lifts on hover. For cards that are themselves a link or a button. */
+  interactive?: boolean;
 }) {
   return (
     <Tag
-      className={`rounded-xl border border-line bg-panel shadow-[var(--shadow)] ${className}`}
+      className={`rounded-xl border border-line bg-panel shadow-[var(--shadow),var(--edge)] ${
+        interactive
+          ? "transition-[box-shadow,transform,border-color] duration-200 hover:-translate-y-px hover:border-line-strong hover:shadow-[var(--shadow-md),var(--edge)]"
+          : ""
+      } ${className}`}
     >
       {children}
     </Tag>
@@ -73,14 +80,19 @@ export function Button({
   className = "",
   ...rest
 }: ButtonProps) {
+  // The press is what makes a button feel like an object rather than a
+  // rectangle that changes colour: it moves under the finger, then settles.
   const base =
-    "inline-flex items-center justify-center gap-1.5 rounded-lg font-medium transition-colors disabled:opacity-40 disabled:pointer-events-none whitespace-nowrap";
+    "inline-flex items-center justify-center gap-1.5 rounded-lg font-medium whitespace-nowrap transition-[background-color,box-shadow,transform,border-color,color] duration-150 active:translate-y-px disabled:opacity-40 disabled:pointer-events-none disabled:active:translate-y-0";
   const sizes = { sm: "h-8 px-2.5 text-[13px]", md: "h-9 px-3.5 text-sm" };
   const variants = {
-    primary: "bg-accent text-white hover:opacity-90",
-    secondary: "border border-line bg-panel text-ink hover:bg-panel-2",
+    primary:
+      "bg-accent text-white shadow-[var(--shadow),inset_0_1px_0_rgba(255,255,255,0.18)] hover:brightness-110 hover:shadow-[var(--shadow-md),inset_0_1px_0_rgba(255,255,255,0.18)] active:brightness-95 active:shadow-[var(--shadow)]",
+    secondary:
+      "border border-line bg-panel text-ink shadow-[var(--shadow)] hover:border-line-strong hover:bg-panel-2 active:shadow-none",
     ghost: "text-ink-2 hover:bg-panel-2 hover:text-ink",
-    danger: "border border-line text-[var(--urgent)] hover:bg-panel-2",
+    danger:
+      "border border-line text-[var(--urgent)] shadow-[var(--shadow)] hover:border-[var(--urgent)]/40 hover:bg-[var(--urgent)]/8 active:shadow-none",
   };
   return (
     <button className={`${base} ${sizes[size]} ${variants[variant]} ${className}`} {...rest}>
@@ -97,7 +109,7 @@ export function Button({
  * stretches its own controls instead, and standalone controls size themselves.
  */
 const fieldClass =
-  "rounded-lg border border-line bg-panel-2 px-3 py-2 text-sm text-ink placeholder:text-ink-3 transition-colors focus:border-accent focus:bg-panel focus:outline-none";
+  "rounded-lg border border-line bg-panel-2 px-3 py-2 text-sm text-ink placeholder:text-ink-3 transition-[background-color,border-color,box-shadow] duration-150 hover:border-line-strong focus:border-accent focus:bg-panel focus:shadow-[0_0_0_3px_var(--accent-soft)] focus:outline-none";
 
 export function Field({
   label,
@@ -238,7 +250,7 @@ export function EmptyState({
   action?: ReactNode;
 }) {
   return (
-    <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-line px-6 py-12 text-center">
+    <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-line bg-panel-2/40 px-6 py-12 text-center">
       <p className="text-sm font-medium text-ink-2">{title}</p>
       {hint && <p className="mt-1 max-w-sm text-sm text-ink-3">{hint}</p>}
       {action && <div className="mt-4">{action}</div>}
@@ -282,7 +294,7 @@ export function Modal({
 
   return createPortal(
     <div
-      className="fixed inset-0 z-50 flex items-end justify-center overflow-y-auto bg-black/30 p-0 backdrop-blur-[2px] sm:items-start sm:p-6 sm:pt-[8vh]"
+      className="fixed inset-0 z-50 flex items-end justify-center overflow-y-auto bg-black/40 p-0 backdrop-blur-[3px] sm:items-start sm:p-6 sm:pt-[8vh]"
       onMouseDown={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
@@ -292,7 +304,7 @@ export function Modal({
         role="dialog"
         aria-modal="true"
         aria-label={title}
-        className={`fade-up w-full rounded-t-2xl border border-line bg-panel shadow-xl sm:rounded-2xl ${
+        className={`fade-up w-full rounded-t-2xl border border-line bg-panel shadow-[var(--shadow-lg),var(--edge)] sm:rounded-2xl ${
           wide ? "sm:max-w-2xl" : "sm:max-w-lg"
         }`}
       >

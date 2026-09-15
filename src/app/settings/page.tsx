@@ -215,13 +215,12 @@ export default function SettingsPage() {
               <code className="rounded bg-panel-2 px-1 py-0.5 text-xs">
                 NEXT_PUBLIC_SUPABASE_ANON_KEY
               </code>{" "}
-              turns on accounts and multi-device sync, and whatever is already in this browser is
-              carried up on your first sign in.
+              turns on accounts and multi-device sync, and whatever is already in this browser
+              is carried up on your first sign in.
             </p>
           )}
         </Panel>
       </section>
-
     </div>
   );
 }

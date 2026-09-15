@@ -62,7 +62,8 @@ export async function signInWithGoogle(redirectTo?: string) {
   const { error } = await client().auth.signInWithOAuth({
     provider: "google",
     options: {
-      redirectTo: redirectTo ?? (typeof window !== "undefined" ? window.location.href : undefined),
+      redirectTo:
+        redirectTo ?? (typeof window !== "undefined" ? window.location.href : undefined),
       queryParams: {
         // Without this Google skips the account chooser once a session
         // exists, which makes switching accounts impossible.

@@ -6,14 +6,14 @@
  * defined once and redefined for dark, never defined only inside the dark block.
  */
 :root {
-  --bg: #fbfbfc;
+  --bg: #faf9f7;
   --panel: #ffffff;
-  --panel-2: #f7f7f9;
-  --border: #e6e6ea;
-  --border-strong: #d6d6dd;
-  --text: #17171a;
-  --text-2: #5d5d68;
-  --text-3: #8b8b96;
+  --panel-2: #f5f4f1;
+  --border: #e8e6e0;
+  --border-strong: #d7d4cb;
+  --text: #1b1a18;
+  --text-2: #5f5d57;
+  --text-3: #8c8a82;
   --accent: #5b5bd6;
   --accent-soft: #eeeefc;
   --accent-text: #4a4ac4;
@@ -27,19 +27,25 @@
   --down: #dc2626;
   --flat: #7c7c88;
 
-  --shadow: 0 1px 2px rgba(20, 20, 30, 0.04), 0 1px 3px rgba(20, 20, 30, 0.03);
+  --shadow: 0 1px 2px rgba(28, 26, 22, 0.05), 0 2px 6px -1px rgba(28, 26, 22, 0.04);
+  --shadow-md: 0 2px 4px rgba(28, 26, 22, 0.04), 0 8px 20px -6px rgba(28, 26, 22, 0.09);
+  --shadow-lg: 0 4px 10px rgba(28, 26, 22, 0.05), 0 20px 48px -12px rgba(28, 26, 22, 0.16);
+  /* Catches the light along a surface's top edge. Doing the same job as a
+     second border, but only where a real one would be lit. */
+  --edge: inset 0 1px 0 rgba(255, 255, 255, 0.7);
+  --sheen: linear-gradient(180deg, rgba(255, 255, 255, 0.6), rgba(255, 255, 255, 0));
 }
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --bg: #0b0b0e;
-    --panel: #131317;
-    --panel-2: #1a1a20;
-    --border: #26262e;
-    --border-strong: #35353f;
-    --text: #f2f2f5;
-    --text-2: #a0a0ad;
-    --text-3: #70707d;
+    --bg: #0c0c0e;
+    --panel: #151517;
+    --panel-2: #1c1c1f;
+    --border: #28282c;
+    --border-strong: #3a3a40;
+    --text: #f3f2f0;
+    --text-2: #a3a19c;
+    --text-3: #73716c;
     --accent: #7b7bf0;
     --accent-soft: #1e1e35;
     --accent-text: #a5a5f7;
@@ -53,19 +59,23 @@
     --down: #f87171;
     --flat: #8b8b98;
 
-    --shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+    --shadow: 0 1px 2px rgba(0, 0, 0, 0.5), 0 2px 6px -1px rgba(0, 0, 0, 0.4);
+    --shadow-md: 0 2px 4px rgba(0, 0, 0, 0.5), 0 8px 20px -6px rgba(0, 0, 0, 0.55);
+    --shadow-lg: 0 4px 10px rgba(0, 0, 0, 0.5), 0 20px 48px -12px rgba(0, 0, 0, 0.7);
+    --edge: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+    --sheen: linear-gradient(180deg, rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0));
   }
 }
 
 :root[data-theme="dark"] {
-  --bg: #0b0b0e;
-  --panel: #131317;
-  --panel-2: #1a1a20;
-  --border: #26262e;
-  --border-strong: #35353f;
-  --text: #f2f2f5;
-  --text-2: #a0a0ad;
-  --text-3: #70707d;
+  --bg: #0c0c0e;
+  --panel: #151517;
+  --panel-2: #1c1c1f;
+  --border: #28282c;
+  --border-strong: #3a3a40;
+  --text: #f3f2f0;
+  --text-2: #a3a19c;
+  --text-3: #73716c;
   --accent: #7b7bf0;
   --accent-soft: #1e1e35;
   --accent-text: #a5a5f7;
@@ -79,7 +89,11 @@
   --down: #f87171;
   --flat: #8b8b98;
 
-  --shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.5), 0 2px 6px -1px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 2px 4px rgba(0, 0, 0, 0.5), 0 8px 20px -6px rgba(0, 0, 0, 0.55);
+  --shadow-lg: 0 4px 10px rgba(0, 0, 0, 0.5), 0 20px 48px -12px rgba(0, 0, 0, 0.7);
+  --edge: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  --sheen: linear-gradient(180deg, rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0));
 }
 
 @theme inline {
@@ -109,6 +123,21 @@ body {
   color: var(--text);
 }
 
+/*
+ * A very slight warm lift behind the top of the page. Flat fills are what
+ * make a screen read as a diagram; one soft gradient is enough to suggest a
+ * surface under the cards without becoming a visible thing of its own.
+ */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: -1;
+  background: radial-gradient(70rem 32rem at 50% -12rem, var(--accent-soft), transparent 70%);
+  opacity: 0.55;
+}
+
 body {
   font-family:
     ui-sans-serif,
@@ -121,7 +150,29 @@ body {
     Arial,
     sans-serif;
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
   font-feature-settings: "cv02", "cv03", "cv04";
+  letter-spacing: -0.006em;
+}
+
+/*
+ * Headings tighten as they grow. Uniform tracking is what makes large type
+ * look loose and small type look cramped; this is the usual correction.
+ */
+h1,
+h2,
+h3 {
+  letter-spacing: -0.021em;
+}
+
+p {
+  text-wrap: pretty;
+}
+
+h1,
+h2,
+h3 {
+  text-wrap: balance;
 }
 
 /* Tabular figures keep grade columns and percentages from jittering. */
@@ -198,20 +249,42 @@ button {
 --------------------------------------------------------------------------- */
 
 @keyframes tour-enter {
-  from { opacity: 0; transform: translateX(14px); }
-  to   { opacity: 1; transform: none; }
+  from {
+    opacity: 0;
+    transform: translateX(14px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
 }
 @keyframes tour-enter-back {
-  from { opacity: 0; transform: translateX(-14px); }
-  to   { opacity: 1; transform: none; }
+  from {
+    opacity: 0;
+    transform: translateX(-14px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
 }
-.tour-enter      { animation: tour-enter 0.34s cubic-bezier(0.22, 1, 0.36, 1) both; }
-.tour-enter-back { animation: tour-enter-back 0.34s cubic-bezier(0.22, 1, 0.36, 1) both; }
+.tour-enter {
+  animation: tour-enter 0.34s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.tour-enter-back {
+  animation: tour-enter-back 0.34s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
 
 /* Rows and cards easing upward in sequence. Stagger via --d. */
 @keyframes rise {
-  from { opacity: 0; transform: translateY(8px); }
-  to   { opacity: 1; transform: none; }
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
 }
 .rise {
   animation: rise 0.42s cubic-bezier(0.22, 1, 0.36, 1) both;
@@ -220,9 +293,18 @@ button {
 
 /* Something arriving with a little weight to it. */
 @keyframes pop {
-  0%   { opacity: 0; transform: scale(0.82); }
-  60%  { opacity: 1; transform: scale(1.04); }
-  100% { opacity: 1; transform: scale(1); }
+  0% {
+    opacity: 0;
+    transform: scale(0.82);
+  }
+  60% {
+    opacity: 1;
+    transform: scale(1.04);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
 }
 .pop {
   animation: pop 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
@@ -231,7 +313,9 @@ button {
 
 /* Line chart drawing itself left to right. Pair with pathLength="1". */
 @keyframes draw {
-  to { stroke-dashoffset: 0; }
+  to {
+    stroke-dashoffset: 0;
+  }
 }
 .draw {
   stroke-dasharray: 1;
@@ -242,8 +326,12 @@ button {
 
 /* Progress bars filling to their value, held in --w. */
 @keyframes grow-x {
-  from { transform: scaleX(0); }
-  to   { transform: scaleX(1); }
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
 }
 .grow-x {
   transform-origin: left;
@@ -253,8 +341,12 @@ button {
 
 /* A fill sweeping upward, for the area under the chart. */
 @keyframes reveal-up {
-  from { clip-path: inset(100% 0 0 0); }
-  to   { clip-path: inset(0 0 0 0); }
+  from {
+    clip-path: inset(100% 0 0 0);
+  }
+  to {
+    clip-path: inset(0 0 0 0);
+  }
 }
 .reveal-up {
   animation: reveal-up 0.9s cubic-bezier(0.22, 1, 0.36, 1) both;
@@ -263,8 +355,12 @@ button {
 
 /* Text appearing a character at a time, for the quick-add demo. */
 @keyframes typing {
-  from { width: 0; }
-  to   { width: 100%; }
+  from {
+    width: 0;
+  }
+  to {
+    width: 100%;
+  }
 }
 .typing {
   display: inline-block;
@@ -276,7 +372,9 @@ button {
 }
 
 @keyframes caret {
-  50% { opacity: 0; }
+  50% {
+    opacity: 0;
+  }
 }
 .caret {
   animation: caret 0.9s step-end infinite;
@@ -285,9 +383,15 @@ button {
 
 /* Attention ring that fires once, then stops. */
 @keyframes halo {
-  0%   { box-shadow: 0 0 0 0 var(--accent-soft); }
-  70%  { box-shadow: 0 0 0 8px transparent; }
-  100% { box-shadow: 0 0 0 0 transparent; }
+  0% {
+    box-shadow: 0 0 0 0 var(--accent-soft);
+  }
+  70% {
+    box-shadow: 0 0 0 8px transparent;
+  }
+  100% {
+    box-shadow: 0 0 0 0 transparent;
+  }
 }
 .halo {
   animation: halo 1.4s ease-out 2 both;
@@ -298,8 +402,13 @@ button {
    these two need their end state restored explicitly, since the animation's
    `from` is what the element would otherwise be stuck at. */
 @media (prefers-reduced-motion: reduce) {
-  .draw   { stroke-dasharray: none; stroke-dashoffset: 0; }
-  .typing { width: 100%; }
+  .draw {
+    stroke-dasharray: none;
+    stroke-dashoffset: 0;
+  }
+  .typing {
+    width: 100%;
+  }
 }
 
 /* ---------------------------------------------------------------------------
@@ -459,7 +568,6 @@ button {
   --accent-soft: #1e242c;
   --accent-text: #cbd5e1;
 }
-
 
 /* ---------------------------------------------------------------------------
    Block size

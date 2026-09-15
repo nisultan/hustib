@@ -53,7 +53,7 @@ export default function CoursesPage() {
 
             return (
               <Link key={c.id} href={`/courses/${c.id}`}>
-                <Panel className="h-full px-4 py-4 transition-colors hover:border-line-strong">
+                <Panel interactive className="h-full px-4 py-4">
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
                       <h2 className="flex items-center gap-2 truncate text-sm font-semibold">

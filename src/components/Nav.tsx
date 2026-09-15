@@ -125,9 +125,9 @@ export function Sidebar() {
         key={item.href}
         href={item.href}
         aria-current={active ? "page" : undefined}
-        className={`flex items-center gap-2.5 rounded-lg px-2.5 py-[7px] text-[13px] font-medium transition-colors ${
+        className={`relative flex items-center gap-2.5 rounded-lg px-2.5 py-[7px] text-[13px] font-medium transition-[background-color,color] duration-150 ${
           active
-            ? "bg-accent-soft text-accent-text"
+            ? "bg-accent-soft text-accent-text before:absolute before:inset-y-1.5 before:left-0 before:w-[3px] before:rounded-full before:bg-accent"
             : "text-ink-2 hover:bg-panel-2 hover:text-ink"
         }`}
       >
@@ -138,7 +138,7 @@ export function Sidebar() {
   };
 
   return (
-    <aside className="fixed inset-y-0 left-0 hidden w-[232px] flex-col border-r border-line bg-panel px-3 py-4 md:flex">
+    <aside className="fixed inset-y-0 left-0 z-40 hidden w-[232px] flex-col border-r border-line bg-panel px-3 py-4 shadow-[var(--shadow)] md:flex">
       <Link href="/" className="mb-6 flex items-center gap-2 px-2.5">
         <span className="grid size-7 place-items-center rounded-lg bg-accent text-[13px] font-bold text-white">
           IB
@@ -163,7 +163,7 @@ export function MobileNav() {
 
   return (
     <nav
-      className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-5 border-t border-line bg-panel pb-[env(safe-area-inset-bottom)] md:hidden"
+      className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-5 border-t border-line bg-panel/95 pb-[env(safe-area-inset-bottom)] shadow-[0_-4px_16px_-8px_rgba(0,0,0,0.18)] backdrop-blur-md md:hidden"
       aria-label="Main"
     >
       {PRIMARY.map((item) => {
