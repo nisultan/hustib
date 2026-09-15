@@ -85,8 +85,22 @@ const PRIMARY: NavItem[] = [
 
 const SECONDARY: NavItem[] = [
   {
-    href: "/journal",
-    label: "Journal",
+    href: "/weight",
+    label: "Weight",
+    icon: (
+      <Icon>
+        <path d="M4.5 6.5h11l1.2 9a1 1 0 0 1-1 1.1H4.3a1 1 0 0 1-1-1.1z" {...stroke} />
+        <path
+          d="M10 3.2a2.2 2.2 0 0 0-2.2 2.2c0 .4.1.8.3 1.1h3.8c.2-.3.3-.7.3-1.1A2.2 2.2 0 0 0 10 3.2z"
+          {...stroke}
+        />
+        <path d="M10 9.5v2.2M10 11.7l1.8-1.4" {...stroke} />
+      </Icon>
+    ),
+  },
+  {
+    href: "/reflection",
+    label: "Reflection",
     icon: (
       <Icon>
         <path d="M5 3.5h9a1 1 0 0 1 1 1v11a1 1 0 0 1-1 1H5z" {...stroke} />
