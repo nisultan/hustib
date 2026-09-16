@@ -11,6 +11,10 @@ export function seedData(): AppData {
 
   return {
     profile: { name: "Sultan" },
+    categories: [
+      { id: "cat-school", name: "School", color: "violet" },
+      { id: "cat-personal", name: "Personal", color: "green" },
+    ],
     // The hub has not met this student yet: memory is earned, never seeded.
     memory: [],
     insights: [],
@@ -307,6 +311,8 @@ function task(
     id,
     title,
     courseId,
+    // Every seeded task is coursework, so they all file under School.
+    categoryId: "cat-school",
     lesson,
     dueDate,
     dueTime,

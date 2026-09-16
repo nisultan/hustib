@@ -74,10 +74,26 @@ create table lessons (
 -- after the fact; short notes stay in tasks.notes.
 -- ---------------------------------------------------------------------------
 
+-- A part of the student's life, for sorting tasks that are not coursework.
+-- Named by the student: the split that matters differs for everyone, and a
+-- list fixed here would be wrong for most people.
+create table categories (
+  id          uuid primary key default gen_random_uuid(),
+  user_id     uuid not null references auth.users on delete cascade,
+  name        text not null,
+  color       text not null default 'violet',
+  created_at  timestamptz not null default now(),
+  constraint name_is_not_empty check (length(trim(name)) > 0),
+  unique (user_id, name)
+);
+
 create table tasks (
   id            uuid primary key default gen_random_uuid(),
   user_id       uuid not null references auth.users on delete cascade,
   course_id     uuid references courses on delete cascade,
+  -- `set null`, never `cascade`: deleting a label must not delete the work
+  -- filed under it.
+  category_id   uuid references categories on delete set null,
   lesson        text,
   title         text not null,
   notes         text not null default '',
@@ -258,6 +274,8 @@ create index on courses (user_id);
 create index on lessons (user_id, course_id);
 create index on tasks (user_id, due_date) where status <> 'completed';
 create index on tasks (user_id, course_id);
+create index on tasks (user_id, category_id);
+create index on categories (user_id);
 create index on task_notes (user_id, task_id);
 create index on grades (user_id, course_id, date);
 create index on grade_categories (user_id, course_id);
@@ -283,7 +301,7 @@ declare
   t text;
 begin
   foreach t in array array[
-    'courses', 'lessons', 'tasks', 'task_notes',
+    'courses', 'categories', 'lessons', 'tasks', 'task_notes',
     'grades', 'grade_categories',
     'universities', 'university_notes', 'recommendations',
     'days', 'memory_notes', 'insights'
@@ -317,6 +335,7 @@ create policy profiles_owner on profiles
 -- ---------------------------------------------------------------------------
 
 alter table courses          alter column user_id set default auth.uid();
+alter table categories       alter column user_id set default auth.uid();
 alter table lessons          alter column user_id set default auth.uid();
 alter table tasks            alter column user_id set default auth.uid();
 alter table task_notes       alter column user_id set default auth.uid();

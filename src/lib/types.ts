@@ -36,10 +36,27 @@ export interface Course {
   lessons: string[];
 }
 
+/**
+ * A part of the student's life, for sorting tasks that are not coursework.
+ *
+ * Defined by the student rather than fixed in code: the split that matters is
+ * different for everyone — swimming, a side project, a part-time job — and a
+ * list chosen here would be wrong for most people and unfixable without a
+ * release. Courses stay separate; a course says which subject, a category says
+ * which part of life, and a task can carry both.
+ */
+export interface Category {
+  id: ID;
+  name: string;
+  /** One of COURSE_COLORS, so categories and courses share a palette. */
+  color: string;
+}
+
 export interface Task {
   id: ID;
   title: string;
   courseId: ID | null;
+  categoryId: ID | null;
   lesson: string | null;
   /** ISO date, "YYYY-MM-DD". Null means no deadline. */
   dueDate: string | null;
@@ -233,6 +250,7 @@ export interface Insight {
 export interface AppData {
   profile: Profile;
   courses: Course[];
+  categories: Category[];
   tasks: Task[];
   grades: Grade[];
   universities: University[];

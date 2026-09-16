@@ -4,6 +4,7 @@ import {
   AppData,
   Block,
   BlockType,
+  Category,
   Course,
   Day,
   Grade,
@@ -16,6 +17,7 @@ import {
 import type { User } from "@supabase/supabase-js";
 import { getSupabase } from "./client";
 import {
+  CategoryRow,
   CourseRow,
   DayRow,
   GradeRow,
@@ -153,8 +155,18 @@ function isMissingSchema(error: { code?: string } | null): boolean {
 export async function fetchAll(): Promise<AppData> {
   const supabase = client();
 
-  const [profile, courses, lessons, tasks, grades, universities, days, memory, insights] =
-    await Promise.all([
+  const [
+    profile,
+    courses,
+    lessons,
+    tasks,
+    grades,
+    universities,
+    days,
+    categories,
+    memory,
+    insights,
+  ] = await Promise.all([
     supabase.from("profiles").select("*").maybeSingle(),
     supabase.from("courses").select("*").order("created_at"),
     supabase.from("lessons").select("*").order("position"),
@@ -162,6 +174,7 @@ export async function fetchAll(): Promise<AppData> {
     supabase.from("grades").select("*").order("date", { ascending: false }),
     supabase.from("universities").select("*").order("deadline", { nullsFirst: false }),
     supabase.from("days").select("*").order("date", { ascending: false }),
+    supabase.from("categories").select("*").order("created_at"),
     supabase.from("memory_notes").select("*").order("created_at"),
     supabase.from("insights").select("*").order("created_at", { ascending: false }),
   ]);
@@ -180,7 +193,7 @@ export async function fetchAll(): Promise<AppData> {
   // arrived after the rest of the schema, and a database still on the earlier
   // migration must load a student's courses and grades exactly as before
   // rather than failing the entire hub over a table it has never heard of.
-  for (const optional of [memory, insights]) {
+  for (const optional of [categories, memory, insights]) {
     if (optional.error && !isMissingSchema(optional.error)) throw optional.error;
   }
 
@@ -200,6 +213,7 @@ export async function fetchAll(): Promise<AppData> {
     grades: ((grades.data ?? []) as GradeRow[]).map(toGrade),
     universities: ((universities.data ?? []) as UniversityRow[]).map(toUniversity),
     days: ((days.data ?? []) as DayRow[]).map(toDay),
+    categories: ((categories.data ?? []) as CategoryRow[]).map(toCategory),
     memory: ((memory.data ?? []) as MemoryNoteRow[]).map(toMemory),
     insights: ((insights.data ?? []) as InsightRow[]).map(toInsight),
     // Undefined on a pre-migration database, which reads as "never reflected".
@@ -272,6 +286,7 @@ export async function createTask(
     .insert({
       title: t.title,
       course_id: t.courseId,
+      category_id: t.categoryId,
       lesson: t.lesson,
       notes: t.notes,
       due_date: t.dueDate,
@@ -291,6 +306,7 @@ export async function updateTask(id: string, patch: Partial<Task>): Promise<void
   const row: Partial<TaskRow> = {};
   if (patch.title !== undefined) row.title = patch.title;
   if (patch.courseId !== undefined) row.course_id = patch.courseId;
+  if (patch.categoryId !== undefined) row.category_id = patch.categoryId;
   if (patch.lesson !== undefined) row.lesson = patch.lesson;
   if (patch.notes !== undefined) row.notes = patch.notes;
   if (patch.dueDate !== undefined) row.due_date = patch.dueDate;
@@ -447,6 +463,36 @@ export async function deleteDay(date: string): Promise<void> {
 /* Profile                                                                    */
 /* -------------------------------------------------------------------------- */
 
+/* --------------------------------- Categories ---------------------------- */
+
+export async function createCategory(c: Omit<Category, "id">): Promise<Category | null> {
+  const { data, error } = await client()
+    .from("categories")
+    .insert({ name: c.name, color: c.color })
+    .select()
+    .single();
+  if (error) {
+    if (isMissingSchema(error)) return null;
+    throw error;
+  }
+  return toCategory(data as CategoryRow);
+}
+
+export async function updateCategory(id: string, patch: Partial<Category>): Promise<void> {
+  const row: Partial<CategoryRow> = {};
+  if (patch.name !== undefined) row.name = patch.name;
+  if (patch.color !== undefined) row.color = patch.color;
+  if (Object.keys(row).length === 0) return;
+
+  const { error } = await client().from("categories").update(row).eq("id", id);
+  if (error && !isMissingSchema(error)) throw error;
+}
+
+export async function deleteCategory(id: string): Promise<void> {
+  const { error } = await client().from("categories").delete().eq("id", id);
+  if (error && !isMissingSchema(error)) throw error;
+}
+
 /* ----------------------------- Memory & insights ------------------------- */
 
 export async function createMemory(m: Omit<MemoryNote, "id">): Promise<MemoryNote> {
@@ -599,6 +645,8 @@ function toTask(row: TaskRow): Task {
     id: row.id,
     title: row.title,
     courseId: row.course_id,
+    // Null on a database that has not run the categories migration.
+    categoryId: row.category_id ?? null,
     lesson: row.lesson,
     dueDate: row.due_date,
     // Postgres `time` comes back as "HH:MM:SS"; the app works in "HH:MM".
@@ -628,6 +676,10 @@ const BLOCK_TYPES = ["text", "h2", "h3", "bullet", "todo", "quote", "divider"];
 
 const MEMORY_SOURCES = ["reflection", "conversation", "pattern"];
 const INSIGHT_KINDS = ["takeaway", "recommendation", "pattern"];
+
+function toCategory(row: CategoryRow): Category {
+  return { id: row.id, name: row.name, color: row.color };
+}
 
 function toMemory(row: MemoryNoteRow): MemoryNote {
   return {

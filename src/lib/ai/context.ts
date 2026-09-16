@@ -43,6 +43,7 @@ export function buildContext(data: AppData): string {
 
   out.push(`Today is ${today} (${weekday(today)}). The student is ${data.profile.name}.`);
 
+  out.push(section("CATEGORIES", categories(data)));
   out.push(section("COURSES", courses(data)));
   out.push(section("OPEN TASKS", openTasks(data)));
   out.push(section("RECENTLY COMPLETED", doneTasks(data)));
@@ -56,6 +57,11 @@ export function buildContext(data: AppData): string {
 
 function section(title: string, body: string): string {
   return body.trim() === "" ? "" : `## ${title}\n${body.trim()}`;
+}
+
+/** The parts of life the student sorts tasks by, in their own words. */
+function categories(data: AppData): string {
+  return data.categories.map((c) => `- ${c.name} (id ${c.id})`).join("\n");
 }
 
 function courses(data: AppData): string {
@@ -113,6 +119,8 @@ function taskLine(t: Task, data: AppData): string {
     bits.push("no deadline");
   }
 
+  const category = data.categories.find((c) => c.id === t.categoryId);
+  if (category) bits.push(category.name);
   if (t.status === "in_progress") bits.push("in progress");
   const course = courseSuffix(t.courseId, data);
   if (course) bits.push(course.replace(" — ", ""));

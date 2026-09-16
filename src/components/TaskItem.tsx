@@ -27,6 +27,7 @@ export function TaskItem({ task, showCourse = true }: { task: Task; showCourse?:
 
   const done = task.status === "completed";
   const course = task.courseId ? courses.get(task.courseId) : null;
+  const category = store.categories.find((c) => c.id === task.categoryId) ?? null;
   const overdue = !done && task.dueDate != null && daysUntil(task.dueDate) < 0;
 
   const due = task.dueDate ? relativeLabel(task.dueDate) : null;
@@ -95,6 +96,17 @@ export function TaskItem({ task, showCourse = true }: { task: Task; showCourse?:
                   style={{ background: courseColor(course.color) }}
                 />
                 {course.name}
+              </span>
+            )}
+            {category && (
+              <span
+                className="inline-flex shrink-0 items-center rounded px-1.5 py-0.5 font-medium"
+                style={{
+                  color: courseColor(category.color),
+                  background: `color-mix(in srgb, ${courseColor(category.color)} 12%, transparent)`,
+                }}
+              >
+                {category.name}
               </span>
             )}
             {task.lesson && <span className="truncate">{task.lesson}</span>}

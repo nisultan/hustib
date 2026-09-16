@@ -50,6 +50,8 @@ export type LessonRow = {
 };
 
 export type TaskRow = {
+  /** Absent on a database that has not run the categories migration. */
+  category_id?: string | null;
   id: string;
   user_id: string;
   course_id: string | null;
@@ -102,6 +104,14 @@ export type DayRow = {
   reflection: BlockJson[];
   created_at: string;
   updated_at: string;
+};
+
+export type CategoryRow = {
+  id: string;
+  user_id: string;
+  name: string;
+  color: string;
+  created_at: string;
 };
 
 export type MemoryNoteRow = {
@@ -169,6 +179,7 @@ export interface Database {
       grades: Table<GradeRow>;
       universities: Table<UniversityRow>;
       days: Table<DayRow>;
+      categories: Table<CategoryRow>;
       memory_notes: Table<MemoryNoteRow>;
       insights: Table<InsightRow>;
     };

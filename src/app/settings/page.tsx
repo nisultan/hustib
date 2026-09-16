@@ -8,6 +8,7 @@ import { useAppearance } from "@/lib/use-appearance";
 import { openTour } from "@/components/Tour";
 import { PasswordSection } from "@/components/PasswordSection";
 import { MemorySection } from "@/components/MemorySection";
+import { CategorySection } from "@/components/CategorySection";
 import { AccountSection } from "@/components/AccountSection";
 
 export default function SettingsPage() {
@@ -144,6 +145,10 @@ export default function SettingsPage() {
           </p>
           <Button onClick={openTour}>Replay the tour</Button>
         </Panel>
+      </section>
+
+      <section className="mb-8">
+        <CategorySection />
       </section>
 
       <section className="mb-8">

@@ -12,6 +12,7 @@ import {
 } from "react";
 import {
   AppData,
+  Category,
   Course,
   Day,
   Grade,
@@ -100,6 +101,11 @@ export interface Store extends AppData {
   deleteTask(id: ID): void;
   toggleTask(id: ID): void;
 
+  addCategory(c: Omit<Category, "id">): void;
+  updateCategory(id: ID, patch: Partial<Category>): void;
+  /** Tasks in the category are kept and simply lose it. */
+  deleteCategory(id: ID): void;
+
   addCourse(c: Omit<Course, "id">): void;
   updateCourse(id: ID, patch: Partial<Course>): void;
   deleteCourse(id: ID): void;
@@ -166,9 +172,45 @@ export interface Store extends AppData {
 
 const StoreContext = createContext<Store | null>(null);
 
+/**
+ * What a new hub starts with.
+ *
+ * Two, not five: the point of custom categories is that the student names the
+ * parts of their own life, and arriving at a pre-sorted list of someone else's
+ * guesses is the thing that makes people leave the defaults alone forever.
+ * These two are the split everyone has, and both are renameable.
+ */
+const DEFAULT_CATEGORIES: Category[] = [
+  { id: "cat-school", name: "School", color: "violet" },
+  { id: "cat-personal", name: "Personal", color: "green" },
+];
+
+/**
+ * Brings a hub saved before categories existed up to date.
+ *
+ * Seeds the defaults, and files existing coursework under School — a task
+ * attached to a school course is schoolwork, so inferring that is safe and
+ * saves tagging a term's work by hand. Nothing is overwritten: only tasks with
+ * no category at all are touched, and only when the categories are the seeded
+ * ones, so a student who has already organised things is left alone.
+ */
+function adoptCategories(data: AppData): AppData {
+  if (data.categories.length > 0) return data;
+
+  const school = DEFAULT_CATEGORIES[0];
+  return {
+    ...data,
+    categories: DEFAULT_CATEGORIES,
+    tasks: data.tasks.map((t) =>
+      t.categoryId == null && t.courseId != null ? { ...t, categoryId: school.id } : t,
+    ),
+  };
+}
+
 function emptyData(): AppData {
   return {
     profile: { name: "there" },
+    categories: DEFAULT_CATEGORIES,
     courses: [],
     tasks: [],
     grades: [],
@@ -200,11 +242,14 @@ function parseData(raw: string | null): AppData {
     const parsed = JSON.parse(raw) as Partial<AppData>;
     // Merge against an empty shape so data saved by an older version that
     // lacked a collection still loads instead of crashing on undefined.
-    return {
+    return adoptCategories({
       ...emptyData(),
       ...parsed,
       profile: { ...emptyData().profile, ...parsed.profile },
-    };
+      // Saved before categories existed: the field is absent rather than null.
+      tasks: (parsed.tasks ?? []).map((t) => ({ ...t, categoryId: t.categoryId ?? null })),
+      categories: parsed.categories ?? [],
+    });
   } catch {
     // Corrupt or unreadable storage. Starting empty loses nothing that could
     // have been read anyway, and beats crashing on load.
@@ -486,6 +531,26 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         };
         mutate((d) => ({ ...d, tasks: upsert(d.tasks, id, patch) }));
         if (cloud) push(repo.updateTask(id, patch));
+      },
+
+      addCategory: (c) => {
+        const created = { ...c, id: uid() };
+        mutate((d) => ({ ...d, categories: [...d.categories, created] }));
+        if (cloud) push(repo.createCategory(c));
+      },
+      updateCategory: (id, patch) => {
+        mutate((d) => ({ ...d, categories: upsert(d.categories, id, patch) }));
+        if (cloud) push(repo.updateCategory(id, patch));
+      },
+      deleteCategory: (id) => {
+        // The tasks outlive the category. Losing a label should never lose
+        // the work filed under it.
+        mutate((d) => ({
+          ...d,
+          categories: d.categories.filter((c) => c.id !== id),
+          tasks: d.tasks.map((t) => (t.categoryId === id ? { ...t, categoryId: null } : t)),
+        }));
+        if (cloud) push(repo.deleteCategory(id));
       },
 
       addCourse: (c) => {

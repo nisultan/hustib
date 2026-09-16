@@ -20,6 +20,7 @@ import { DateField } from "./DateField";
 interface Draft {
   title: string;
   courseId: string;
+  categoryId: string;
   lesson: string;
   dueDate: string;
   dueTime: string;
@@ -28,10 +29,11 @@ interface Draft {
   notes: string;
 }
 
-function emptyDraft(courseId = ""): Draft {
+function emptyDraft(courseId = "", categoryId = ""): Draft {
   return {
     title: "",
     courseId,
+    categoryId,
     lesson: "",
     dueDate: "",
     dueTime: "",
@@ -45,6 +47,7 @@ function toDraft(t: Task): Draft {
   return {
     title: t.title,
     courseId: t.courseId ?? "",
+    categoryId: t.categoryId ?? "",
     lesson: t.lesson ?? "",
     dueDate: t.dueDate ?? "",
     dueTime: t.dueTime ?? "",
@@ -117,6 +120,7 @@ export function TaskDialog({
     const payload = {
       title,
       courseId: draft.courseId || null,
+      categoryId: draft.categoryId || null,
       lesson: draft.lesson.trim() || null,
       dueDate: draft.dueDate || null,
       // A time without a date has nothing to anchor to, so it is dropped.
@@ -198,6 +202,20 @@ export function TaskDialog({
         </Field>
 
         <div className="grid gap-4 sm:grid-cols-2">
+          <Field label="Category">
+            <Select
+              value={draft.categoryId}
+              onChange={(e) => set("categoryId", e.target.value)}
+            >
+              <option value="">None</option>
+              {store.categories.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+            </Select>
+          </Field>
+
           <Field label="Course">
             <Select value={draft.courseId} onChange={(e) => set("courseId", e.target.value)}>
               <option value="">No course</option>

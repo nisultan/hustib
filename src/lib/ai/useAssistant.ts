@@ -4,6 +4,7 @@ import { useCallback, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useStore } from "@/lib/store";
 import { todayISO } from "@/lib/dates";
+import { COURSE_COLORS } from "@/lib/appearance";
 import { buildContext } from "./context";
 import { ToolCall, ToolResult } from "./tools";
 import {
@@ -64,7 +65,9 @@ export function useAssistant() {
   const wire = useRef<Content[]>([]);
 
   const run = useCallback(
-    async (contents: Content[]): Promise<{ parts: Part[]; text: string; calls: ToolCall[] }> => {
+    async (
+      contents: Content[],
+    ): Promise<{ parts: Part[]; text: string; calls: ToolCall[] }> => {
       const response = await fetch("/api/ai", {
         method: "POST",
         headers: { "content-type": "application/json" },
@@ -182,10 +185,14 @@ function runTool(call: ToolCall, store: Store, router: Router): ToolResult {
         const courseId = optionalCourse(a.courseId, store);
         if (courseId === INVALID) return fail("That course is not in the hub.");
 
+        const categoryId = optionalCategory(a.categoryId, store);
+        if (categoryId === INVALID) return fail("That category is not in the hub.");
+
         const due = date(a.dueDate);
         store.addTask({
           title,
           courseId,
+          categoryId,
           lesson: str(a.lesson),
           dueDate: due,
           dueTime: time(a.dueTime),
@@ -202,18 +209,32 @@ function runTool(call: ToolCall, store: Store, router: Router): ToolResult {
 
         const patch: Record<string, unknown> = {};
         if (str(a.title)) patch.title = str(a.title);
-        if (a.dueDate !== undefined) patch.dueDate = a.dueDate === "none" ? null : date(a.dueDate);
-        if (a.dueTime !== undefined) patch.dueTime = a.dueTime === "none" ? null : time(a.dueTime);
-        if (a.priority !== undefined) patch.priority = oneOf(a.priority, PRIORITIES, task.priority);
+        if (a.dueDate !== undefined)
+          patch.dueDate = a.dueDate === "none" ? null : date(a.dueDate);
+        if (a.dueTime !== undefined)
+          patch.dueTime = a.dueTime === "none" ? null : time(a.dueTime);
+        if (a.priority !== undefined)
+          patch.priority = oneOf(a.priority, PRIORITIES, task.priority);
         if (a.notes !== undefined) patch.notes = str(a.notes) ?? "";
         if (a.courseId !== undefined) {
           const courseId = optionalCourse(a.courseId, store);
           if (courseId === INVALID) return fail("That course is not in the hub.");
           patch.courseId = courseId;
         }
+        if (a.categoryId !== undefined) {
+          if (a.categoryId === "none") {
+            patch.categoryId = null;
+          } else {
+            const categoryId = optionalCategory(a.categoryId, store);
+            if (categoryId === INVALID) return fail("That category is not in the hub.");
+            patch.categoryId = categoryId;
+          }
+        }
 
         const status =
-          a.status === undefined ? undefined : (oneOf(a.status, STATUSES, task.status) as Status);
+          a.status === undefined
+            ? undefined
+            : (oneOf(a.status, STATUSES, task.status) as Status);
         if (status !== undefined && status !== "completed") patch.status = status;
 
         if (Object.keys(patch).length === 0 && status === undefined) {
@@ -238,6 +259,19 @@ function runTool(call: ToolCall, store: Store, router: Router): ToolResult {
         if (task.status === "completed") return ok(`"${task.title}" was already done`);
         store.toggleTask(task.id);
         return ok(`Completed "${task.title}"`);
+      }
+
+      case "create_category": {
+        const name = str(a.name);
+        if (!name) return fail("A category needs a name.");
+        if (store.categories.some((c) => c.name.toLowerCase() === name.toLowerCase())) {
+          return ok(`You already have a "${name}" category`);
+        }
+        // The palette is shared with courses; cycling keeps a new category
+        // from landing on the same colour as the last one.
+        const color = COURSE_COLORS[store.categories.length % COURSE_COLORS.length].id;
+        store.addCategory({ name, color });
+        return ok(`Added the "${name}" category`);
       }
 
       case "create_course": {
@@ -312,7 +346,9 @@ function runTool(call: ToolCall, store: Store, router: Router): ToolResult {
           done: false,
         }));
         store.setDay(when, { reflection: [...existing, ...added] });
-        return ok(`Added ${lines.length === 1 ? "a note" : `${lines.length} notes`} to ${when}`);
+        return ok(
+          `Added ${lines.length === 1 ? "a note" : `${lines.length} notes`} to ${when}`,
+        );
       }
 
       case "remember": {
@@ -427,6 +463,13 @@ function time(v: unknown): string | null {
 function oneOf<T extends string>(v: unknown, allowed: readonly T[], fallback: T): T {
   const s = str(v);
   return s && (allowed as readonly string[]).includes(s) ? (s as T) : fallback;
+}
+
+/** null means "no category"; INVALID means the model named one that does not exist. */
+function optionalCategory(v: unknown, store: Store): string | null | typeof INVALID {
+  const id = str(v);
+  if (!id) return null;
+  return store.categories.some((c) => c.id === id) ? id : INVALID;
 }
 
 /** null means "no course"; INVALID means the model named one that does not exist. */
