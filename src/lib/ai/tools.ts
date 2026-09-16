@@ -288,4 +288,13 @@ export interface ToolResult {
   ok: boolean;
   /** One line, written for the student to read in the transcript. */
   summary: string;
+  /**
+   * Where the change landed, when there is a page that shows it.
+   *
+   * A chip that says "Added 'Finish lab report'" and cannot be opened makes
+   * the student go and find it. This is what turns the receipt into a way in.
+   * It is stripped before the result goes back to the model, which has its own
+   * `navigate` tool and no use for a link.
+   */
+  href?: string;
 }

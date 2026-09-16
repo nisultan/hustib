@@ -1,7 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Assistant } from "./Assistant";
+import { motion } from "motion/react";
+import { Assistant, ASSISTANT_NAME } from "./Assistant";
+import { springSnappy } from "@/lib/motion";
 
 /**
  * Owns whether the assistant is open, and the two ways to open it.
@@ -34,12 +36,19 @@ export function AssistantButton() {
 
   return (
     <>
-      <button
+      <motion.button
         type="button"
         onClick={show}
-        aria-label="Open assistant"
-        title="Assistant  ⌘J"
-        className="grid size-9 shrink-0 place-items-center rounded-lg text-ink-3 transition-colors hover:bg-panel-2 hover:text-ink"
+        aria-label={`Open ${ASSISTANT_NAME}`}
+        title={`${ASSISTANT_NAME}  ⌘J`}
+        // The spark turns a little as you reach for it: the one control in the
+        // header that opens something with an opinion should look awake.
+        whileHover={{ rotate: 12, scale: 1.08 }}
+        whileTap={{ scale: 0.9, rotate: 0 }}
+        transition={springSnappy}
+        className={`grid size-9 shrink-0 place-items-center rounded-lg transition-colors hover:bg-panel-2 hover:text-ink ${
+          open ? "bg-accent-soft text-accent-text" : "text-ink-3"
+        }`}
       >
         <svg viewBox="0 0 20 20" aria-hidden className="size-[18px]">
           <path
@@ -50,7 +59,7 @@ export function AssistantButton() {
             strokeLinejoin="round"
           />
         </svg>
-      </button>
+      </motion.button>
 
       {everOpened && <Assistant open={open} onClose={() => setOpen(false)} />}
     </>

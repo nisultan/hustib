@@ -122,7 +122,15 @@ export function useAssistant() {
           const results = calls.map((call) => {
             const result = runTool(call, store, router);
             actions.push(result);
-            return { functionResponse: { name: call.name, response: { ...result } } };
+            // The link is for the chip in the transcript, not for the model:
+            // it has `navigate` for going places, and a URL in the response
+            // only invites it to describe one in prose.
+            return {
+              functionResponse: {
+                name: call.name,
+                response: { ok: result.ok, summary: result.summary },
+              },
+            };
           });
           wire.current.push({ role: "user", parts: results });
         }
@@ -200,7 +208,7 @@ function runTool(call: ToolCall, store: Store, router: Router): ToolResult {
           status: "not_started",
           notes: str(a.notes) ?? "",
         });
-        return ok(`Added "${title}"${due ? ` — due ${due}` : ""}`);
+        return ok(`Added "${title}"${due ? ` — due ${due}` : ""}`, "/tasks");
       }
 
       case "update_task": {
@@ -247,18 +255,19 @@ function runTool(call: ToolCall, store: Store, router: Router): ToolResult {
         // toggleTask rather than being written straight into the patch.
         if (status === "completed" && task.status !== "completed") {
           store.toggleTask(task.id);
-          return ok(`Completed "${task.title}"`);
+          return ok(`Completed "${task.title}"`, "/tasks");
         }
 
-        return ok(`Updated "${task.title}"`);
+        return ok(`Updated "${task.title}"`, "/tasks");
       }
 
       case "complete_task": {
         const task = store.tasks.find((t) => t.id === str(a.id));
         if (!task) return fail("No task with that id.");
-        if (task.status === "completed") return ok(`"${task.title}" was already done`);
+        if (task.status === "completed")
+          return ok(`"${task.title}" was already done`, "/tasks");
         store.toggleTask(task.id);
-        return ok(`Completed "${task.title}"`);
+        return ok(`Completed "${task.title}"`, "/tasks");
       }
 
       case "create_category": {
@@ -284,7 +293,7 @@ function runTool(call: ToolCall, store: Store, router: Router): ToolResult {
           color: "violet",
           lessons: strings(a.lessons),
         });
-        return ok(`Added course ${name}`);
+        return ok(`Added course ${name}`, "/courses");
       }
 
       case "record_grade": {
@@ -303,7 +312,7 @@ function runTool(call: ToolCall, store: Store, router: Router): ToolResult {
           weight: num(a.weight),
           date: date(a.date) ?? todayISO(),
         });
-        return ok(`Recorded ${assessment} — ${score}% in ${course.name}`);
+        return ok(`Recorded ${assessment} — ${score}% in ${course.name}`, "/school");
       }
 
       case "add_university": {
@@ -321,7 +330,7 @@ function runTool(call: ToolCall, store: Store, router: Router): ToolResult {
           notes: str(a.notes) ?? "",
           website: "",
         });
-        return ok(`Added ${name} to your university list`);
+        return ok(`Added ${name} to your university list`, "/universities");
       }
 
       case "log_weight": {
@@ -331,7 +340,7 @@ function runTool(call: ToolCall, store: Store, router: Router): ToolResult {
         }
         const when = date(a.date) ?? todayISO();
         store.setDay(when, { weight });
-        return ok(`Logged ${weight}kg for ${when}`);
+        return ok(`Logged ${weight}kg for ${when}`, "/weight");
       }
 
       case "append_reflection": {
@@ -348,6 +357,7 @@ function runTool(call: ToolCall, store: Store, router: Router): ToolResult {
         store.setDay(when, { reflection: [...existing, ...added] });
         return ok(
           `Added ${lines.length === 1 ? "a note" : `${lines.length} notes`} to ${when}`,
+          "/reflection",
         );
       }
 
@@ -378,7 +388,7 @@ function runTool(call: ToolCall, store: Store, router: Router): ToolResult {
           categoryId: categoryId ?? task?.categoryId ?? null,
           taskId: task?.id ?? null,
         });
-        return ok(`Planned "${title}"${start ? ` at ${start}` : ""} on ${when}`);
+        return ok(`Planned "${title}"${start ? ` at ${start}` : ""} on ${when}`, "/plan");
       }
 
       case "remember": {
@@ -410,7 +420,7 @@ function runTool(call: ToolCall, store: Store, router: Router): ToolResult {
             pinned: false,
           },
         ]);
-        return ok(`Noted — ${note}`);
+        return ok(`Noted — ${note}`, "/settings");
       }
 
       case "navigate": {
@@ -428,8 +438,8 @@ function runTool(call: ToolCall, store: Store, router: Router): ToolResult {
   }
 }
 
-function ok(summary: string): ToolResult {
-  return { ok: true, summary };
+function ok(summary: string, href?: string): ToolResult {
+  return { ok: true, summary, href };
 }
 
 function fail(summary: string): ToolResult {
