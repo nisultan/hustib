@@ -7,6 +7,8 @@ import { Block } from "@/lib/types";
 import { BlockEditor } from "@/components/BlockEditor";
 import { DateField } from "@/components/DateField";
 import { Button, PageHeader, Panel, SectionTitle } from "@/components/ui";
+import { motion } from "motion/react";
+import { spring } from "@/lib/motion";
 
 /** Where the wide-column preference is kept. */
 const WIDE_KEY = "iblearner.reflectionWide";
@@ -54,6 +56,7 @@ export default function ReflectionPage() {
         date={date}
         today={today}
         blocks={reflection}
+        streak={streak(store.days, today)}
         onChange={(blocks) => store.setDay(date, { reflection: blocks })}
         onDate={setDate}
         onClose={() => setFocus(false)}
@@ -176,6 +179,27 @@ function Step({ label, onClick, d }: { label: string; onClick: () => void; d: st
 }
 
 /** The opening words, so a card shows the entry rather than its shape. */
+/**
+ * Consecutive days written, counting back from today.
+ *
+ * Today not being written yet does not break the streak — it has not happened
+ * yet. A journal that resets your count at midnight for not having lived the
+ * day out is a journal you stop opening.
+ */
+function streak(days: { date: string; reflection: Block[] }[], today: string): number {
+  const written = new Set(
+    days.filter((d) => d.reflection.some((b) => b.text.trim() !== "")).map((d) => d.date),
+  );
+
+  let cursor = written.has(today) ? today : addDays(today, -1);
+  let count = 0;
+  while (written.has(cursor)) {
+    count += 1;
+    cursor = addDays(cursor, -1);
+  }
+  return count;
+}
+
 function summarise(blocks: Block[]): string {
   return (
     blocks
@@ -192,13 +216,18 @@ function summarise(blocks: Block[]): string {
  * this is to stop seeing the deadline counters and the nav while writing about
  * your day, and a page that merely got wider still has all of that on it.
  *
- * Deliberately sparse — the date, a way back, and the page. Every control that
- * is not writing is one more thing to look at instead of writing.
+ * Sparse, but not bare. The first version was text on the raw background with
+ * nothing else on screen, and an empty day read as a fault rather than an
+ * invitation — there was no surface, no edge, nothing to write *on*. The page
+ * is a lit sheet now, the day it belongs to is stated once at the top, and
+ * what you have written is counted at the foot. That is the whole addition:
+ * everything else is still the page.
  */
 function FocusMode({
   date,
   today,
   blocks,
+  streak,
   onChange,
   onDate,
   onClose,
@@ -206,6 +235,8 @@ function FocusMode({
   date: string;
   today: string;
   blocks: Block[];
+  /** Consecutive days written, ending today. Shown at the foot. */
+  streak: number;
   onChange: (blocks: Block[]) => void;
   onDate: (date: string) => void;
   onClose: () => void;
@@ -233,16 +264,39 @@ function FocusMode({
     }
   };
 
+  const written = blocks.filter((b) => b.text.trim() !== "").length;
+  const words = blocks
+    .map((b) => b.text)
+    .join(" ")
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean).length;
+
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto bg-bg">
+      {/* One wash of colour, thrown from above the page.
+
+          Not decoration for its own sake: a full-bleed flat background gives
+          the eye no depth cue at all, so the sheet below had nothing to sit
+          against. At this strength it is barely nameable as a colour — it just
+          stops the screen reading as switched off. */}
+      <div
+        aria-hidden
+        className="pointer-events-none fixed inset-x-0 top-0 h-[42vh] opacity-[0.55]"
+        style={{
+          background:
+            "radial-gradient(90% 100% at 50% 0%, color-mix(in srgb, var(--accent) 16%, transparent), transparent 70%)",
+        }}
+      />
+
       {/* The width is a computed value rather than a utility class: Tailwind
           does not generate an arbitrary `min()` with a comma in it, so the
           class was applied and silently did nothing. */}
       <div
-        className="mx-auto w-full px-5 py-10 transition-[max-width] duration-300 sm:px-8 sm:py-16"
+        className="relative mx-auto w-full px-5 py-10 transition-[max-width] duration-300 sm:px-8 sm:py-16"
         style={{ maxWidth: wide ? "min(1400px, 92vw)" : "42rem" }}
       >
-        <div className="mb-8 flex items-center justify-between gap-3">
+        <div className="mb-5 flex items-center justify-between gap-3">
           <div className="flex items-center gap-1">
             <Step
               label="Previous day"
@@ -250,7 +304,7 @@ function FocusMode({
               d="M10 3.5 L5.5 8 L10 12.5"
             />
             <div className="min-w-[140px] text-center">
-              <p className="text-sm font-semibold tracking-tight">{formatDate(date)}</p>
+              <p className="text-[15px] font-semibold tracking-tight">{formatDate(date)}</p>
               <p className="text-xs text-ink-3">{pastLabel(date)}</p>
             </div>
             <Step
@@ -316,12 +370,53 @@ function FocusMode({
           </div>
         </div>
 
-        <BlockEditor
-          key={date}
-          blocks={blocks}
-          onChange={onChange}
-          placeholder="How did it go? Press / for a heading, list, image or link."
-        />
+        {/*
+          The sheet. A page you are writing on should have an edge and catch
+          some light; without one the words were floating in the dark and the
+          left margin was wherever the longest line happened to end.
+        */}
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={spring}
+          // A minimum height, so a day with one line on it still looks like a
+          // page you have started rather than a box that failed to fill.
+          className="min-h-[46vh] rounded-2xl border border-line bg-panel px-4 py-6 shadow-[var(--shadow-lg),var(--edge)] sm:px-8 sm:py-9"
+        >
+          <BlockEditor
+            key={date}
+            blocks={blocks}
+            onChange={onChange}
+            placeholder="How did it go? Press / for a heading, list, image or link."
+          />
+        </motion.div>
+
+        {/*
+          What you have written, at the foot where a manuscript keeps it.
+
+          The streak is the only number here that is about more than today, and
+          it is the reason to open this tomorrow as well — a journal's whole
+          difficulty is the second week, not the first.
+        */}
+        <div className="mt-4 flex items-center gap-3 px-1 text-[11px] text-ink-3">
+          <span className="nums">
+            {words} {words === 1 ? "word" : "words"}
+          </span>
+          {words > 0 && (
+            <>
+              <span aria-hidden>·</span>
+              <span className="nums">
+                {written} {written === 1 ? "block" : "blocks"}
+              </span>
+            </>
+          )}
+          {streak > 1 && (
+            <span className="ml-auto inline-flex items-center gap-1.5 rounded-full bg-accent-soft px-2 py-0.5 font-medium text-accent-text">
+              <span aria-hidden className="size-1.5 rounded-full bg-accent" />
+              {streak} days in a row
+            </span>
+          )}
+        </div>
       </div>
     </div>
   );
