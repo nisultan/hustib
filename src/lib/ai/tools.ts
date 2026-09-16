@@ -151,6 +151,27 @@ export const TOOL_DECLARATIONS = [
     },
   },
   {
+    name: "remember",
+    description:
+      "Record something durable you have learned about the student that is not already " +
+      "visible in their data — how they work, what derails them, what they are aiming at. " +
+      "Use it when a conversation reveals something that should change how their weeks are " +
+      "planned from now on. Do not use it for one-off events, for anything that is already " +
+      "a task, grade or deadline, or for what they are feeling right this minute.",
+    parameters: {
+      type: "OBJECT",
+      properties: {
+        topic: { ...STR, description: "Short grouping, e.g. 'Study habits', 'Stress signals', 'Goals'." },
+        note: {
+          ...STR,
+          description:
+            "One specific sentence in the third person, true next month as well as today.",
+        },
+      },
+      required: ["topic", "note"],
+    },
+  },
+  {
     name: "navigate",
     description:
       "Open a page in the app. Use after acting, when the student would want to see the result, " +

@@ -25,6 +25,8 @@ export type ApplicationStatus =
 export type ApplicationPriority = "dream" | "target" | "safety";
 
 export type ProfileRow = {
+  /** When the hub last reflected on this student. */
+  reflected_at?: string | null;
   id: string;
   name: string;
   created_at: string;
@@ -102,6 +104,29 @@ export type DayRow = {
   updated_at: string;
 };
 
+export type MemoryNoteRow = {
+  id: string;
+  user_id: string;
+  topic: string;
+  note: string;
+  source: string;
+  pinned: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
+export type InsightRow = {
+  id: string;
+  user_id: string;
+  kind: string;
+  title: string;
+  body: string;
+  basis: string;
+  href: string | null;
+  created_at: string;
+  dismissed_at: string | null;
+};
+
 /** The reflection blocks as they sit in the jsonb column. */
 export type BlockJson = {
   id: string;
@@ -144,6 +169,8 @@ export interface Database {
       grades: Table<GradeRow>;
       universities: Table<UniversityRow>;
       days: Table<DayRow>;
+      memory_notes: Table<MemoryNoteRow>;
+      insights: Table<InsightRow>;
     };
     Views: { [_ in never]: never };
     Functions: { [_ in never]: never };

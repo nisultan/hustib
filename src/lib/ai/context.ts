@@ -34,6 +34,7 @@ export function buildContext(data: AppData): string {
   out.push(section("GRADES", grades(data)));
   out.push(section("UNIVERSITIES", universities(data)));
   out.push(section("JOURNAL", journal(data)));
+  out.push(section("WHAT YOU HAVE LEARNED ABOUT THEM", memory(data)));
 
   return out.filter(Boolean).join("\n\n");
 }
@@ -164,6 +165,14 @@ function journal(data: AppData): string {
     })
     .filter(Boolean)
     .join("\n");
+}
+
+/**
+ * Carried into every conversation, so the assistant starts each one already
+ * knowing the student rather than meeting them again.
+ */
+function memory(data: AppData): string {
+  return data.memory.map((n) => `- (${n.topic}) ${n.note}`).join("\n");
 }
 
 function blocksToText(blocks: Block[]): string {

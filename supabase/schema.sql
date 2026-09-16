@@ -34,6 +34,8 @@ create type application_priority as enum ('dream', 'target', 'safety');
 create table profiles (
   id          uuid primary key references auth.users on delete cascade,
   name        text not null default 'there',
+  -- When the hub last sat down and thought about this student.
+  reflected_at timestamptz,
   created_at  timestamptz not null default now()
 );
 
@@ -203,6 +205,49 @@ create table days (
 );
 
 -- ---------------------------------------------------------------------------
+-- Memory and insights
+--
+-- What the hub has learned about the student, and what it noticed unprompted.
+--
+-- Memory is short separate notes rather than one growing document: a note can
+-- be corrected or deleted on its own, the student can read exactly what is
+-- believed about them, and a wrong inference does not contaminate the rest.
+--
+-- Insights are stored rather than recomputed per render, because a dismissal
+-- has to stick, and last week's reading is worth comparing against this one.
+-- ---------------------------------------------------------------------------
+
+create table memory_notes (
+  id          uuid primary key default gen_random_uuid(),
+  user_id     uuid not null references auth.users on delete cascade,
+  -- Free text, not an enum: the topics are the model's own grouping, and a
+  -- fixed list would need a migration every time it found a new one.
+  topic       text not null default 'General',
+  note        text not null,
+  source      text not null default 'pattern',
+  -- A pinned note is never revised or dropped by a reflection pass.
+  pinned      boolean not null default false,
+  created_at  timestamptz not null default now(),
+  updated_at  timestamptz not null default now(),
+  constraint note_is_not_empty check (length(trim(note)) > 0),
+  constraint source_is_known check (source in ('reflection', 'conversation', 'pattern'))
+);
+
+create table insights (
+  id            uuid primary key default gen_random_uuid(),
+  user_id       uuid not null references auth.users on delete cascade,
+  kind          text not null default 'takeaway',
+  title         text not null,
+  body          text not null,
+  -- What it was drawn from, so the student can check the reasoning.
+  basis         text not null default '',
+  href          text,
+  created_at    timestamptz not null default now(),
+  dismissed_at  timestamptz,
+  constraint kind_is_known check (kind in ('takeaway', 'recommendation', 'pattern'))
+);
+
+-- ---------------------------------------------------------------------------
 -- Indexes
 --
 -- Every query the app makes is scoped to one user, and the hot paths are
@@ -221,6 +266,9 @@ create index on university_notes (user_id, university_id);
 create index on recommendations (user_id) where dismissed_at is null;
 -- The journal always reads newest first, and weight charts scan a range.
 create index on days (user_id, date desc);
+create index on memory_notes (user_id);
+-- The dashboard only ever reads insights still standing, newest first.
+create index on insights (user_id, created_at desc) where dismissed_at is null;
 
 -- ---------------------------------------------------------------------------
 -- Row-level security
@@ -238,7 +286,7 @@ begin
     'courses', 'lessons', 'tasks', 'task_notes',
     'grades', 'grade_categories',
     'universities', 'university_notes', 'recommendations',
-    'days'
+    'days', 'memory_notes', 'insights'
   ]
   loop
     execute format('alter table %I enable row level security', t);
@@ -278,6 +326,8 @@ alter table universities     alter column user_id set default auth.uid();
 alter table university_notes alter column user_id set default auth.uid();
 alter table recommendations  alter column user_id set default auth.uid();
 alter table days             alter column user_id set default auth.uid();
+alter table memory_notes     alter column user_id set default auth.uid();
+alter table insights         alter column user_id set default auth.uid();
 
 -- ---------------------------------------------------------------------------
 -- Create a profile row whenever someone signs up.

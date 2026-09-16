@@ -315,6 +315,38 @@ function runTool(call: ToolCall, store: Store, router: Router): ToolResult {
         return ok(`Added ${lines.length === 1 ? "a note" : `${lines.length} notes`} to ${when}`);
       }
 
+      case "remember": {
+        const note = str(a.note);
+        if (!note) return fail("Nothing to remember.");
+        const topic = str(a.topic) ?? "General";
+
+        // A near-duplicate is an update, not a second note: the same
+        // observation arriving twice should sharpen the memory, not pad it.
+        const now = new Date().toISOString();
+        const existing = store.memory.find(
+          (n) => n.topic.toLowerCase() === topic.toLowerCase() && similar(n.note, note),
+        );
+        if (existing) {
+          if (existing.pinned) return ok("Already noted");
+          store.updateMemoryNote(existing.id, { note, updatedAt: now });
+          return ok(`Updated what I know about ${topic.toLowerCase()}`);
+        }
+
+        store.setMemory([
+          ...store.memory,
+          {
+            id: uid(),
+            topic,
+            note,
+            source: "conversation",
+            createdAt: now,
+            updatedAt: now,
+            pinned: false,
+          },
+        ]);
+        return ok(`Noted — ${note}`);
+      }
+
       case "navigate": {
         const path = str(a.path);
         if (!path || !PAGES.includes(path)) return fail("Unknown page.");
@@ -342,6 +374,31 @@ function fail(summary: string): ToolResult {
    still arrive as a number, and an enum as something invented. */
 
 const INVALID = Symbol("invalid");
+
+/**
+ * Whether two notes are the same observation worded differently.
+ *
+ * A word-overlap ratio rather than anything cleverer: it only has to catch
+ * "Works best in the morning" against "Works best early in the morning", and
+ * a false negative just means one extra note the student can delete.
+ */
+function similar(a: string, b: string): boolean {
+  const words = (s: string) =>
+    new Set(
+      s
+        .toLowerCase()
+        .replace(/[^a-z0-9\s]/g, "")
+        .split(/\s+/)
+        .filter((w) => w.length > 3),
+    );
+  const x = words(a);
+  const y = words(b);
+  if (x.size === 0 || y.size === 0) return false;
+
+  let shared = 0;
+  for (const w of x) if (y.has(w)) shared += 1;
+  return shared / Math.min(x.size, y.size) >= 0.6;
+}
 
 function str(v: unknown): string | null {
   return typeof v === "string" && v.trim() !== "" ? v.trim() : null;

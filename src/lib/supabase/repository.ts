@@ -1,9 +1,30 @@
 "use client";
 
-import { AppData, Block, BlockType, Course, Day, Grade, Task, University } from "../types";
+import {
+  AppData,
+  Block,
+  BlockType,
+  Course,
+  Day,
+  Grade,
+  Insight,
+  InsightKind,
+  MemoryNote,
+  Task,
+  University,
+} from "../types";
 import type { User } from "@supabase/supabase-js";
 import { getSupabase } from "./client";
-import { CourseRow, DayRow, GradeRow, LessonRow, TaskRow, UniversityRow } from "./types";
+import {
+  CourseRow,
+  DayRow,
+  GradeRow,
+  InsightRow,
+  LessonRow,
+  MemoryNoteRow,
+  TaskRow,
+  UniversityRow,
+} from "./types";
 
 /**
  * The Supabase implementation of the same operations `store.tsx` performs
@@ -115,7 +136,8 @@ export async function currentUser() {
 export async function fetchAll(): Promise<AppData> {
   const supabase = client();
 
-  const [profile, courses, lessons, tasks, grades, universities, days] = await Promise.all([
+  const [profile, courses, lessons, tasks, grades, universities, days, memory, insights] =
+    await Promise.all([
     supabase.from("profiles").select("*").maybeSingle(),
     supabase.from("courses").select("*").order("created_at"),
     supabase.from("lessons").select("*").order("position"),
@@ -123,6 +145,8 @@ export async function fetchAll(): Promise<AppData> {
     supabase.from("grades").select("*").order("date", { ascending: false }),
     supabase.from("universities").select("*").order("deadline", { nullsFirst: false }),
     supabase.from("days").select("*").order("date", { ascending: false }),
+    supabase.from("memory_notes").select("*").order("created_at"),
+    supabase.from("insights").select("*").order("created_at", { ascending: false }),
   ]);
 
   const firstError =
@@ -132,7 +156,9 @@ export async function fetchAll(): Promise<AppData> {
     tasks.error ??
     grades.error ??
     universities.error ??
-    days.error;
+    days.error ??
+    memory.error ??
+    insights.error;
   if (firstError) throw firstError;
 
   const lessonsByCourse = new Map<string, string[]>();
@@ -151,6 +177,9 @@ export async function fetchAll(): Promise<AppData> {
     grades: ((grades.data ?? []) as GradeRow[]).map(toGrade),
     universities: ((universities.data ?? []) as UniversityRow[]).map(toUniversity),
     days: ((days.data ?? []) as DayRow[]).map(toDay),
+    memory: ((memory.data ?? []) as MemoryNoteRow[]).map(toMemory),
+    insights: ((insights.data ?? []) as InsightRow[]).map(toInsight),
+    reflectedAt: (profile.data as { reflected_at?: string | null } | null)?.reflected_at ?? null,
   };
 }
 
@@ -394,6 +423,79 @@ export async function deleteDay(date: string): Promise<void> {
 /* Profile                                                                    */
 /* -------------------------------------------------------------------------- */
 
+/* ----------------------------- Memory & insights ------------------------- */
+
+export async function createMemory(m: Omit<MemoryNote, "id">): Promise<MemoryNote> {
+  const { data, error } = await client()
+    .from("memory_notes")
+    .insert({
+      topic: m.topic,
+      note: m.note,
+      source: m.source,
+      pinned: m.pinned,
+      created_at: m.createdAt,
+      updated_at: m.updatedAt,
+    })
+    .select()
+    .single();
+  if (error) throw error;
+  return toMemory(data as MemoryNoteRow);
+}
+
+export async function updateMemory(id: string, patch: Partial<MemoryNote>): Promise<void> {
+  const row: Partial<MemoryNoteRow> = { updated_at: new Date().toISOString() };
+  if (patch.topic !== undefined) row.topic = patch.topic;
+  if (patch.note !== undefined) row.note = patch.note;
+  if (patch.pinned !== undefined) row.pinned = patch.pinned;
+
+  const { error } = await client().from("memory_notes").update(row).eq("id", id);
+  if (error) throw error;
+}
+
+export async function deleteMemory(id: string): Promise<void> {
+  const { error } = await client().from("memory_notes").delete().eq("id", id);
+  if (error) throw error;
+}
+
+export async function createInsight(i: Omit<Insight, "id">): Promise<Insight> {
+  const { data, error } = await client()
+    .from("insights")
+    .insert({
+      kind: i.kind,
+      title: i.title,
+      body: i.body,
+      basis: i.basis,
+      href: i.href,
+      created_at: i.createdAt,
+      dismissed_at: i.dismissedAt,
+    })
+    .select()
+    .single();
+  if (error) throw error;
+  return toInsight(data as InsightRow);
+}
+
+export async function dismissInsight(id: string, at: string | null): Promise<void> {
+  const { error } = await client().from("insights").update({ dismissed_at: at }).eq("id", id);
+  if (error) throw error;
+}
+
+export async function deleteInsight(id: string): Promise<void> {
+  const { error } = await client().from("insights").delete().eq("id", id);
+  if (error) throw error;
+}
+
+export async function setReflectedAt(at: string): Promise<void> {
+  const supabase = client();
+  const { data: user } = await supabase.auth.getUser();
+  if (!user.user) throw new Error("Not signed in.");
+  const { error } = await supabase
+    .from("profiles")
+    .update({ reflected_at: at })
+    .eq("id", user.user.id);
+  if (error) throw error;
+}
+
 export async function updateProfileName(name: string): Promise<void> {
   const supabase = client();
   const { data } = await supabase.auth.getUser();
@@ -493,6 +595,36 @@ function toGrade(row: GradeRow): Grade {
 }
 
 const BLOCK_TYPES = ["text", "h2", "h3", "bullet", "todo", "quote", "divider"];
+
+const MEMORY_SOURCES = ["reflection", "conversation", "pattern"];
+const INSIGHT_KINDS = ["takeaway", "recommendation", "pattern"];
+
+function toMemory(row: MemoryNoteRow): MemoryNote {
+  return {
+    id: row.id,
+    topic: row.topic,
+    note: row.note,
+    // Written by a model through an older client, so the column is plain text
+    // rather than an enum; an unrecognised value degrades instead of breaking.
+    source: (MEMORY_SOURCES.includes(row.source) ? row.source : "pattern") as MemoryNote["source"],
+    pinned: Boolean(row.pinned),
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+function toInsight(row: InsightRow): Insight {
+  return {
+    id: row.id,
+    kind: (INSIGHT_KINDS.includes(row.kind) ? row.kind : "takeaway") as InsightKind,
+    title: row.title,
+    body: row.body,
+    basis: row.basis ?? "",
+    href: row.href,
+    createdAt: row.created_at,
+    dismissedAt: row.dismissed_at,
+  };
+}
 
 function toDay(row: DayRow): Day {
   return {

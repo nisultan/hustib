@@ -11,6 +11,10 @@ export function seedData(): AppData {
 
   return {
     profile: { name: "Sultan" },
+    // The hub has not met this student yet: memory is earned, never seeded.
+    memory: [],
+    insights: [],
+    reflectedAt: null,
     courses: [
       {
         id: "c-math",

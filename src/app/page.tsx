@@ -15,6 +15,7 @@ import {
 } from "@/lib/dates";
 import { UNI_PRIORITIES, UNI_PRIORITY_LABEL } from "@/lib/types";
 import { Panel, SectionTitle, EmptyState, Button, TrendLabel } from "@/components/ui";
+import { Insights } from "@/components/Insights";
 import { TaskList, sortTasks } from "@/components/TaskItem";
 import { AddTaskButton } from "@/components/TaskDialog";
 import { openTour } from "@/components/Tour";
@@ -67,6 +68,10 @@ export default function HomePage() {
             : "Here's what needs your attention."}
         </p>
       </header>
+
+      {/* What the hub noticed on its own comes first — it is the part that
+          knows this particular student, where the rules below know anyone. */}
+      <Insights limit={2} />
 
       {/* Recommendations sit above the fold: the dashboard should answer
           "what should I focus on" before it shows a list to scan. */}

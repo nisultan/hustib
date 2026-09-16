@@ -10,7 +10,18 @@ import {
   useCallback,
   ReactNode,
 } from "react";
-import { AppData, Course, Day, Grade, Task, University, Profile, ID } from "./types";
+import {
+  AppData,
+  Course,
+  Day,
+  Grade,
+  Insight,
+  MemoryNote,
+  Task,
+  University,
+  Profile,
+  ID,
+} from "./types";
 import { seedData } from "./seed";
 import { isSupabaseConfigured } from "./supabase/client";
 import * as repo from "./supabase/repository";
@@ -113,6 +124,26 @@ export interface Store extends AppData {
 
   updateProfile(patch: Partial<Profile>): void;
 
+  /**
+   * Replaces what the hub believes about the student.
+   *
+   * A whole-list write rather than per-note edits: a reflection pass revises
+   * several notes and drops others at once, and applying that as a stream of
+   * individual mutations would leave the UI showing a half-updated portrait.
+   * Pinned notes are the student's, and are preserved by the caller.
+   */
+  setMemory(notes: MemoryNote[]): void;
+  updateMemoryNote(id: ID, patch: Partial<MemoryNote>): void;
+  deleteMemoryNote(id: ID): void;
+
+  addInsights(insights: Omit<Insight, "id">[]): void;
+  dismissInsight(id: ID): void;
+  restoreInsight(id: ID): void;
+  clearInsights(): void;
+
+  /** Records that a reflection pass just finished. */
+  markReflected(at: string): void;
+
   resetToSample(): void;
   clearAll(): void;
   exportJSON(): string;
@@ -143,6 +174,9 @@ function emptyData(): AppData {
     grades: [],
     universities: [],
     days: [],
+    memory: [],
+    insights: [],
+    reflectedAt: null,
   };
 }
 
@@ -520,6 +554,66 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       updateProfile: (patch) => {
         mutate((d) => ({ ...d, profile: { ...d.profile, ...patch } }));
         if (cloud && patch.name !== undefined) push(repo.updateProfileName(patch.name));
+      },
+
+      setMemory: (notes) => {
+        const before = data.memory;
+        mutate((d) => ({ ...d, memory: notes }));
+        if (!cloud) return;
+
+        // Diffed against what was there so the cloud sees the same three
+        // operations the local list just went through, rather than a delete
+        // and re-insert that would churn every id the student has pinned.
+        const kept = new Set(notes.map((n) => n.id));
+        for (const old of before) {
+          if (!kept.has(old.id)) push(repo.deleteMemory(old.id));
+        }
+        for (const note of notes) {
+          const previous = before.find((n) => n.id === note.id);
+          if (!previous) {
+            push(repo.createMemory(note));
+          } else if (previous.note !== note.note || previous.topic !== note.topic) {
+            push(repo.updateMemory(note.id, note));
+          }
+        }
+      },
+
+      updateMemoryNote: (id, patch) => {
+        mutate((d) => ({ ...d, memory: upsert(d.memory, id, patch) }));
+        if (cloud) push(repo.updateMemory(id, patch));
+      },
+
+      deleteMemoryNote: (id) => {
+        mutate((d) => ({ ...d, memory: d.memory.filter((n) => n.id !== id) }));
+        if (cloud) push(repo.deleteMemory(id));
+      },
+
+      addInsights: (incoming) => {
+        const created = incoming.map((i) => ({ ...i, id: uid() }));
+        mutate((d) => ({ ...d, insights: [...created, ...d.insights] }));
+        if (cloud) for (const i of incoming) push(repo.createInsight(i));
+      },
+
+      dismissInsight: (id) => {
+        const at = new Date().toISOString();
+        mutate((d) => ({ ...d, insights: upsert(d.insights, id, { dismissedAt: at }) }));
+        if (cloud) push(repo.dismissInsight(id, at));
+      },
+
+      restoreInsight: (id) => {
+        mutate((d) => ({ ...d, insights: upsert(d.insights, id, { dismissedAt: null }) }));
+        if (cloud) push(repo.dismissInsight(id, null));
+      },
+
+      clearInsights: () => {
+        const existing = data.insights;
+        mutate((d) => ({ ...d, insights: [] }));
+        if (cloud) for (const i of existing) push(repo.deleteInsight(i.id));
+      },
+
+      markReflected: (at) => {
+        mutate((d) => ({ ...d, reflectedAt: at }));
+        if (cloud) push(repo.setReflectedAt(at));
       },
 
       resetToSample: () => {

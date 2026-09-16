@@ -176,6 +176,60 @@ export interface Day {
   reflection: Block[];
 }
 
+/**
+ * One durable thing the hub has learned about the student.
+ *
+ * Deliberately a list of short, separate notes rather than one growing essay:
+ * a note can be corrected or deleted on its own, the student can read exactly
+ * what is believed about them, and a wrong inference does not contaminate
+ * everything around it.
+ *
+ * `source` is kept so a note that turns out to be wrong can be traced back to
+ * whatever produced it.
+ */
+export interface MemoryNote {
+  id: ID;
+  /** Grouping shown in Settings, e.g. "Study habits", "Stress signals". */
+  topic: string;
+  /** One sentence, written in the third person: "Works best early." */
+  note: string;
+  source: "reflection" | "conversation" | "pattern";
+  createdAt: string;
+  updatedAt: string;
+  /** Set by the student. A pinned note is never revised or dropped. */
+  pinned: boolean;
+}
+
+export type InsightKind = "takeaway" | "recommendation" | "pattern";
+
+export const INSIGHT_LABEL: Record<InsightKind, string> = {
+  takeaway: "Takeaway",
+  recommendation: "Suggestion",
+  pattern: "Pattern",
+};
+
+/**
+ * Something the hub noticed on its own, rather than in reply to a question.
+ *
+ * Kept as data instead of being regenerated on every render: the student
+ * should be able to dismiss one and have it stay dismissed, and comparing what
+ * was said last week against this week is the whole point of a hub that is
+ * supposed to know them better over time.
+ */
+export interface Insight {
+  id: ID;
+  kind: InsightKind;
+  /** A few words. The line the student reads first. */
+  title: string;
+  body: string;
+  /** What in the hub it was drawn from, so the reasoning can be checked. */
+  basis: string;
+  /** Where acting on it would start, when there is an obvious place. */
+  href: string | null;
+  createdAt: string;
+  dismissedAt: string | null;
+}
+
 export interface AppData {
   profile: Profile;
   courses: Course[];
@@ -183,4 +237,8 @@ export interface AppData {
   grades: Grade[];
   universities: University[];
   days: Day[];
+  memory: MemoryNote[];
+  insights: Insight[];
+  /** When the hub last sat down and thought about the student. ISO datetime. */
+  reflectedAt: string | null;
 }
