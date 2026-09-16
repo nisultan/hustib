@@ -158,25 +158,33 @@ export default function PlanPage() {
 }
 
 /**
- * The day beside its sidebar, with a handle between them.
+ * The day beside its sidebar.
  *
- * How much room a calendar wants is not a thing a designer can decide for
- * someone else: it depends on the screen, and on whether today is three blocks
- * or thirty. The split is remembered per device, because nobody wants to drag
- * it back every morning.
+ * The sidebar is a stack of cards — a box to type into, a habit list, a few
+ * task rows — and none of that reads better for being wider. The calendar is
+ * the opposite: every extra pixel is more room for a block's title and a
+ * clearer sense of how full the day is. So the sidebar holds a fixed width and
+ * the day takes everything else, which is why a calendar app looks like this
+ * and not like two panes splitting the screen in half.
  *
- * Below the large breakpoint the two stack and the handle disappears — a
- * resizable split on a phone is a way to make one column unusable.
+ * The handle sets the sidebar's width, not a ratio. Remembered per device;
+ * double-click resets it.
  */
+const SIDEBAR_DEFAULT = 300;
+const SIDEBAR_MIN = 240;
+const SIDEBAR_MAX = 560;
+
 function Split({ children }: { children: ReactNode }) {
   const [left, right] = Array.isArray(children) ? children : [children, null];
   const frame = useRef<HTMLDivElement>(null);
-  const [percent, setPercent] = useState(() => {
+  const [width, setWidth] = useState(() => {
     try {
       const saved = Number(localStorage.getItem(SPLIT_KEY));
-      return Number.isFinite(saved) && saved >= 35 && saved <= 80 ? saved : 62;
+      return Number.isFinite(saved) && saved >= SIDEBAR_MIN && saved <= SIDEBAR_MAX
+        ? saved
+        : SIDEBAR_DEFAULT;
     } catch {
-      return 62;
+      return SIDEBAR_DEFAULT;
     }
   });
 
@@ -185,46 +193,62 @@ function Split({ children }: { children: ReactNode }) {
     const box = frame.current?.getBoundingClientRect();
     if (!box) return;
 
-    const onMove = (move: PointerEvent) => {
-      const next = Math.min(80, Math.max(35, ((move.clientX - box.left) / box.width) * 100));
-      setPercent(next);
-    };
+    // Measured from the right edge, because that is the edge the sidebar is
+    // pinned to and the one the number describes.
+    const at = (clientX: number) =>
+      Math.min(SIDEBAR_MAX, Math.max(SIDEBAR_MIN, box.right - clientX));
+
+    const onMove = (move: PointerEvent) => setWidth(at(move.clientX));
     const onUp = (up: PointerEvent) => {
       window.removeEventListener("pointermove", onMove);
       window.removeEventListener("pointerup", onUp);
-      const next = Math.min(80, Math.max(35, ((up.clientX - box.left) / box.width) * 100));
       try {
-        localStorage.setItem(SPLIT_KEY, String(Math.round(next)));
+        localStorage.setItem(SPLIT_KEY, String(Math.round(at(up.clientX))));
       } catch {
         // Private browsing. The width still holds for this session.
       }
     };
 
     // Listeners on the window, not the handle: the pointer routinely leaves a
-    // 6px strip mid-drag, and a handler bound to it would stop tracking.
+    // few pixels of strip mid-drag, and a handler bound to it would stop.
     window.addEventListener("pointermove", onMove);
     window.addEventListener("pointerup", onUp);
   };
 
+  const reset = () => {
+    setWidth(SIDEBAR_DEFAULT);
+    try {
+      localStorage.setItem(SPLIT_KEY, String(SIDEBAR_DEFAULT));
+    } catch {
+      // As above.
+    }
+  };
+
   return (
     <div ref={frame} className="flex flex-col gap-6 lg:flex-row lg:gap-0">
-      <div className="min-w-0 lg:pr-3" style={{ flexBasis: `${percent}%` }}>
-        {left}
-      </div>
+      <div className="min-w-0 flex-1 lg:pr-2">{left}</div>
 
       <div
         onPointerDown={drag}
-        onDoubleClick={() => setPercent(62)}
+        onDoubleClick={reset}
         role="separator"
         aria-orientation="vertical"
-        aria-label="Resize the day column. Double-click to reset."
+        aria-label="Resize the sidebar. Double-click to reset."
         title="Drag to resize · double-click to reset"
-        className="group hidden w-1.5 shrink-0 cursor-col-resize items-center justify-center lg:flex"
+        className="group hidden w-3 shrink-0 cursor-col-resize items-center justify-center lg:flex"
       >
-        <span className="h-16 w-0.5 rounded-full bg-[var(--border)] transition-colors group-hover:bg-accent" />
+        <span className="h-10 w-1 rounded-full bg-[var(--border-strong)] transition-colors group-hover:bg-accent" />
       </div>
 
-      <div className="min-w-0 flex-1 lg:pl-3">{right}</div>
+      {/* The width goes through a custom property rather than an inline
+          `width`, so it applies only at the breakpoint where the two sit side
+          by side — stacked on a phone, the sidebar is simply full width. */}
+      <div
+        className="min-w-0 lg:w-[var(--sidebar-col)] lg:shrink-0"
+        style={{ "--sidebar-col": `${width}px` } as React.CSSProperties}
+      >
+        {right}
+      </div>
     </div>
   );
 }

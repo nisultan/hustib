@@ -18,10 +18,12 @@ export function Main({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const wide = WIDE.some((p) => pathname === p || pathname.startsWith(`${p}/`));
 
+  // Reading pages keep a generous gutter; the planner gives that space to the
+  // calendar instead, where 32px of margin is a visible amount of a day.
   return (
     <main
-      className={`mx-auto w-full px-4 pb-24 pt-6 md:px-8 md:pb-16 md:pt-8 ${
-        wide ? "max-w-[1680px]" : "max-w-5xl"
+      className={`mx-auto w-full pb-24 pt-6 md:pb-16 md:pt-8 ${
+        wide ? "max-w-[1680px] px-3 md:px-4" : "max-w-5xl px-4 md:px-8"
       }`}
     >
       {children}
