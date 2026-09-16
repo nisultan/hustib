@@ -11,6 +11,7 @@ import { courseAverage } from "@/lib/grades";
 import { daysUntil, greeting, relativeLabel, todayISO } from "@/lib/dates";
 import { ToolResult } from "@/lib/ai/tools";
 import { listContainer, listItem, spring, springSnappy } from "@/lib/motion";
+import { play } from "@/lib/sound";
 
 /**
  * Lifee, as a dock on the right rather than a page of its own.
@@ -138,6 +139,7 @@ export function Assistant({ open, onClose }: { open: boolean; onClose: () => voi
 
   const ask = (text: string) => {
     setDraft("");
+    void play("send");
     void send(text);
     inputRef.current?.focus();
   };

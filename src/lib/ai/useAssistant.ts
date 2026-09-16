@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useStore } from "@/lib/store";
 import { todayISO } from "@/lib/dates";
 import { COURSE_COLORS } from "@/lib/appearance";
+import { play } from "@/lib/sound";
 import { buildContext } from "./context";
 import { ToolCall, ToolResult } from "./tools";
 import {
@@ -98,6 +99,9 @@ export function useAssistant() {
 
           if (calls.length === 0) {
             wire.current.push({ role: "model", parts });
+            // The reply is the only thing here the student is waiting on, so
+            // it is the only arrival worth a sound — tool rounds pass silently.
+            void play("receive");
             setMessages((m) => [
               ...m,
               {
@@ -136,6 +140,7 @@ export function useAssistant() {
         }
       } catch (e) {
         setError(e instanceof Error ? e.message : "Something went wrong.");
+        void play("error");
         // The failed turn is dropped from the wire transcript, so a retry does
         // not resend a conversation that ended mid-tool-call.
         wire.current = wire.current.slice(0, lastPlainUserTurn(wire.current));

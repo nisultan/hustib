@@ -5,6 +5,7 @@ import { useStore } from "@/lib/store";
 import { Button, Field, Input, PageHeader, Panel, SectionTitle } from "@/components/ui";
 import { ACCENTS, DENSITIES, THEMES, Theme } from "@/lib/appearance";
 import { useAppearance } from "@/lib/use-appearance";
+import { useSound } from "@/lib/sound";
 import { openTour } from "@/components/Tour";
 import { PasswordSection } from "@/components/PasswordSection";
 import { MemorySection } from "@/components/MemorySection";
@@ -16,6 +17,7 @@ export default function SettingsPage() {
   const cloud = store.backend === "cloud";
   const [name, setName] = useState("");
   const { theme, setTheme, accent, setAccent, density, setDensity } = useAppearance();
+  const [sound, setSound] = useSound();
   const [confirmClear, setConfirmClear] = useState(false);
 
   useEffect(() => {
@@ -133,6 +135,46 @@ export default function SettingsPage() {
             <p className="mt-1.5 text-xs text-ink-3">
               Resizes every card, row and gutter in the app at once.
             </p>
+          </div>
+
+          {/*
+            Off until asked for. A hub that starts making noises on a shared
+            laptop is one someone silences at the operating system, and then
+            never hears again.
+          */}
+          <div>
+            <button
+              onClick={() => setSound(!sound)}
+              aria-pressed={sound}
+              className={`flex w-full items-center justify-between gap-3 rounded-lg border px-3 py-2.5 text-left transition-colors ${
+                sound ? "border-accent bg-accent-soft" : "border-line hover:bg-panel-2"
+              }`}
+            >
+              <span>
+                <span
+                  className={`block text-sm font-medium ${
+                    sound ? "text-accent-text" : "text-ink-2"
+                  }`}
+                >
+                  Sound
+                </span>
+                <span className="block text-xs text-ink-3">
+                  A quiet note when you finish something, and when the assistant answers.
+                </span>
+              </span>
+              <span
+                aria-hidden
+                className={`relative h-5 w-9 shrink-0 rounded-full transition-colors ${
+                  sound ? "bg-accent" : "bg-[var(--border-strong)]"
+                }`}
+              >
+                <span
+                  className={`absolute top-0.5 size-4 rounded-full bg-white shadow-sm transition-[left] duration-200 ease-[var(--ease-out)] ${
+                    sound ? "left-[18px]" : "left-0.5"
+                  }`}
+                />
+              </span>
+            </button>
           </div>
         </Panel>
       </section>

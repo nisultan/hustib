@@ -9,6 +9,7 @@ import { PriorityDot, ConfirmDeleteButton } from "./ui";
 import { courseColor } from "@/lib/appearance";
 import { TaskDialog } from "./TaskDialog";
 import { listContainer, listItem, spring } from "@/lib/motion";
+import { play } from "@/lib/sound";
 
 /** Sort: overdue first, then soonest deadline, then priority, then title. */
 export function sortTasks(tasks: Task[]): Task[] {
@@ -53,7 +54,12 @@ export function TaskItem({ task, showCourse = true }: { task: Task; showCourse?:
         className="group flex items-start gap-3 border-b border-line px-3.5 py-3 last:border-b-0 hover:bg-panel-2"
       >
         <button
-          onClick={() => store.toggleTask(task.id)}
+          onClick={() => {
+            // The sound belongs to the act, not the state: ticking something
+            // off is the moment worth marking, un-ticking it is a correction.
+            if (!done) void play("complete");
+            store.toggleTask(task.id);
+          }}
           aria-label={
             done ? `Mark "${task.title}" as not done` : `Mark "${task.title}" as done`
           }
