@@ -60,6 +60,29 @@
    */
   --nav-dur: 300ms;
   --nav-ease: cubic-bezier(0.32, 0.72, 0, 1);
+
+  /*
+   * The width animates here, on the variable, rather than on the sidebar and
+   * the content edge separately.
+   *
+   * Transitioning `width: var(--nav-w)` on the elements does not work: when
+   * the variable changes on an ancestor, the browser does not treat that as a
+   * transitionable change on the descendants, so the sidebar kept its old
+   * width until some unrelated recalc happened to flush it. Animating the
+   * variable makes both followers move for free, and exactly together.
+   */
+  transition: --nav-w var(--nav-dur) var(--nav-ease);
+}
+
+/*
+ * A custom property is only animatable once it has a type, so this has to be
+ * registered. `inherits` matters: both the sidebar and the content beside it
+ * read it from the root.
+ */
+@property --nav-w {
+  syntax: "<length>";
+  inherits: true;
+  initial-value: 232px;
 }
 
 :root[data-nav="collapsed"] {

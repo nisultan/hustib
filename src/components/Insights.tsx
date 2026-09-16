@@ -18,14 +18,15 @@ import { SectionTitle } from "./ui";
 
 export function Insights({ limit }: { limit?: number }) {
   const store = useStore();
-  const { reflect, running, error, ready } = useReflection();
+  const { reflect, running, error, outcome, ready } = useReflection();
 
   const live = store.insights.filter((i) => i.dismissedAt == null);
   const shown = limit ? live.slice(0, limit) : live;
 
-  // Nothing learned and nothing to learn from: the section would be an empty
-  // promise, so it stays out of the way until the hub has something to say.
-  if (shown.length === 0 && !running && !ready) return null;
+  // On the dashboard an empty section is just clutter, so it stays out of the
+  // way. On the recommendations page — where the student came specifically to
+  // see this — silence reads as breakage, so it explains itself instead.
+  if (shown.length === 0 && !running && !ready && limit != null) return null;
 
   return (
     <section className="mb-8">
@@ -47,7 +48,9 @@ export function Insights({ limit }: { limit?: number }) {
         <p className="rounded-xl border border-dashed border-line px-3.5 py-6 text-center text-sm text-ink-3">
           {running
             ? "Reading through your week…"
-            : "Nothing worth flagging right now. Keep logging and this fills in."}
+            : ready
+              ? "Nothing worth flagging right now. Keep logging and this fills in."
+              : "Not enough recorded yet. Add your courses and a few tasks, and this starts noticing things."}
         </p>
       ) : (
         <div className="grid gap-2">
@@ -58,6 +61,17 @@ export function Insights({ limit }: { limit?: number }) {
       )}
 
       {error && <p className="mt-2 text-xs text-[var(--urgent)]">{error}</p>}
+
+      {/* A pass that finds nothing is a real result, and saying so is the
+          difference between restraint and a button that appears to do
+          nothing. */}
+      {!error && outcome && outcome.insightsAdded === 0 && (
+        <p className="mt-2 text-xs text-ink-3">
+          {outcome.memoryChanged
+            ? "Read through your week — nothing new worth flagging, but I updated what I know about you."
+            : "Read through your week. Nothing new worth flagging since last time."}
+        </p>
+      )}
     </section>
   );
 }

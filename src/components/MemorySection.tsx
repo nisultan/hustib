@@ -18,7 +18,7 @@ import { Button, Panel } from "./ui";
  */
 export function MemorySection() {
   const store = useStore();
-  const { reflect, running, error, ready } = useReflection();
+  const { reflect, running, error, outcome, ready } = useReflection();
   const [editing, setEditing] = useState<string | null>(null);
   const [draft, setDraft] = useState("");
 
@@ -57,6 +57,12 @@ export function MemorySection() {
       </div>
 
       {error && <p className="mb-3 text-xs text-[var(--urgent)]">{error}</p>}
+
+      {!error && outcome && !outcome.memoryChanged && (
+        <p className="mb-3 text-xs text-ink-3">
+          Read through everything — nothing here needed changing.
+        </p>
+      )}
 
       {store.memory.length === 0 ? (
         <Panel className="px-4 py-8 text-center">

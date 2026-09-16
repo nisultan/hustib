@@ -179,7 +179,7 @@ export function Sidebar() {
 
   return (
     <aside
-      className={`fixed inset-y-0 left-0 z-40 hidden w-[var(--nav-w)] flex-col overflow-hidden border-r border-line bg-panel py-4 shadow-[var(--shadow)] transition-[width,padding] duration-[var(--nav-dur)] ease-[var(--nav-ease)] md:flex ${
+      className={`fixed inset-y-0 left-0 z-40 hidden w-[var(--nav-w)] flex-col overflow-hidden border-r border-line bg-panel py-4 shadow-[var(--shadow)] transition-[padding] duration-[var(--nav-dur)] ease-[var(--nav-ease)] md:flex ${
         collapsed ? "px-2" : "px-3"
       }`}
     >
