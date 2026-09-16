@@ -1,8 +1,12 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { RefObject, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
+import { motion } from "motion/react";
 import { Block, BLOCK_LABEL, BlockType } from "@/lib/types";
 import { prepareImage } from "@/lib/image";
+import { useMounted } from "@/lib/useMounted";
+import { springSnappy } from "@/lib/motion";
 
 /**
  * The reflection editor.
@@ -241,6 +245,9 @@ function BlockRow({
   onInsertBelow: () => void;
 }) {
   const ref = useRef<HTMLTextAreaElement>(null);
+  // The type menu is positioned against the whole row, not the control inside
+  // it, so it lands in the same place whatever kind of block this is.
+  const rowRef = useRef<HTMLDivElement>(null);
 
   // Textareas do not grow on their own; measuring the scroll height each time
   // the text changes is what keeps a paragraph from becoming a scrollbox.
@@ -253,7 +260,7 @@ function BlockRow({
 
   if (block.type === "image") {
     return (
-      <div className="group relative flex items-start gap-1.5 py-1 pl-14">
+      <div ref={rowRef} className="group relative flex items-start gap-1.5 py-1 pl-14">
         <Handle
           onDelete={onDelete}
           onMove={onMove}
@@ -262,7 +269,12 @@ function BlockRow({
         />
         <ImageBlock block={block} onPatch={onPatch} onDelete={onDelete} />
         {menuOpen && (
-          <TypeMenu current={block.type} onPick={onType} onClose={() => setMenuOpen(false)} />
+          <TypeMenu
+            anchorRef={rowRef}
+            current={block.type}
+            onPick={onType}
+            onClose={() => setMenuOpen(false)}
+          />
         )}
       </div>
     );
@@ -270,7 +282,7 @@ function BlockRow({
 
   if (block.type === "link") {
     return (
-      <div className="group relative flex items-start gap-1.5 py-0.5 pl-14">
+      <div ref={rowRef} className="group relative flex items-start gap-1.5 py-0.5 pl-14">
         <Handle
           onDelete={onDelete}
           onMove={onMove}
@@ -279,7 +291,12 @@ function BlockRow({
         />
         <LinkBlock block={block} onPatch={onPatch} onEnter={onEnter} />
         {menuOpen && (
-          <TypeMenu current={block.type} onPick={onType} onClose={() => setMenuOpen(false)} />
+          <TypeMenu
+            anchorRef={rowRef}
+            current={block.type}
+            onPick={onType}
+            onClose={() => setMenuOpen(false)}
+          />
         )}
       </div>
     );
@@ -287,7 +304,7 @@ function BlockRow({
 
   if (block.type === "divider") {
     return (
-      <div className="group relative flex items-center gap-1 py-2 pl-14">
+      <div ref={rowRef} className="group relative flex items-center gap-1 py-2 pl-14">
         <Handle
           onDelete={onDelete}
           onMove={onMove}
@@ -296,14 +313,19 @@ function BlockRow({
         />
         <hr className="w-full border-t border-line" />
         {menuOpen && (
-          <TypeMenu current={block.type} onPick={onType} onClose={() => setMenuOpen(false)} />
+          <TypeMenu
+            anchorRef={rowRef}
+            current={block.type}
+            onPick={onType}
+            onClose={() => setMenuOpen(false)}
+          />
         )}
       </div>
     );
   }
 
   return (
-    <div className="group relative flex items-start gap-1.5 pl-14">
+    <div ref={rowRef} className="group relative flex items-start gap-1.5 pl-14">
       <Handle
         onDelete={onDelete}
         onMove={onMove}
@@ -396,7 +418,12 @@ function BlockRow({
       />
 
       {menuOpen && (
-        <TypeMenu current={block.type} onPick={onType} onClose={() => setMenuOpen(false)} />
+        <TypeMenu
+          anchorRef={rowRef}
+          current={block.type}
+          onPick={onType}
+          onClose={() => setMenuOpen(false)}
+        />
       )}
     </div>
   );
@@ -482,16 +509,59 @@ function Handle({
   );
 }
 
+/**
+ * The block-type picker.
+ *
+ * Portalled and fixed rather than absolutely positioned inside the row: as a
+ * child of the journal card it was painted in the card's stacking context, so
+ * a later card further down the page — an entry under EARLIER — drew straight
+ * over the middle of the open menu, and any ancestor that scrolled or clipped
+ * cut it in half. Measuring the row and rendering into the body puts the menu
+ * above the whole page, where a menu belongs.
+ */
 function TypeMenu({
+  anchorRef,
   current,
   onPick,
   onClose,
 }: {
+  anchorRef: RefObject<HTMLElement | null>;
   current: BlockType;
   onPick: (type: BlockType) => void;
   onClose: () => void;
 }) {
   const ref = useRef<HTMLDivElement>(null);
+  const mounted = useMounted();
+  const [box, setBox] = useState<{ left: number; top: number } | null>(null);
+
+  // Layout effect, so the menu is placed in the frame it first paints in
+  // rather than flashing in the top left corner.
+  useLayoutEffect(() => {
+    const place = () => {
+      const el = anchorRef.current;
+      if (!el) return;
+      const r = el.getBoundingClientRect();
+      const width = 192; // w-48
+      const height = MENU_TYPES.length * 32 + 8;
+      // Flip above the row when the menu would otherwise run off the bottom
+      // of the window, and keep it inside the left and right edges.
+      const below = r.top + 28;
+      const top = below + height > window.innerHeight - 8 ? r.top - height - 4 : below;
+      setBox({
+        left: Math.max(8, Math.min(r.left + 56, window.innerWidth - width - 8)),
+        top: Math.max(8, top),
+      });
+    };
+
+    place();
+    window.addEventListener("resize", place);
+    // Capture phase, so scrolling any ancestor moves it, not just the window.
+    window.addEventListener("scroll", place, true);
+    return () => {
+      window.removeEventListener("resize", place);
+      window.removeEventListener("scroll", place, true);
+    };
+  }, [anchorRef]);
 
   useEffect(() => {
     const onDown = (e: PointerEvent) => {
@@ -508,10 +578,16 @@ function TypeMenu({
     };
   }, [onClose]);
 
-  return (
-    <div
+  if (!mounted || !box) return null;
+
+  return createPortal(
+    <motion.div
       ref={ref}
-      className="fade-up absolute left-14 top-7 z-50 w-48 rounded-xl border border-line bg-panel p-1 shadow-[var(--shadow-lg),var(--edge)]"
+      style={{ position: "fixed", left: box.left, top: box.top }}
+      initial={{ opacity: 0, y: -4, scale: 0.97 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      transition={springSnappy}
+      className="z-[70] w-48 origin-top rounded-xl border border-line bg-panel p-1 shadow-[var(--shadow-lg),var(--edge)]"
     >
       {MENU_TYPES.map((type) => (
         <button
@@ -527,7 +603,8 @@ function TypeMenu({
           <span className="text-[11px] text-ink-3">{HINT[type]}</span>
         </button>
       ))}
-    </div>
+    </motion.div>,
+    document.body,
   );
 }
 

@@ -3,8 +3,10 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { ReactNode } from "react";
+import { motion } from "motion/react";
 import { Logo } from "./Logo";
 import { useNavCollapsed } from "@/lib/use-nav";
+import { springSnappy } from "@/lib/motion";
 
 interface NavItem {
   href: string;
@@ -168,14 +170,27 @@ export function Sidebar() {
         // it is what screen readers announce, and animating its width is what
         // makes the collapse a movement instead of a jump.
         title={collapsed ? item.label : undefined}
-        className={`relative flex items-center gap-2.5 rounded-lg py-[7px] text-[13px] font-medium transition-[background-color,color,padding,gap] duration-[var(--nav-dur)] ease-[var(--nav-ease)] ${
+        className={`relative flex items-center gap-2.5 rounded-lg py-[7px] text-[13px] font-medium transition-[color,padding,gap] duration-[var(--nav-dur)] ease-[var(--nav-ease)] ${
           collapsed ? "justify-center gap-0 px-0" : "px-2.5"
-        } ${
-          active
-            ? "bg-accent-soft text-accent-text before:absolute before:inset-y-1.5 before:left-0 before:w-[3px] before:rounded-full before:bg-accent"
-            : "text-ink-2 hover:bg-panel-2 hover:text-ink"
-        }`}
+        } ${active ? "text-accent-text" : "text-ink-2 hover:bg-panel-2 hover:text-ink"}`}
       >
+        {/*
+          One highlight for the whole sidebar, handed from link to link.
+          Fading a background in on the new item and out on the old one says
+          "something changed"; moving the same shape says "you went there" —
+          and the rail travelling with it is what makes the two feel like one
+          object rather than two effects that happen to agree.
+        */}
+        {active && (
+          <motion.span
+            layoutId="sidebar-active"
+            transition={springSnappy}
+            aria-hidden
+            className="absolute inset-0 -z-10 rounded-lg bg-accent-soft"
+          >
+            <span className="absolute inset-y-1.5 left-0 w-[3px] rounded-full bg-accent" />
+          </motion.span>
+        )}
         {item.icon}
         <span
           className={`overflow-hidden whitespace-nowrap transition-[max-width,opacity] duration-[var(--nav-dur)] ease-[var(--nav-ease)] ${
@@ -303,11 +318,23 @@ export function MobileNav() {
             key={item.href}
             href={item.href}
             aria-current={active ? "page" : undefined}
-            className={`flex flex-col items-center gap-1 py-2 text-[10px] font-medium transition-colors ${
+            className={`relative flex flex-col items-center gap-1 py-2 text-[10px] font-medium transition-colors ${
               active ? "text-accent-text" : "text-ink-3"
             }`}
           >
-            {item.icon}
+            {/* The same travelling highlight as the sidebar, reduced to the
+                one line a 10px-tall bar has room for. */}
+            {active && (
+              <motion.span
+                layoutId="mobile-nav-active"
+                transition={springSnappy}
+                aria-hidden
+                className="absolute inset-x-5 top-0 h-[2px] rounded-full bg-accent"
+              />
+            )}
+            <motion.span whileTap={{ scale: 0.88 }} transition={springSnappy}>
+              {item.icon}
+            </motion.span>
             {item.label === "Universities" ? "Unis" : item.label}
           </Link>
         );

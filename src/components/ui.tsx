@@ -2,6 +2,8 @@
 
 import { CSSProperties, ReactNode, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { AnimatePresence, motion } from "motion/react";
+import { backdrop, dialogPanel, spring, springSnappy } from "@/lib/motion";
 import { useMounted } from "@/lib/useMounted";
 import { LogoMark } from "./Logo";
 import { Choice } from "./Choice";
@@ -28,17 +30,31 @@ export function Panel({
   /** For values a class cannot carry, such as a per-course tint. */
   style?: CSSProperties;
 }) {
+  const base = `rounded-xl border border-line bg-panel shadow-[var(--shadow),var(--edge)] ${className}`;
+
+  if (!interactive) {
+    return (
+      <Tag style={style} className={base}>
+        {children}
+      </Tag>
+    );
+  }
+
+  // A card that responds to the pointer has to come back down as convincingly
+  // as it went up; a CSS hover lift snaps back the instant the cursor leaves.
+  // The spring means the card settles either way, and the press gives the
+  // click somewhere to land.
+  const Motion = Tag === "section" ? motion.section : motion.div;
   return (
-    <Tag
+    <Motion
       style={style}
-      className={`rounded-xl border border-line bg-panel shadow-[var(--shadow),var(--edge)] ${
-        interactive
-          ? "transition-[box-shadow,transform,border-color] duration-200 hover:-translate-y-px hover:border-line-strong hover:shadow-[var(--shadow-md),var(--edge)]"
-          : ""
-      } ${className}`}
+      className={`${base} transition-[box-shadow,border-color] duration-200 hover:border-line-strong hover:shadow-[var(--shadow-md),var(--edge)]`}
+      whileHover={{ y: -2 }}
+      whileTap={{ y: 0, scale: 0.995 }}
+      transition={spring}
     >
       {children}
-    </Tag>
+    </Motion>
   );
 }
 
@@ -89,7 +105,7 @@ export function Button({
   // The press is what makes a button feel like an object rather than a
   // rectangle that changes colour: it moves under the finger, then settles.
   const base =
-    "inline-flex items-center justify-center gap-1.5 rounded-lg font-medium whitespace-nowrap transition-[background-color,box-shadow,transform,border-color,color] duration-150 active:translate-y-px disabled:opacity-40 disabled:pointer-events-none disabled:active:translate-y-0";
+    "inline-flex items-center justify-center gap-1.5 rounded-lg font-medium whitespace-nowrap transition-[background-color,box-shadow,border-color,color] duration-150 disabled:opacity-40 disabled:pointer-events-none";
   const sizes = { sm: "h-8 px-2.5 text-[13px]", md: "h-9 px-3.5 text-sm" };
   const variants = {
     primary:
@@ -101,9 +117,15 @@ export function Button({
       "border border-line text-[var(--urgent)] shadow-[var(--shadow)] hover:border-[var(--urgent)]/40 hover:bg-[var(--urgent)]/8 active:shadow-none",
   };
   return (
-    <button className={`${base} ${sizes[size]} ${variants[variant]} ${className}`} {...rest}>
+    <motion.button
+      className={`${base} ${sizes[size]} ${variants[variant]} ${className}`}
+      whileHover={rest.disabled ? undefined : { y: -1 }}
+      whileTap={rest.disabled ? undefined : { y: 1, scale: 0.97 }}
+      transition={springSnappy}
+      {...(rest as React.ComponentProps<typeof motion.button>)}
+    >
       {children}
-    </button>
+    </motion.button>
   );
 }
 
@@ -207,7 +229,9 @@ export function Segmented<T extends string>({
     <div
       role="tablist"
       aria-label={label}
-      className="inline-flex flex-wrap gap-0.5 rounded-xl border border-line bg-panel-2 p-1"
+      /* `isolate` keeps the sliding thumb's negative z-index inside this
+         control, instead of dropping it behind the page. */
+      className="isolate inline-flex flex-wrap gap-0.5 rounded-xl border border-line bg-panel-2 p-1"
     >
       {options.map((o) => {
         const selected = value === o.id;
@@ -217,13 +241,22 @@ export function Segmented<T extends string>({
             role="tab"
             aria-selected={selected}
             onClick={() => onChange(o.id)}
-            className={`rounded-lg px-3 py-1.5 text-[13px] font-medium transition-[background-color,color,box-shadow] duration-150 ${
-              selected
-                ? "bg-panel text-ink shadow-[var(--shadow),var(--edge)]"
-                : "text-ink-2 hover:text-ink"
+            className={`relative rounded-lg px-3 py-1.5 text-[13px] font-medium transition-colors duration-150 ${
+              selected ? "text-ink" : "text-ink-2 hover:text-ink"
             }`}
           >
-            {o.label}
+            {/* The raised segment slides to the option you picked, so the
+                control reads as one thumb moving in a track rather than two
+                buttons swapping appearance. */}
+            {selected && (
+              <motion.span
+                layoutId={`segmented-${label}`}
+                transition={springSnappy}
+                aria-hidden
+                className="absolute inset-0 -z-10 rounded-lg bg-panel shadow-[var(--shadow),var(--edge)]"
+              />
+            )}
+            <span className="relative">{o.label}</span>
           </button>
         );
       })}
@@ -374,44 +407,57 @@ export function Modal({
     };
   }, [open, onClose]);
 
-  if (!open || !mounted) return null;
+  if (!mounted) return null;
 
+  // Rendered inside AnimatePresence rather than behind an early return, so
+  // the dialog gets to leave: closing used to cut the panel and its backdrop
+  // out of the page in a single frame, which is the one moment a dialog most
+  // needs to look deliberate.
   return createPortal(
-    <div
-      className="fixed inset-0 z-50 flex items-end justify-center overflow-y-auto bg-black/40 p-0 backdrop-blur-[3px] sm:items-start sm:p-6 sm:pt-[8vh]"
-      onMouseDown={(e) => {
-        if (e.target === e.currentTarget) onClose();
-      }}
-    >
-      <div
-        ref={panelRef}
-        role="dialog"
-        aria-modal="true"
-        aria-label={title}
-        className={`fade-up w-full rounded-t-2xl border border-line bg-panel shadow-[var(--shadow-lg),var(--edge)] sm:rounded-2xl ${
-          wide ? "sm:max-w-2xl" : "sm:max-w-lg"
-        }`}
-      >
-        <div className="flex items-center justify-between border-b border-line px-5 py-3.5">
-          <h2 className="text-sm font-semibold">{title}</h2>
-          <button
-            onClick={onClose}
-            aria-label="Close"
-            className="-mr-1 rounded-md p-1 text-ink-3 transition-colors hover:bg-panel-2 hover:text-ink"
+    <AnimatePresence>
+      {open && (
+        <motion.div
+          variants={backdrop}
+          initial="hidden"
+          animate="show"
+          exit="exit"
+          className="fixed inset-0 z-50 flex items-end justify-center overflow-y-auto bg-black/40 p-0 backdrop-blur-[3px] sm:items-start sm:p-6 sm:pt-[8vh]"
+          onMouseDown={(e) => {
+            if (e.target === e.currentTarget) onClose();
+          }}
+        >
+          <motion.div
+            ref={panelRef}
+            role="dialog"
+            aria-modal="true"
+            aria-label={title}
+            variants={dialogPanel}
+            className={`w-full rounded-t-2xl border border-line bg-panel shadow-[var(--shadow-lg),var(--edge)] sm:rounded-2xl ${
+              wide ? "sm:max-w-2xl" : "sm:max-w-lg"
+            }`}
           >
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden>
-              <path
-                d="M4 4l8 8M12 4l-8 8"
-                stroke="currentColor"
-                strokeWidth="1.5"
-                strokeLinecap="round"
-              />
-            </svg>
-          </button>
-        </div>
-        <div className="max-h-[70vh] overflow-y-auto px-5 py-4">{children}</div>
-      </div>
-    </div>,
+            <div className="flex items-center justify-between border-b border-line px-5 py-3.5">
+              <h2 className="text-sm font-semibold">{title}</h2>
+              <button
+                onClick={onClose}
+                aria-label="Close"
+                className="-mr-1 rounded-md p-1 text-ink-3 transition-colors hover:bg-panel-2 hover:text-ink"
+              >
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden>
+                  <path
+                    d="M4 4l8 8M12 4l-8 8"
+                    stroke="currentColor"
+                    strokeWidth="1.5"
+                    strokeLinecap="round"
+                  />
+                </svg>
+              </button>
+            </div>
+            <div className="max-h-[70vh] overflow-y-auto px-5 py-4">{children}</div>
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>,
     document.body,
   );
 }

@@ -13,6 +13,7 @@ import { PageTransition } from "@/components/PageTransition";
 import { Main } from "@/components/Main";
 import { APPEARANCE_INIT_SCRIPT } from "@/lib/appearance";
 import { Logo } from "@/components/Logo";
+import { MotionProvider } from "@/lib/motion";
 
 export const metadata: Metadata = {
   title: "LifeOS",
@@ -36,36 +37,38 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <script dangerouslySetInnerHTML={{ __html: APPEARANCE_INIT_SCRIPT }} />
       </head>
       <body>
-        <StoreProvider>
-          <Lock>
-            <Sidebar />
+        <MotionProvider>
+          <StoreProvider>
+            <Lock>
+              <Sidebar />
 
-            <div className="md:pl-[var(--nav-w)]">
-              <header className="sticky top-0 z-30 flex items-center gap-3 border-b border-line bg-bg/85 px-4 py-2.5 backdrop-blur-md md:px-8">
-                <Logo className="md:hidden" />
-                <NavToggle />
-                <div className="flex-1 md:flex-none">
-                  <GlobalSearch />
-                </div>
-                <div className="ml-auto flex items-center gap-1.5">
-                  <AssistantButton />
-                  <ThemeToggle />
-                  <MobileHeaderLinks />
-                  <AddTaskButton compact />
-                </div>
-              </header>
+              <div className="md:pl-[var(--nav-w)]">
+                <header className="sticky top-0 z-30 flex items-center gap-3 border-b border-line bg-bg/85 px-4 py-2.5 backdrop-blur-md md:px-8">
+                  <Logo className="md:hidden" />
+                  <NavToggle />
+                  <div className="flex-1 md:flex-none">
+                    <GlobalSearch />
+                  </div>
+                  <div className="ml-auto flex items-center gap-1.5">
+                    <AssistantButton />
+                    <ThemeToggle />
+                    <MobileHeaderLinks />
+                    <AddTaskButton compact />
+                  </div>
+                </header>
 
-              <SyncBanner />
+                <SyncBanner />
 
-              <Main>
-                <PageTransition>{children}</PageTransition>
-              </Main>
-            </div>
+                <Main>
+                  <PageTransition>{children}</PageTransition>
+                </Main>
+              </div>
 
-            <MobileNav />
-            <TourHost />
-          </Lock>
-        </StoreProvider>
+              <MobileNav />
+              <TourHost />
+            </Lock>
+          </StoreProvider>
+        </MotionProvider>
       </body>
     </html>
   );

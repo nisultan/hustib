@@ -1,12 +1,14 @@
 "use client";
 
 import { useState } from "react";
+import { AnimatePresence, motion } from "motion/react";
 import { Task, PRIORITY_LABEL, PRIORITY_RANK } from "@/lib/types";
 import { useCourseMap, useStore } from "@/lib/store";
 import { daysUntil, formatTime, relativeLabel } from "@/lib/dates";
 import { PriorityDot, ConfirmDeleteButton } from "./ui";
 import { courseColor } from "@/lib/appearance";
 import { TaskDialog } from "./TaskDialog";
+import { listContainer, listItem, spring } from "@/lib/motion";
 
 /** Sort: overdue first, then soonest deadline, then priority, then title. */
 export function sortTasks(tasks: Task[]): Task[] {
@@ -35,7 +37,21 @@ export function TaskItem({ task, showCourse = true }: { task: Task; showCourse?:
 
   return (
     <>
-      <div className="group flex items-start gap-3 border-b border-line px-3.5 py-3 last:border-b-0 hover:bg-panel-2">
+      {/*
+        `layout` is what makes completing a task legible: the row does not
+        just vanish and leave the list to snap shut — every row below it
+        travels up to the space it left. The exit animation buys the eye the
+        moment it needs to see which row went.
+      */}
+      <motion.div
+        layout="position"
+        variants={listItem}
+        initial="hidden"
+        animate="show"
+        exit="exit"
+        transition={spring}
+        className="group flex items-start gap-3 border-b border-line px-3.5 py-3 last:border-b-0 hover:bg-panel-2"
+      >
         <button
           onClick={() => store.toggleTask(task.id)}
           aria-label={
@@ -47,8 +63,20 @@ export function TaskItem({ task, showCourse = true }: { task: Task; showCourse?:
               : "border-line-strong hover:border-accent"
           }`}
         >
+          {/* The tick lands rather than appearing — the one moment in the app
+              worth a little overshoot, because it is the moment something got
+              finished. */}
           {done && (
-            <svg width="11" height="11" viewBox="0 0 12 12" fill="none" aria-hidden>
+            <motion.svg
+              width="11"
+              height="11"
+              viewBox="0 0 12 12"
+              fill="none"
+              aria-hidden
+              initial={{ scale: 0.4, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              transition={{ type: "spring", stiffness: 700, damping: 18 }}
+            >
               <path
                 d="m2.5 6.2 2.3 2.3L9.5 3.8"
                 stroke="currentColor"
@@ -56,7 +84,7 @@ export function TaskItem({ task, showCourse = true }: { task: Task; showCourse?:
                 strokeLinecap="round"
                 strokeLinejoin="round"
               />
-            </svg>
+            </motion.svg>
           )}
         </button>
 
@@ -174,7 +202,7 @@ export function TaskItem({ task, showCourse = true }: { task: Task; showCourse?:
           onConfirm={() => store.deleteTask(task.id)}
           className="opacity-100 transition-opacity md:opacity-0 md:group-focus-within:opacity-100 md:group-hover:opacity-100"
         />
-      </div>
+      </motion.div>
 
       <TaskDialog open={editing} onClose={() => setEditing(false)} task={task} />
     </>
@@ -192,10 +220,20 @@ export function TaskList({
 }) {
   if (tasks.length === 0) return <>{empty}</>;
   return (
-    <div className="overflow-hidden rounded-xl border border-line bg-panel shadow-[var(--shadow)]">
-      {sortTasks(tasks).map((t) => (
-        <TaskItem key={t.id} task={t} showCourse={showCourse} />
-      ))}
-    </div>
+    <motion.div
+      variants={listContainer}
+      initial="hidden"
+      animate="show"
+      className="overflow-hidden rounded-xl border border-line bg-panel shadow-[var(--shadow)]"
+    >
+      {/* `initial={false}` on the presence: rows already on screen when the
+          page mounts are dealt in by the container's stagger, not replayed
+          from scratch every time the list re-renders. */}
+      <AnimatePresence initial={false}>
+        {sortTasks(tasks).map((t) => (
+          <TaskItem key={t.id} task={t} showCourse={showCourse} />
+        ))}
+      </AnimatePresence>
+    </motion.div>
   );
 }
