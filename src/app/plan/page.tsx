@@ -3,12 +3,13 @@
 import { useMemo, useState } from "react";
 import { useStore } from "@/lib/store";
 import { addDays, daysUntil, formatDate, pastLabel, todayISO } from "@/lib/dates";
-import { Habit, PlanItem } from "@/lib/types";
+import { Habit, PlanItem, Priority, PRIORITIES, PRIORITY_LABEL } from "@/lib/types";
 import { courseColor } from "@/lib/appearance";
-import { Button, PageHeader, Panel, SectionTitle } from "@/components/ui";
+import { Button, PageHeader, Panel, PriorityDot, SectionTitle } from "@/components/ui";
 import { DateField } from "@/components/DateField";
 import { HabitSection } from "@/components/HabitSection";
 import { TimeField } from "@/components/TimeField";
+import { DayGrid, toClock } from "@/components/DayGrid";
 
 /**
  * One day at a time, as a column of hours.
@@ -21,9 +22,25 @@ import { TimeField } from "@/components/TimeField";
  * to an hour.
  */
 
-/** The window most people actually plan inside. */
-const FIRST_HOUR = 6;
-const LAST_HOUR = 23;
+/**
+ * What a drag is carrying.
+ *
+ * Two kinds, because two things can be dropped onto an hour: a block already
+ * in the day, which moves, and a task from the list beside it, which becomes a
+ * new block. Encoding both in one string keeps every drop target to a single
+ * handler rather than one per source.
+ */
+const DRAG_TYPE = "application/x-lifeos-plan";
+
+function dragPayload(kind: "plan" | "task", id: string): string {
+  return `${kind}:${id}`;
+}
+
+function readDrag(e: React.DragEvent): { kind: string; id: string } | null {
+  const raw = e.dataTransfer.getData(DRAG_TYPE);
+  const at = raw.indexOf(":");
+  return at === -1 ? null : { kind: raw.slice(0, at), id: raw.slice(at + 1) };
+}
 
 export default function PlanPage() {
   const store = useStore();
@@ -84,6 +101,7 @@ export default function PlanPage() {
             </p>
           )}
           <CarryOver date={date} />
+          <CopyDay date={date} items={items} />
           <div className="w-[190px]">
             <DateField value={date} onChange={(v) => setDate(v || today)} />
           </div>
@@ -92,20 +110,45 @@ export default function PlanPage() {
 
       <div className="grid gap-6 lg:grid-cols-[1.6fr_1fr]">
         <section>
-          <SectionTitle>The day</SectionTitle>
-          <Panel className="overflow-hidden">
-            {Array.from({ length: LAST_HOUR - FIRST_HOUR + 1 }, (_, i) => FIRST_HOUR + i).map(
-              (hour) => (
-                <Hour
-                  key={hour}
-                  hour={hour}
-                  date={date}
-                  today={today}
-                  items={scheduled.filter((p) => Number((p.start ?? "").slice(0, 2)) === hour)}
-                />
-              ),
-            )}
-          </Panel>
+          <SectionTitle
+            right={
+              <span className="text-[11px] text-ink-3">
+                Drag to move · pull the bottom edge to lengthen
+              </span>
+            }
+          >
+            The day
+          </SectionTitle>
+          <DayGrid
+            date={date}
+            today={today}
+            items={scheduled}
+            onOpenDrag={(e, at) => {
+              const payload = readDrag(e);
+              if (!payload) return;
+
+              if (payload.kind === "plan") {
+                store.updatePlanItem(payload.id, { start: toClock(at), date });
+                return;
+              }
+              const task = store.tasks.find((t) => t.id === payload.id);
+              if (!task) return;
+              store.addPlanItem({
+                date,
+                title: task.title,
+                start: toClock(at),
+                minutes: 45,
+                done: false,
+                priority: task.priority,
+                categoryId: task.categoryId,
+                taskId: task.id,
+              });
+            }}
+          />
+
+          <div className="mt-3">
+            <Scheduled date={date} items={scheduled} />
+          </div>
         </section>
 
         <div className="flex flex-col gap-6">
@@ -147,58 +190,109 @@ function CarryOver({ date }: { date: string }) {
   );
 }
 
-/** One hour row, and the click target that adds a block inside it. */
-function Hour({
-  hour,
-  date,
-  today,
-  items,
-}: {
-  hour: number;
-  date: string;
-  today: string;
-  items: PlanItem[];
-}) {
+/**
+ * Repeating a day forward.
+ *
+ * A student's week is mostly the same shape — the same training, the same
+ * study window — and rebuilding that by hand every evening is what makes
+ * people abandon a planner. Copies the structure, never the outcome: the new
+ * day starts unticked, because copying a day you finished into one you have
+ * not lived is how a plan turns into a lie.
+ */
+function CopyDay({ date, items }: { date: string; items: PlanItem[] }) {
   const store = useStore();
-  const now = new Date();
-  const isNow = date === today && now.getHours() === hour;
+  const [open, setOpen] = useState(false);
+
+  if (items.length === 0) return null;
+
+  const copyTo = (target: string) => {
+    for (const item of items) {
+      store.addPlanItem({
+        date: target,
+        title: item.title,
+        start: item.start,
+        minutes: item.minutes,
+        done: false,
+        priority: item.priority,
+        categoryId: item.categoryId,
+        // The link is to a specific piece of work that is either done or not;
+        // pointing a second day at it would let one tick close both.
+        taskId: null,
+      });
+    }
+    setOpen(false);
+  };
 
   return (
-    <div
-      className={`flex items-stretch gap-3 border-b border-line last:border-0 ${
-        isNow ? "bg-accent-soft/40" : ""
-      }`}
-    >
-      <span className="nums w-14 shrink-0 py-2 pl-3.5 text-[11px] text-ink-3">
-        {String(hour).padStart(2, "0")}:00
-      </span>
+    <span className="relative">
+      <button
+        onClick={() => setOpen((v) => !v)}
+        className="rounded-lg border border-line px-2 py-1 text-xs text-ink-2 transition-colors hover:border-line-strong hover:bg-panel-2 hover:text-ink"
+      >
+        Copy day
+      </button>
 
-      <div className="min-w-0 flex-1 py-1.5 pr-3">
-        {items.length === 0 ? (
-          <button
-            onClick={() =>
-              store.addPlanItem({
-                date,
-                title: "",
-                start: `${String(hour).padStart(2, "0")}:00`,
-                minutes: 60,
-                done: false,
-                categoryId: null,
-                taskId: null,
-              })
-            }
-            className="h-7 w-full rounded-md text-left text-xs text-transparent transition-colors hover:bg-panel-2 hover:text-ink-3"
-          >
-            + Add
-          </button>
-        ) : (
-          <div className="flex flex-col gap-1">
-            {items.map((item) => (
-              <Item key={item.id} item={item} />
+      {open && (
+        <>
+          <span className="fixed inset-0 z-30" onClick={() => setOpen(false)} aria-hidden />
+          <span className="absolute right-0 top-8 z-40 flex w-44 flex-col gap-0.5 rounded-lg border border-line bg-panel p-1 shadow-[var(--shadow-md)]">
+            {[
+              { label: "Tomorrow", days: 1 },
+              { label: "In 2 days", days: 2 },
+              { label: "Next week", days: 7 },
+            ].map((option) => (
+              <button
+                key={option.days}
+                onClick={() => copyTo(addDays(date, option.days))}
+                className="rounded px-2 py-1.5 text-left text-xs text-ink-2 transition-colors hover:bg-panel-2 hover:text-ink"
+              >
+                {option.label}
+                <span className="ml-1 text-ink-3">
+                  {formatDate(addDays(date, option.days))}
+                </span>
+              </button>
             ))}
-          </div>
-        )}
-      </div>
+
+            <span className="mt-1 border-t border-line px-2 pb-1 pt-2 text-[10px] text-ink-3">
+              Copies {items.length} {items.length === 1 ? "block" : "blocks"}, unticked.
+            </span>
+
+            <span className="px-1 pb-1">
+              <DateField
+                value=""
+                onChange={(v) => {
+                  if (v) copyTo(v);
+                }}
+              />
+            </span>
+          </span>
+        </>
+      )}
+    </span>
+  );
+}
+
+/**
+ * The scheduled blocks as rows, under the grid.
+ *
+ * The grid answers "what does my day look like" and is a poor place to type;
+ * these rows are where a block gets renamed, re-timed or removed. Two views of
+ * one list, each doing the thing the other is bad at.
+ */
+function Scheduled({ date, items }: { date: string; items: PlanItem[] }) {
+  if (items.length === 0) {
+    return (
+      <p className="rounded-xl border border-dashed border-line px-3.5 py-5 text-center text-[13px] text-ink-3">
+        Nothing timed yet. Double-click the grid, or drag a task in from the right.
+      </p>
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-1">
+      {items.map((item) => (
+        <Item key={item.id} item={item} />
+      ))}
     </div>
   );
 }
@@ -209,12 +303,51 @@ function Item({ item }: { item: PlanItem }) {
   const category = store.categories.find((c) => c.id === item.categoryId);
   const task = item.taskId ? store.tasks.find((t) => t.id === item.taskId) : null;
 
+  // Only the grip starts a drag. With the whole row draggable, selecting text
+  // in the title drags the block instead, which makes renaming impossible.
+  const [dragging, setDragging] = useState(false);
+  const [armed, setArmed] = useState(false);
+
   return (
     <div
-      className="group flex items-center gap-2 rounded-md border border-line bg-panel-2 px-2 py-1.5"
+      draggable={armed}
+      onDragStart={(e) => {
+        e.dataTransfer.setData(DRAG_TYPE, dragPayload("plan", item.id));
+        e.dataTransfer.effectAllowed = "move";
+        setDragging(true);
+      }}
+      onDragEnd={() => {
+        setDragging(false);
+        setArmed(false);
+      }}
+      className={`group flex items-center gap-2 rounded-md border border-line bg-panel-2 px-2 py-1.5 transition-opacity ${
+        dragging ? "opacity-40" : ""
+      }`}
       style={category ? { borderLeft: `2px solid ${courseColor(category.color)}` } : undefined}
     >
+      <span
+        onPointerDown={() => setArmed(true)}
+        onPointerUp={() => setArmed(false)}
+        aria-hidden
+        title="Drag to another time"
+        className="-ml-0.5 shrink-0 cursor-grab select-none px-0.5 text-ink-3 opacity-0 transition-opacity group-hover:opacity-100 active:cursor-grabbing"
+      >
+        <svg viewBox="0 0 16 16" className="size-3">
+          <path
+            d="M6 4h.01M6 8h.01M6 12h.01M10 4h.01M10 8h.01M10 12h.01"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+          />
+        </svg>
+      </span>
+
       <Tick checked={item.done} onChange={() => store.togglePlanItem(item.id)} />
+
+      <PriorityPicker
+        value={item.priority}
+        onChange={(priority) => store.updatePlanItem(item.id, { priority })}
+      />
 
       <input
         value={item.title}
@@ -300,6 +433,7 @@ function Item({ item }: { item: PlanItem }) {
 function Loose({ date, items }: { date: string; items: PlanItem[] }) {
   const store = useStore();
   const [draft, setDraft] = useState("");
+  const [over, setOver] = useState(false);
 
   const add = () => {
     const title = draft.trim();
@@ -310,6 +444,7 @@ function Loose({ date, items }: { date: string; items: PlanItem[] }) {
       start: null,
       minutes: 30,
       done: false,
+      priority: "medium",
       categoryId: null,
       taskId: null,
     });
@@ -319,7 +454,41 @@ function Loose({ date, items }: { date: string; items: PlanItem[] }) {
   return (
     <section>
       <SectionTitle>Also today</SectionTitle>
-      <Panel className="divide-y divide-[var(--border)]">
+      <div
+        onDragOver={(e: React.DragEvent) => {
+          e.preventDefault();
+          setOver(true);
+        }}
+        onDragLeave={() => setOver(false)}
+        onDrop={(e: React.DragEvent) => {
+          e.preventDefault();
+          setOver(false);
+          const payload = readDrag(e);
+          if (!payload) return;
+
+          // Dropping here is how a block gives up its hour without being
+          // deleted and retyped.
+          if (payload.kind === "plan") {
+            store.updatePlanItem(payload.id, { start: null, date });
+            return;
+          }
+          const task = store.tasks.find((t) => t.id === payload.id);
+          if (!task) return;
+          store.addPlanItem({
+            date,
+            title: task.title,
+            start: null,
+            minutes: 45,
+            done: false,
+            priority: task.priority,
+            categoryId: task.categoryId,
+            taskId: task.id,
+          });
+        }}
+        className={`divide-y divide-[var(--border)] rounded-xl border bg-panel shadow-[var(--shadow),var(--edge)] transition-colors ${
+          over ? "border-accent/50 bg-accent-soft/40" : "border-line"
+        }`}
+      >
         {items.map((item) => (
           <div key={item.id} className="px-2 py-1.5">
             <Item item={item} />
@@ -339,7 +508,7 @@ function Loose({ date, items }: { date: string; items: PlanItem[] }) {
             Add
           </Button>
         </div>
-      </Panel>
+      </div>
     </section>
   );
 }
@@ -378,6 +547,11 @@ function FromTasks({ date }: { date: string }) {
           return (
             <button
               key={task.id}
+              draggable
+              onDragStart={(e) => {
+                e.dataTransfer.setData(DRAG_TYPE, dragPayload("task", task.id));
+                e.dataTransfer.effectAllowed = "copy";
+              }}
               onClick={() =>
                 store.addPlanItem({
                   date,
@@ -385,6 +559,9 @@ function FromTasks({ date }: { date: string }) {
                   start: null,
                   minutes: 45,
                   done: false,
+                  // The work already has an importance; the block inherits it
+                  // rather than asking the student to say it twice.
+                  priority: task.priority,
                   categoryId: task.categoryId,
                   taskId: task.id,
                 })
@@ -482,6 +659,59 @@ function relative(iso: string): string {
   if (d === 0) return "today";
   if (d === 1) return "tomorrow";
   return `${d}d`;
+}
+
+/**
+ * How much a block matters, as a dot you click.
+ *
+ * A select would be four times the width for something most blocks never
+ * change. The dot carries the colour the rest of the app already uses for
+ * priority, so it needs no label to be read.
+ */
+function PriorityPicker({
+  value,
+  onChange,
+}: {
+  value: Priority;
+  onChange: (p: Priority) => void;
+}) {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <span className="relative shrink-0">
+      <button
+        onClick={() => setOpen((v) => !v)}
+        aria-label={`Priority: ${PRIORITY_LABEL[value]}`}
+        title={PRIORITY_LABEL[value]}
+        className="grid size-4 place-items-center rounded transition-colors hover:bg-panel"
+      >
+        <PriorityDot priority={value} />
+      </button>
+
+      {open && (
+        <>
+          <span className="fixed inset-0 z-10" onClick={() => setOpen(false)} aria-hidden />
+          <span className="absolute left-0 top-5 z-20 flex flex-col gap-0.5 rounded-lg border border-line bg-panel p-1 shadow-[var(--shadow-md)]">
+            {PRIORITIES.map((p) => (
+              <button
+                key={p}
+                onClick={() => {
+                  onChange(p);
+                  setOpen(false);
+                }}
+                className={`flex items-center gap-1.5 rounded px-1.5 py-1 text-left text-[11px] transition-colors hover:bg-panel-2 ${
+                  p === value ? "text-ink" : "text-ink-2"
+                }`}
+              >
+                <PriorityDot priority={p} />
+                {PRIORITY_LABEL[p]}
+              </button>
+            ))}
+          </span>
+        </>
+      )}
+    </span>
+  );
 }
 
 function Tick({ checked, onChange }: { checked: boolean; onChange: () => void }) {

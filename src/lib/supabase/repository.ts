@@ -478,19 +478,28 @@ export async function deleteDay(date: string): Promise<void> {
 /* ------------------------------ Plan & habits ---------------------------- */
 
 export async function createPlanItem(p: Omit<PlanItem, "id">): Promise<PlanItem | null> {
-  const { data, error } = await client()
-    .from("plan_items")
-    .insert({
-      date: p.date,
-      title: p.title,
-      start_time: p.start,
-      minutes: p.minutes,
-      done: p.done,
-      category_id: p.categoryId,
-      task_id: p.taskId,
-    })
-    .select()
-    .single();
+  const row: Partial<PlanItemRow> = {
+    date: p.date,
+    title: p.title,
+    start_time: p.start,
+    minutes: p.minutes,
+    done: p.done,
+    category_id: p.categoryId,
+    task_id: p.taskId,
+  };
+
+  const insert = (body: Partial<PlanItemRow>) =>
+    client().from("plan_items").insert(body).select().single();
+
+  let { data, error } = await insert({ ...row, priority: p.priority });
+
+  // A database that has not run the priorities migration rejects the column
+  // rather than the row. Dropping one field beats losing the whole block —
+  // the plan still saves, just without a priority, until the SQL is run.
+  if (error && isMissingSchema(error)) {
+    ({ data, error } = await insert(row));
+  }
+
   if (error) {
     if (isMissingSchema(error)) return null;
     throw error;
@@ -504,6 +513,7 @@ export async function updatePlanItem(id: string, patch: Partial<PlanItem>): Prom
   if (patch.start !== undefined) row.start_time = patch.start;
   if (patch.minutes !== undefined) row.minutes = patch.minutes;
   if (patch.done !== undefined) row.done = patch.done;
+  if (patch.priority !== undefined) row.priority = patch.priority;
   if (patch.date !== undefined) row.date = patch.date;
   if (patch.categoryId !== undefined) row.category_id = patch.categoryId;
   if (patch.taskId !== undefined) row.task_id = patch.taskId;
@@ -766,6 +776,7 @@ function toPlanItem(row: PlanItemRow): PlanItem {
     start: row.start_time ? row.start_time.slice(0, 5) : null,
     minutes: Number(row.minutes) || 30,
     done: Boolean(row.done),
+    priority: row.priority ?? "medium",
     categoryId: row.category_id,
     taskId: row.task_id,
   };

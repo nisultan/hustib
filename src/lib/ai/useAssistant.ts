@@ -372,6 +372,7 @@ function runTool(call: ToolCall, store: Store, router: Router): ToolResult {
           start,
           minutes,
           done: false,
+          priority: oneOf(a.priority, PRIORITIES, task?.priority ?? "medium") as Priority,
           // A block standing in for a task inherits its category, so the plan
           // is coloured the same way the task list is.
           categoryId: categoryId ?? task?.categoryId ?? null,

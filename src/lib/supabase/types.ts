@@ -125,6 +125,8 @@ export type PlanItemRow = {
   start_time: string | null;
   minutes: number;
   done: boolean;
+  /** Absent on a database that has not run the priorities migration. */
+  priority?: TaskPriority;
   category_id: string | null;
   task_id: string | null;
   created_at: string;

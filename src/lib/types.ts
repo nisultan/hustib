@@ -168,6 +168,15 @@ export interface PlanItem {
   /** How long it is expected to take. */
   minutes: number;
   done: boolean;
+  /**
+   * How much this one matters, independent of when it sits.
+   *
+   * A day has an order in time and an order in importance, and they are not
+   * the same — the thing at 9am is not automatically the thing that matters.
+   * Separating them is what makes a plan survive a day that goes wrong: you
+   * can see at a glance what still has to happen.
+   */
+  priority: Priority;
   categoryId: ID | null;
   taskId: ID | null;
 }
