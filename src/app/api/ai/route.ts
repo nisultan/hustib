@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { fetchGemini } from "@/lib/ai/fetchGemini";
 import { TOOL_DECLARATIONS } from "@/lib/ai/tools";
 import { SYSTEM_INSTRUCTION } from "@/lib/ai/prompt";
 
@@ -65,7 +66,10 @@ export async function POST(request: Request) {
 
   const contents = body.contents;
   if (!Array.isArray(contents) || contents.length === 0) {
-    return NextResponse.json({ error: "`contents` must be a non-empty array." }, { status: 400 });
+    return NextResponse.json(
+      { error: "`contents` must be a non-empty array." },
+      { status: 400 },
+    );
   }
 
   // The snapshot of the student's hub rides in the system instruction rather
@@ -75,17 +79,15 @@ export async function POST(request: Request) {
 
   let response: Response;
   try {
-    response = await fetch(ENDPOINT, {
-      method: "POST",
-      headers: { "content-type": "application/json", "x-goog-api-key": key },
-      body: JSON.stringify({
-        systemInstruction: {
-          parts: [{ text: `${SYSTEM_INSTRUCTION}\n\n# The student's hub, right now\n\n${context}` }],
-        },
-        contents: (contents as Content[]).slice(-MAX_CONTENTS),
-        tools: [{ functionDeclarations: TOOL_DECLARATIONS }],
-        generationConfig: { temperature: 0.7, maxOutputTokens: 2048 },
-      }),
+    response = await fetchGemini(ENDPOINT, key, {
+      systemInstruction: {
+        parts: [
+          { text: `${SYSTEM_INSTRUCTION}\n\n# The student's hub, right now\n\n${context}` },
+        ],
+      },
+      contents: (contents as Content[]).slice(-MAX_CONTENTS),
+      tools: [{ functionDeclarations: TOOL_DECLARATIONS }],
+      generationConfig: { temperature: 0.7, maxOutputTokens: 2048 },
     });
   } catch (e) {
     // Logged with the cause: "could not reach" covers DNS, TLS, a proxy and a
@@ -97,7 +99,11 @@ export async function POST(request: Request) {
   if (!response.ok) {
     // Google's error bodies can echo the request back, and the request
     // contains the student's journal — so this is logged, never returned.
-    console.error("Gemini request failed", response.status, await response.text().catch(() => ""));
+    console.error(
+      "Gemini request failed",
+      response.status,
+      await response.text().catch(() => ""),
+    );
     const message =
       response.status === 429
         ? "The assistant is rate-limited right now. Try again in a moment."
@@ -117,7 +123,9 @@ export async function POST(request: Request) {
     .join("")
     .trim();
   const calls = parts
-    .filter((p): p is Part & { functionCall: NonNullable<Part["functionCall"]> } => !!p.functionCall)
+    .filter(
+      (p): p is Part & { functionCall: NonNullable<Part["functionCall"]> } => !!p.functionCall,
+    )
     .map((p) => ({ name: p.functionCall.name, args: p.functionCall.args ?? {} }));
 
   if (text === "" && calls.length === 0) {

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { fetchGemini } from "@/lib/ai/fetchGemini";
 import { REFLECT_INSTRUCTION } from "@/lib/ai/prompt";
 
 /**
@@ -26,7 +27,11 @@ const RESPONSE_SCHEMA = {
           id: { type: "STRING", description: "Existing note id, or omitted for a new note." },
           topic: { type: "STRING" },
           note: { type: "STRING" },
-          source: { type: "STRING", format: "enum", enum: ["reflection", "conversation", "pattern"] },
+          source: {
+            type: "STRING",
+            format: "enum",
+            enum: ["reflection", "conversation", "pattern"],
+          },
         },
         required: ["topic", "note", "source"],
       },
@@ -37,7 +42,11 @@ const RESPONSE_SCHEMA = {
       items: {
         type: "OBJECT",
         properties: {
-          kind: { type: "STRING", format: "enum", enum: ["takeaway", "recommendation", "pattern"] },
+          kind: {
+            type: "STRING",
+            format: "enum",
+            enum: ["takeaway", "recommendation", "pattern"],
+          },
           title: { type: "STRING" },
           body: { type: "STRING" },
           basis: { type: "STRING" },
@@ -76,34 +85,30 @@ export async function POST(request: Request) {
 
   let response: Response;
   try {
-    response = await fetch(ENDPOINT, {
-      method: "POST",
-      headers: { "content-type": "application/json", "x-goog-api-key": key },
-      body: JSON.stringify({
-        systemInstruction: { parts: [{ text: REFLECT_INSTRUCTION }] },
-        contents: [
-          {
-            role: "user",
-            parts: [
-              {
-                text:
-                  `# The student's hub, right now\n\n${context}\n\n` +
-                  `# What you already know about them\n\n${memory}\n\n` +
-                  `# Insights still showing in the app\n\n${standing}\n\n` +
-                  `Update the memory, and return any insight worth surfacing today.`,
-              },
-            ],
-          },
-        ],
-        generationConfig: {
-          // Lower than the chat route: this one is making durable claims about
-          // a person, and should reach for the obvious reading, not a novel one.
-          temperature: 0.4,
-          maxOutputTokens: 4096,
-          responseMimeType: "application/json",
-          responseSchema: RESPONSE_SCHEMA,
+    response = await fetchGemini(ENDPOINT, key, {
+      systemInstruction: { parts: [{ text: REFLECT_INSTRUCTION }] },
+      contents: [
+        {
+          role: "user",
+          parts: [
+            {
+              text:
+                `# The student's hub, right now\n\n${context}\n\n` +
+                `# What you already know about them\n\n${memory}\n\n` +
+                `# Insights still showing in the app\n\n${standing}\n\n` +
+                `Update the memory, and return any insight worth surfacing today.`,
+            },
+          ],
         },
-      }),
+      ],
+      generationConfig: {
+        // Lower than the chat route: this one is making durable claims about
+        // a person, and should reach for the obvious reading, not a novel one.
+        temperature: 0.4,
+        maxOutputTokens: 4096,
+        responseMimeType: "application/json",
+        responseSchema: RESPONSE_SCHEMA,
+      },
     });
   } catch (e) {
     console.error("Gemini reflect fetch failed:", e);
@@ -113,8 +118,15 @@ export async function POST(request: Request) {
   if (!response.ok) {
     // The request body contains the student's journal, and Google's errors can
     // echo it back, so this is logged and never returned.
-    console.error("Gemini reflect failed", response.status, await response.text().catch(() => ""));
-    return NextResponse.json({ error: "The reflection could not be completed." }, { status: 502 });
+    console.error(
+      "Gemini reflect failed",
+      response.status,
+      await response.text().catch(() => ""),
+    );
+    return NextResponse.json(
+      { error: "The reflection could not be completed." },
+      { status: 502 },
+    );
   }
 
   const data = await response.json();

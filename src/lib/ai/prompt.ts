@@ -161,10 +161,35 @@ nothing is always better than padding. Only include something that is:
 - actionable or genuinely clarifying
 - grounded in what changed recently
 
+Read the journal first, and hardest. Deadlines and averages are already on the
+dashboard; the student can see those without you. Their own writing is the only
+thing here nobody else has read, and it is where the insight they could not have
+got themselves is going to come from. Look for:
+- a worry or idea they keep returning to across weeks, that they may not have
+  noticed is recurring
+- a shift in how they write — shorter entries, a subject that stops being
+  mentioned, a tone that changes after some particular week
+- a gap between what they write and what the data says: feeling behind in a
+  subject they are actually doing well in, or the reverse
+- something they said they would do, once, weeks ago, and have not mentioned
+  since
+- a connection between the non-academic entries and the academic ones — sleep,
+  training, mood — where the timing genuinely lines up
+
+Quote or closely paraphrase their own words when you do this. "You wrote in
+March that you were 'just going through the motions' in Economics, and it has
+not come up since" lands; "your engagement may be declining" does not.
+
+Be careful with causation. Two things happening in the same week is a
+coincidence worth mentioning, not a mechanism to assert. Say what lines up and
+let them draw the conclusion.
+
 kind:
 - "takeaway" — what their recent data actually shows, stated plainly
 - "recommendation" — one specific thing to do, and when
-- "pattern" — a connection across time they probably have not noticed
+- "pattern" — something running through their writing over weeks or months that
+  they probably have not noticed themselves. This is the most valuable of the
+  three and the most underused; reach for it whenever the journal supports one.
 
 title: at most six words, no trailing punctuation.
 body: two or three sentences, addressed to them as "you". Specific figures and

@@ -5,6 +5,8 @@ import { createPortal } from "react-dom";
 import { useAssistant, Message } from "@/lib/ai/useAssistant";
 import { useStore } from "@/lib/store";
 import { useMounted } from "@/lib/useMounted";
+import { courseAverage } from "@/lib/grades";
+import { daysUntil, greeting, relativeLabel, todayISO } from "@/lib/dates";
 import { ToolResult } from "@/lib/ai/tools";
 
 /**
@@ -16,15 +18,54 @@ import { ToolResult } from "@/lib/ai/tools";
  * becomes a full sheet.
  */
 
-const SUGGESTIONS = [
-  "What should I work on right now?",
-  "How is my week looking?",
-  "Which course needs the most attention?",
-];
+/**
+ * What to open with, drawn from the hub rather than written in advance.
+ *
+ * A panel that greets everyone identically is a search box with a personality
+ * bolted on. This costs no request — it is all data already in memory — and it
+ * means opening the assistant already tells you something, and the things it
+ * offers to do are about your actual week.
+ */
+function brief(store: ReturnType<typeof useStore>): { line: string; prompts: string[] } {
+  const open = store.tasks.filter((t) => t.status !== "completed");
+  const overdue = open.filter((t) => t.dueDate != null && daysUntil(t.dueDate) < 0);
+  const today = open.filter((t) => t.dueDate === todayISO());
+
+  const soon = open
+    .filter((t) => t.dueDate != null && daysUntil(t.dueDate) >= 0 && daysUntil(t.dueDate) <= 7)
+    .sort((a, b) => (a.dueDate ?? "").localeCompare(b.dueDate ?? ""))[0];
+
+  const weakest = store.courses
+    .map((c) => ({ course: c, avg: courseAverage(store.grades, c.id).value }))
+    .filter((x): x is { course: (typeof store.courses)[number]; avg: number } => x.avg != null)
+    .sort((a, b) => a.avg - b.avg)[0];
+
+  const journalled = store.days.filter((d) =>
+    d.reflection.some((b) => b.text.trim() !== ""),
+  ).length;
+
+  const line =
+    overdue.length > 0
+      ? `${overdue.length} ${overdue.length === 1 ? "thing is" : "things are"} overdue.`
+      : today.length > 0
+        ? `${today.length} ${today.length === 1 ? "task is" : "tasks are"} due today.`
+        : soon
+          ? `Next up is "${soon.title}", ${relativeLabel(soon.dueDate as string).toLowerCase()}.`
+          : "Nothing is pressing right now.";
+
+  const prompts: string[] = [];
+  if (overdue.length > 0) prompts.push("Help me get out from under the overdue work");
+  if (soon) prompts.push(`How should I approach "${soon.title}"?`);
+  if (weakest) prompts.push(`Why is ${weakest.course.name} the one slipping?`);
+  if (journalled >= 3) prompts.push("What patterns do you see in my journal?");
+  prompts.push("What should I work on right now?");
+
+  return { line, prompts: prompts.slice(0, 3) };
+}
 
 export function Assistant({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { messages, pending, error, send, reset } = useAssistant();
-  const { profile } = useStore();
+  const store = useStore();
   const mounted = useMounted();
   const [draft, setDraft] = useState("");
 
@@ -113,7 +154,7 @@ export function Assistant({ open, onClose }: { open: boolean; onClose: () => voi
 
         <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-4">
           {messages.length === 0 ? (
-            <Empty name={profile.name} onPick={(s) => void send(s)} />
+            <Empty store={store} onPick={(s) => void send(s)} />
           ) : (
             <div className="flex flex-col gap-4">
               {messages.map((m) => (
@@ -181,18 +222,36 @@ export function Assistant({ open, onClose }: { open: boolean; onClose: () => voi
   );
 }
 
-function Empty({ name, onPick }: { name: string; onPick: (s: string) => void }) {
+function Empty({
+  store,
+  onPick,
+}: {
+  store: ReturnType<typeof useStore>;
+  onPick: (s: string) => void;
+}) {
+  const { line, prompts } = brief(store);
+  const noticed = store.insights.filter((i) => i.dismissedAt == null)[0];
+
   return (
     <div className="flex h-full flex-col justify-center gap-5 px-1 pb-8">
       <div>
-        <p className="text-[15px] font-semibold tracking-tight">Hey {name}.</p>
-        <p className="mt-1 text-[13px] leading-relaxed text-ink-2">
-          I can see your tasks, courses, grades, universities and journal. Ask me about any of it —
-          or just tell me what you need done.
+        <p className="text-[15px] font-semibold tracking-tight">
+          {greeting()}, {store.profile.name}.
         </p>
+        <p className="mt-1 text-[13px] leading-relaxed text-ink-2">{line}</p>
       </div>
+
+      {noticed && (
+        <div className="rounded-lg border border-line bg-panel-2 px-3 py-2.5">
+          <p className="text-[11px] font-medium uppercase tracking-wide text-ink-3">
+            I noticed
+          </p>
+          <p className="mt-1 text-[12px] leading-relaxed text-ink-2">{noticed.body}</p>
+        </div>
+      )}
+
       <div className="flex flex-col items-start gap-1.5">
-        {SUGGESTIONS.map((s) => (
+        {prompts.map((s) => (
           <button
             key={s}
             onClick={() => onPick(s)}
@@ -334,7 +393,11 @@ function bold(text: string): React.ReactNode {
 /** Turns over while the model is working, so the header shows life. */
 function Spark({ active }: { active: boolean }) {
   return (
-    <svg viewBox="0 0 16 16" aria-hidden className={`size-4 text-accent ${active ? "animate-spin" : ""}`}>
+    <svg
+      viewBox="0 0 16 16"
+      aria-hidden
+      className={`size-4 text-accent ${active ? "animate-spin" : ""}`}
+    >
       <path
         d="M8 1.5 9.6 6.4 14.5 8 9.6 9.6 8 14.5 6.4 9.6 1.5 8 6.4 6.4z"
         fill="currentColor"

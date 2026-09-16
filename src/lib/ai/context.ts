@@ -19,8 +19,23 @@ import { daysUntil, todayISO } from "@/lib/dates";
 const MAX_OPEN_TASKS = 40;
 const MAX_DONE_TASKS = 10;
 const MAX_GRADES_PER_COURSE = 6;
-const MAX_JOURNAL_DAYS = 14;
-const MAX_REFLECTION_CHARS = 600;
+/*
+ * The journal gets a budget rather than a row limit.
+ *
+ * It is the only place the hub holds the student's own words, and it is where
+ * everything interesting comes from — a fortnight of it was enough to answer
+ * "how is this week going" and nowhere near enough to notice they have been
+ * circling the same worry since March. Recent days are kept close to whole;
+ * older ones are trimmed but still present, because the value of an old entry
+ * is usually that it rhymes with a new one.
+ *
+ * Sized against what a year of journalling actually costs — roughly 10k tokens
+ * at the ceiling, which the model has room for many times over.
+ */
+const JOURNAL_BUDGET_CHARS = 40_000;
+const RECENT_DAYS = 45;
+const RECENT_ENTRY_CHARS = 2_400;
+const OLDER_ENTRY_CHARS = 500;
 
 export function buildContext(data: AppData): string {
   const today = todayISO();
@@ -86,7 +101,13 @@ function taskLine(t: Task, data: AppData): string {
   if (t.dueDate) {
     const d = daysUntil(t.dueDate);
     const when =
-      d < 0 ? `OVERDUE by ${-d}d` : d === 0 ? "due TODAY" : d === 1 ? "due tomorrow" : `due in ${d}d`;
+      d < 0
+        ? `OVERDUE by ${-d}d`
+        : d === 0
+          ? "due TODAY"
+          : d === 1
+            ? "due tomorrow"
+            : `due in ${d}d`;
     bits.push(`${when} (${t.dueDate}${t.dueTime ? ` ${t.dueTime}` : ""})`);
   } else {
     bits.push("no deadline");
@@ -113,7 +134,9 @@ function grades(data: AppData): string {
   const lines: string[] = [];
 
   if (overall.value != null) {
-    const direction = t ? `, ${t.direction} (${t.delta > 0 ? "+" : ""}${t.delta} pts over ${t.days}d)` : "";
+    const direction = t
+      ? `, ${t.direction} (${t.delta > 0 ? "+" : ""}${t.delta} pts over ${t.days}d)`
+      : "";
     lines.push(`Overall average: ${overall.value}%${direction}`);
   }
 
@@ -126,7 +149,10 @@ function grades(data: AppData): string {
 
     const avg = courseAverage(data.grades, c.id);
     const recent = mine
-      .map((g) => `${g.assessment} ${g.score}%${g.weight ? ` (weight ${g.weight}%)` : ""} on ${g.date}`)
+      .map(
+        (g) =>
+          `${g.assessment} ${g.score}%${g.weight ? ` (weight ${g.weight}%)` : ""} on ${g.date}`,
+      )
       .join("; ");
     lines.push(`${c.name}: average ${avg.value}% over ${avg.count} — recent: ${recent}`);
   }
@@ -152,19 +178,53 @@ function universities(data: AppData): string {
  * a dip in grades is the kind of link a rules engine cannot make.
  */
 function journal(data: AppData): string {
-  return [...data.days]
-    .sort((a, b) => b.date.localeCompare(a.date))
-    .slice(0, MAX_JOURNAL_DAYS)
-    .map((d) => {
-      const weight = d.weight != null ? `weight ${d.weight}kg` : null;
-      const text = blocksToText(d.reflection);
-      const body = [weight, text ? `reflection: ${truncate(text, MAX_REFLECTION_CHARS)}` : null]
-        .filter(Boolean)
-        .join(" · ");
-      return body ? `- ${d.date}: ${body}` : "";
-    })
-    .filter(Boolean)
-    .join("\n");
+  const days = [...data.days].sort((a, b) => b.date.localeCompare(a.date));
+  const today = todayISO();
+
+  const lines: string[] = [];
+  let spent = 0;
+  let omitted = 0;
+
+  for (const day of days) {
+    const text = blocksToText(day.reflection);
+    const weight = day.weight != null ? `weight ${day.weight}kg` : null;
+    if (!text && !weight) continue;
+
+    if (spent >= JOURNAL_BUDGET_CHARS) {
+      omitted += 1;
+      continue;
+    }
+
+    const recent = daysUntil(day.date) >= -RECENT_DAYS;
+    const body = text ? truncate(text, recent ? RECENT_ENTRY_CHARS : OLDER_ENTRY_CHARS) : "";
+
+    // The heading carries the weekday and the distance, so a run of bad
+    // Sundays is visible without the model reconstructing a calendar.
+    const head = `- ${day.date} (${weekday(day.date)}, ${agoLabel(day.date, today)})`;
+    const entry = [`${head}${weight ? ` — ${weight}` : ""}`, body ? `  ${body}` : ""]
+      .filter(Boolean)
+      .join("\n");
+
+    lines.push(entry);
+    spent += entry.length;
+  }
+
+  if (omitted > 0) {
+    lines.push(`- (${omitted} older ${omitted === 1 ? "entry" : "entries"} not shown)`);
+  }
+
+  return lines.join("\n");
+}
+
+/** How long ago, in the units a person would use for that distance. */
+function agoLabel(iso: string, today: string): string {
+  if (iso === today) return "today";
+  const d = -daysUntil(iso);
+  if (d < 0) return "upcoming";
+  if (d === 1) return "yesterday";
+  if (d < 14) return `${d} days ago`;
+  if (d < 60) return `${Math.round(d / 7)} weeks ago`;
+  return `${Math.round(d / 30)} months ago`;
 }
 
 /**
@@ -176,19 +236,26 @@ function memory(data: AppData): string {
 }
 
 function blocksToText(blocks: Block[]): string {
-  return blocks
-    .map((b) => {
-      if (b.type === "divider") return "";
-      if (b.type === "todo") return `[${b.done ? "x" : " "}] ${b.text}`;
-      if (b.type === "bullet") return `• ${b.text}`;
-      return b.text;
-    })
-    .filter((s) => s.trim() !== "")
-    .join(" / ");
+  return (
+    blocks
+      .map((b) => {
+        if (b.type === "divider") return "";
+        if (b.type === "todo") return `[${b.done ? "x" : " "}] ${b.text}`;
+        if (b.type === "bullet") return `• ${b.text}`;
+        if (b.type === "quote") return `> ${b.text}`;
+        if (b.type === "h2" || b.type === "h3") return `## ${b.text}`;
+        return b.text;
+      })
+      .filter((s) => s.trim() !== "")
+      // Kept on separate lines rather than run together: the shape of how
+      // someone wrote a day is part of what is being read for.
+      .join("\n  ")
+  );
 }
 
+/** Collapses runs of spaces but keeps line breaks, which carry the structure. */
 function truncate(s: string, max: number): string {
-  const clean = s.replace(/\s+/g, " ").trim();
+  const clean = s.replace(/[^\S\n]+/g, " ").trim();
   return clean.length <= max ? clean : `${clean.slice(0, max)}…`;
 }
 
