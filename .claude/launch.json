@@ -4,8 +4,14 @@
     {
       "name": "hustib",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev"],
-      "port": 3000
+      "runtimeArgs": [
+        "run",
+        "dev"
+      ],
+      "port": 3000,
+      "env": {
+        "NODE_EXTRA_CA_CERTS": "certs/local-tls-proxy-root.pem"
+      }
     }
   ]
 }

@@ -1,0 +1,58 @@
+"use client";
+
+import { useCallback, useEffect, useState } from "react";
+import { Assistant } from "./Assistant";
+
+/**
+ * Owns whether the assistant is open, and the two ways to open it.
+ *
+ * The panel stays mounted once opened so the conversation survives closing it
+ * — a student who shuts it to look at a grade and reopens it has not lost
+ * what they were in the middle of asking.
+ */
+export function AssistantButton() {
+  const [open, setOpen] = useState(false);
+  const [everOpened, setEverOpened] = useState(false);
+
+  const show = useCallback(() => {
+    setEverOpened(true);
+    setOpen(true);
+  }, []);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      // ⌘J / Ctrl+J. Search already owns K, and J is next to it.
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "j") {
+        e.preventDefault();
+        setEverOpened(true);
+        setOpen((v) => !v);
+      }
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, []);
+
+  return (
+    <>
+      <button
+        type="button"
+        onClick={show}
+        aria-label="Open assistant"
+        title="Assistant  ⌘J"
+        className="grid size-9 shrink-0 place-items-center rounded-lg text-ink-3 transition-colors hover:bg-panel-2 hover:text-ink"
+      >
+        <svg viewBox="0 0 20 20" aria-hidden className="size-[18px]">
+          <path
+            d="M10 2.5 11.9 8.1 17.5 10 11.9 11.9 10 17.5 8.1 11.9 2.5 10 8.1 8.1z"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.5"
+            strokeLinejoin="round"
+          />
+        </svg>
+      </button>
+
+      {everOpened && <Assistant open={open} onClose={() => setOpen(false)} />}
+    </>
+  );
+}

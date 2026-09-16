@@ -4,6 +4,7 @@ import { StoreProvider } from "@/lib/store";
 import { MobileHeaderLinks, MobileNav, NavToggle, Sidebar } from "@/components/Nav";
 import { GlobalSearch } from "@/components/Search";
 import { AddTaskButton } from "@/components/TaskDialog";
+import { AssistantButton } from "@/components/AssistantButton";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { TourHost } from "@/components/Tour";
 import { Lock } from "@/components/Lock";
@@ -46,6 +47,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                   <GlobalSearch />
                 </div>
                 <div className="ml-auto flex items-center gap-1.5">
+                  <AssistantButton />
                   <ThemeToggle />
                   <MobileHeaderLinks />
                   <AddTaskButton compact />
