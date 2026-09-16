@@ -9,7 +9,12 @@ import { NextResponse } from "next/server";
  * only ever sees the generated text.
  */
 
-const MODEL = "gemini-2.0-flash";
+// Pinned to an exact model rather than a floating alias: a model swapping
+// itself under a running app changes both the cost and the shape of what
+// comes back. Bumping it should be a commit. Check the deprecation list
+// before changing — 2.0-flash was shut down on 2026-06-01.
+// https://ai.google.dev/gemini-api/docs/deprecations
+const MODEL = "gemini-3.8-flash";
 
 export async function POST(request: Request) {
   const key = process.env.GEMINI_API_KEY;
