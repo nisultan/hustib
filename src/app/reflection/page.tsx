@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useStore } from "@/lib/store";
 import { addDays, formatDate, pastLabel, todayISO } from "@/lib/dates";
 import { Block } from "@/lib/types";
@@ -11,6 +11,24 @@ import { Button, PageHeader, Panel, SectionTitle } from "@/components/ui";
 export default function ReflectionPage() {
   const store = useStore();
   const [date, setDate] = useState(() => todayISO());
+  const [focus, setFocus] = useState(false);
+
+  // Escape leaves focus mode. It is the only way out that does not require
+  // finding a button on a page deliberately stripped of them.
+  useEffect(() => {
+    if (!focus) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setFocus(false);
+    };
+    document.addEventListener("keydown", onKey);
+    // The page behind must not scroll under the overlay.
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.body.style.overflow = previous;
+    };
+  }, [focus]);
 
   const byDate = useMemo(() => new Map(store.days.map((d) => [d.date, d])), [store.days]);
 
@@ -26,6 +44,19 @@ export default function ReflectionPage() {
 
   const today = todayISO();
   const reflection = byDate.get(date)?.reflection ?? [];
+
+  if (focus) {
+    return (
+      <FocusMode
+        date={date}
+        today={today}
+        blocks={reflection}
+        onChange={(blocks) => store.setDay(date, { reflection: blocks })}
+        onDate={setDate}
+        onClose={() => setFocus(false)}
+      />
+    );
+  }
 
   return (
     <div className="page-in">
@@ -59,6 +90,23 @@ export default function ReflectionPage() {
                 Today
               </Button>
             )}
+            <button
+              onClick={() => setFocus(true)}
+              aria-label="Focus mode"
+              title="Focus mode"
+              className="grid size-9 shrink-0 place-items-center rounded-lg text-ink-3 transition-colors hover:bg-panel-2 hover:text-ink"
+            >
+              <svg viewBox="0 0 16 16" aria-hidden className="size-4">
+                <path
+                  d="M6 2H2v4M10 2h4v4M6 14H2v-4M10 14h4v-4"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            </button>
             <div className="w-[190px]">
               <DateField value={date} onChange={(v) => setDate(v || today)} />
             </div>
@@ -71,7 +119,7 @@ export default function ReflectionPage() {
           key={date}
           blocks={reflection}
           onChange={(blocks) => store.setDay(date, { reflection: blocks })}
-          placeholder="How did it go? Press / for a heading, list or checkbox."
+          placeholder="How did it go? Press / for a heading, list, image or link."
         />
       </Panel>
 
@@ -131,5 +179,86 @@ function summarise(blocks: Block[]): string {
       .filter((b) => b.text.trim() !== "")
       .map((b) => b.text.trim())
       .join(" · ") || "—"
+  );
+}
+
+/**
+ * The journal, alone on the screen.
+ *
+ * Fixed over everything rather than a wider column: the point of asking for
+ * this is to stop seeing the deadline counters and the nav while writing about
+ * your day, and a page that merely got wider still has all of that on it.
+ *
+ * Deliberately sparse — the date, a way back, and the page. Every control that
+ * is not writing is one more thing to look at instead of writing.
+ */
+function FocusMode({
+  date,
+  today,
+  blocks,
+  onChange,
+  onDate,
+  onClose,
+}: {
+  date: string;
+  today: string;
+  blocks: Block[];
+  onChange: (blocks: Block[]) => void;
+  onDate: (date: string) => void;
+  onClose: () => void;
+}) {
+  return (
+    <div className="fixed inset-0 z-50 overflow-y-auto bg-bg">
+      <div className="mx-auto w-full max-w-2xl px-5 py-10 sm:px-8 sm:py-16">
+        <div className="mb-8 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-1">
+            <Step
+              label="Previous day"
+              onClick={() => onDate(addDays(date, -1))}
+              d="M10 3.5 L5.5 8 L10 12.5"
+            />
+            <div className="min-w-[140px] text-center">
+              <p className="text-sm font-semibold tracking-tight">{formatDate(date)}</p>
+              <p className="text-xs text-ink-3">{pastLabel(date)}</p>
+            </div>
+            <Step
+              label="Next day"
+              onClick={() => onDate(addDays(date, 1))}
+              d="M6 3.5 L10.5 8 L6 12.5"
+            />
+            {date !== today && (
+              <Button size="sm" onClick={() => onDate(today)}>
+                Today
+              </Button>
+            )}
+          </div>
+
+          <button
+            onClick={onClose}
+            className="flex shrink-0 items-center gap-1.5 rounded-lg px-2 py-1.5 text-xs text-ink-3 transition-colors hover:bg-panel-2 hover:text-ink"
+          >
+            <svg viewBox="0 0 16 16" aria-hidden className="size-3.5">
+              <path
+                d="M2 6h4V2M14 6h-4V2M2 10h4v4M14 10h-4v4"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+            Exit
+            <kbd className="ml-0.5 rounded border border-line px-1 text-[10px]">Esc</kbd>
+          </button>
+        </div>
+
+        <BlockEditor
+          key={date}
+          blocks={blocks}
+          onChange={onChange}
+          placeholder="How did it go? Press / for a heading, list, image or link."
+        />
+      </div>
+    </div>
   );
 }

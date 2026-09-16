@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Block, BLOCK_LABEL, BlockType } from "@/lib/types";
+import { prepareImage } from "@/lib/image";
 
 /**
  * The reflection editor.
@@ -162,6 +163,7 @@ export function BlockEditor({
             focusNext.current = { id: block.id, at: "end" };
           }}
           onToggle={() => replace(block.id, { done: !block.done })}
+          onPatch={(patch) => replace(block.id, patch)}
           onDelete={() => remove(block.id)}
           onInsertBelow={() => insertAfter(block.id, empty())}
         />
@@ -218,6 +220,7 @@ function BlockRow({
   onMove,
   onType,
   onToggle,
+  onPatch,
   onDelete,
   onInsertBelow,
 }: {
@@ -233,6 +236,7 @@ function BlockRow({
   onMove: (delta: number) => void;
   onType: (type: BlockType) => void;
   onToggle: () => void;
+  onPatch: (patch: Partial<Block>) => void;
   onDelete: () => void;
   onInsertBelow: () => void;
 }) {
@@ -246,6 +250,40 @@ function BlockRow({
     el.style.height = "auto";
     el.style.height = `${el.scrollHeight}px`;
   }, [block.text, block.type]);
+
+  if (block.type === "image") {
+    return (
+      <div className="group relative flex items-start gap-1.5 py-1 pl-14">
+        <Handle
+          onDelete={onDelete}
+          onMove={onMove}
+          onMenu={() => setMenuOpen(!menuOpen)}
+          onInsertBelow={onInsertBelow}
+        />
+        <ImageBlock block={block} onPatch={onPatch} onDelete={onDelete} />
+        {menuOpen && (
+          <TypeMenu current={block.type} onPick={onType} onClose={() => setMenuOpen(false)} />
+        )}
+      </div>
+    );
+  }
+
+  if (block.type === "link") {
+    return (
+      <div className="group relative flex items-start gap-1.5 py-0.5 pl-14">
+        <Handle
+          onDelete={onDelete}
+          onMove={onMove}
+          onMenu={() => setMenuOpen(!menuOpen)}
+          onInsertBelow={onInsertBelow}
+        />
+        <LinkBlock block={block} onPatch={onPatch} onEnter={onEnter} />
+        {menuOpen && (
+          <TypeMenu current={block.type} onPick={onType} onClose={() => setMenuOpen(false)} />
+        )}
+      </div>
+    );
+  }
 
   if (block.type === "divider") {
     return (
@@ -372,6 +410,8 @@ const STYLE: Record<BlockType, string> = {
   todo: "text-sm leading-relaxed",
   quote: "border-l-2 border-accent/50 pl-3 text-sm italic leading-relaxed text-ink-2",
   divider: "",
+  image: "text-xs text-ink-3",
+  link: "text-sm",
 };
 
 /**
@@ -499,6 +539,8 @@ const HINT: Record<BlockType, string> = {
   todo: "[]",
   quote: ">",
   divider: "",
+  image: "",
+  link: "",
 };
 
 let seq = 0;
@@ -511,4 +553,176 @@ function empty(type: BlockType = "text"): Block {
     text: "",
     done: false,
   };
+}
+
+/**
+ * A picture in the journal.
+ *
+ * Empty until one is chosen, so a freshly inserted image block is a drop
+ * target rather than a broken graphic. Accepts a click, a drop, or a paste,
+ * because all three are how people actually get a photo into a page.
+ */
+function ImageBlock({
+  block,
+  onPatch,
+  onDelete,
+}: {
+  block: Block;
+  onPatch: (patch: Partial<Block>) => void;
+  onDelete: () => void;
+}) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const input = useRef<HTMLInputElement>(null);
+
+  const take = async (file: File | undefined) => {
+    if (!file) return;
+    setError(null);
+    setBusy(true);
+    try {
+      const { src } = await prepareImage(file);
+      onPatch({ src });
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not read that image.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  if (!block.src) {
+    return (
+      <div className="w-full">
+        <button
+          onClick={() => input.current?.click()}
+          onDragOver={(e) => e.preventDefault()}
+          onDrop={(e) => {
+            e.preventDefault();
+            void take(e.dataTransfer.files[0]);
+          }}
+          onPaste={(e) => void take(e.clipboardData.files[0])}
+          className="flex w-full items-center justify-center gap-2 rounded-lg border border-dashed border-line py-6 text-xs text-ink-3 transition-colors hover:border-line-strong hover:text-ink-2"
+        >
+          {busy ? "Adding…" : "Click, drop or paste an image"}
+        </button>
+        <input
+          ref={input}
+          type="file"
+          accept="image/*"
+          hidden
+          onChange={(e) => void take(e.target.files?.[0])}
+        />
+        {error && <p className="mt-1 text-xs text-[var(--urgent)]">{error}</p>}
+      </div>
+    );
+  }
+
+  return (
+    <figure className="w-full">
+      {/* The image is a data URL the student chose, so next/image would buy
+          nothing here and cannot optimise it anyway. */}
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={block.src}
+        alt={block.text || "Journal image"}
+        className="max-h-[420px] w-full rounded-lg object-contain"
+      />
+      <figcaption className="mt-1 flex items-center gap-2">
+        <input
+          value={block.text}
+          onChange={(e) => onPatch({ text: e.target.value })}
+          placeholder="Add a caption…"
+          className="flex-1 border-0 bg-transparent text-xs text-ink-3 outline-none placeholder:text-ink-3"
+        />
+        <button
+          onClick={onDelete}
+          className="text-xs text-ink-3 opacity-0 transition-opacity hover:text-[var(--urgent)] group-hover:opacity-100"
+        >
+          Remove
+        </button>
+      </figcaption>
+    </figure>
+  );
+}
+
+/**
+ * A link, kept as a block rather than as inline markup.
+ *
+ * The editor is textareas all the way down, so there is nowhere for an inline
+ * anchor to live without a rich-text layer. A block keeps the URL editable and
+ * the link clickable, and reads fine in a journal where a link is usually its
+ * own thought anyway.
+ */
+function LinkBlock({
+  block,
+  onPatch,
+  onEnter,
+}: {
+  block: Block;
+  onPatch: (patch: Partial<Block>) => void;
+  onEnter: () => void;
+}) {
+  const [editing, setEditing] = useState(!block.href);
+
+  const commit = (raw: string) => {
+    const url = raw.trim();
+    // Typing "arxiv.org" and getting a relative link is never what anyone
+    // meant, so a bare host is treated as https.
+    onPatch({ href: url === "" ? "" : /^https?:\/\//i.test(url) ? url : `https://${url}` });
+  };
+
+  if (editing) {
+    return (
+      <div className="flex w-full items-center gap-2 py-1">
+        <input
+          autoFocus
+          defaultValue={block.href ?? ""}
+          onChange={(e) => commit(e.target.value)}
+          onBlur={() => setEditing(false)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              setEditing(false);
+              if (block.href) onEnter();
+            }
+            if (e.key === "Escape") setEditing(false);
+          }}
+          placeholder="Paste a link…"
+          className="flex-1 rounded-md border border-line-strong bg-bg px-2 py-1 text-sm outline-none"
+        />
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex w-full items-center gap-2 py-1">
+      <svg viewBox="0 0 16 16" aria-hidden className="size-3.5 shrink-0 text-ink-3">
+        <path
+          d="M6.5 9.5a2.5 2.5 0 0 0 3.5 0l2-2a2.5 2.5 0 0 0-3.5-3.5l-.6.6M9.5 6.5a2.5 2.5 0 0 0-3.5 0l-2 2a2.5 2.5 0 0 0 3.5 3.5l.6-.6"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.4"
+          strokeLinecap="round"
+        />
+      </svg>
+      <a
+        href={block.href}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="truncate text-sm text-accent-text underline-offset-2 hover:underline"
+      >
+        {block.text.trim() || block.href}
+      </a>
+      <input
+        value={block.text}
+        onChange={(e) => onPatch({ text: e.target.value })}
+        placeholder="Label"
+        className="w-24 shrink-0 border-0 bg-transparent text-xs text-ink-3 opacity-0 outline-none transition-opacity focus:opacity-100 group-hover:opacity-100"
+      />
+      <button
+        onClick={() => setEditing(true)}
+        className="shrink-0 text-xs text-ink-3 opacity-0 transition-opacity hover:text-ink group-hover:opacity-100"
+      >
+        Edit
+      </button>
+    </div>
+  );
 }

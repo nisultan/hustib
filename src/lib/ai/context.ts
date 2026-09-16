@@ -251,6 +251,10 @@ function blocksToText(blocks: Block[]): string {
         if (b.type === "todo") return `[${b.done ? "x" : " "}] ${b.text}`;
         if (b.type === "bullet") return `• ${b.text}`;
         if (b.type === "quote") return `> ${b.text}`;
+      // The picture itself is useless here and would swamp everything else;
+      // the caption is the part that carries meaning.
+      if (b.type === "image") return b.text ? `[image: ${b.text}]` : "[image]";
+      if (b.type === "link") return `[link: ${b.text || b.href || ""}]`;
         if (b.type === "h2" || b.type === "h3") return `## ${b.text}`;
         return b.text;
       })

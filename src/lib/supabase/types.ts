@@ -143,6 +143,8 @@ export type BlockJson = {
   type: string;
   text: string;
   done: boolean;
+  src?: string;
+  href?: string;
 };
 
 // Declared as type aliases, not interfaces, on purpose: supabase-js constrains

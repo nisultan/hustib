@@ -158,9 +158,12 @@ export interface Profile {
  * a checkbox each know what they are, so Enter, Backspace and the checkbox
  * can behave differently in each without parsing prose on every keystroke.
  */
-export type BlockType = "text" | "h2" | "h3" | "bullet" | "todo" | "quote" | "divider";
+export type BlockType =
+  "text" | "h2" | "h3" | "bullet" | "todo" | "quote" | "divider" | "image" | "link";
 
 export const BLOCK_LABEL: Record<BlockType, string> = {
+  image: "Image",
+  link: "Link",
   text: "Text",
   h2: "Heading",
   h3: "Subheading",
@@ -173,9 +176,21 @@ export const BLOCK_LABEL: Record<BlockType, string> = {
 export interface Block {
   id: ID;
   type: BlockType;
+  /** The body. For "image" and "link" this is the caption or label. */
   text: string;
   /** Only meaningful for "todo". */
   done: boolean;
+  /**
+   * For "image": the picture itself, as a data URL.
+   *
+   * Inline rather than a file reference, because the journal is encrypted on
+   * the student's device and an image kept outside that would be the one part
+   * of their diary sitting in the clear. Downscaled on the way in — a phone
+   * photo is several megabytes and localStorage is not.
+   */
+  src?: string;
+  /** For "link": where it points. */
+  href?: string;
 }
 
 /**

@@ -672,7 +672,17 @@ function toGrade(row: GradeRow): Grade {
   };
 }
 
-const BLOCK_TYPES = ["text", "h2", "h3", "bullet", "todo", "quote", "divider"];
+const BLOCK_TYPES = [
+  "text",
+  "h2",
+  "h3",
+  "bullet",
+  "todo",
+  "quote",
+  "divider",
+  "image",
+  "link",
+];
 
 const MEMORY_SOURCES = ["reflection", "conversation", "pattern"];
 const INSIGHT_KINDS = ["takeaway", "recommendation", "pattern"];
@@ -720,6 +730,10 @@ function toDay(row: DayRow): Day {
       type: (BLOCK_TYPES.includes(b?.type) ? b.type : "text") as BlockType,
       text: String(b?.text ?? ""),
       done: Boolean(b?.done),
+      // Only present on image and link blocks; kept off the object entirely
+      // otherwise so a text block does not carry two empty strings per row.
+      ...(b?.src ? { src: String(b.src) } : {}),
+      ...(b?.href ? { href: String(b.href) } : {}),
     })),
   };
 }
