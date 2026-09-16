@@ -7,7 +7,7 @@ import { Habit, PlanItem, Priority, PRIORITIES, PRIORITY_LABEL } from "@/lib/typ
 import { courseColor } from "@/lib/appearance";
 import { Button, PageHeader, Panel, PriorityDot, SectionTitle } from "@/components/ui";
 import { DateField } from "@/components/DateField";
-import { HabitSection } from "@/components/HabitSection";
+import { Habits } from "@/components/Habits";
 import { TimeField } from "@/components/TimeField";
 import { DayGrid, toClock } from "@/components/DayGrid";
 
@@ -47,7 +47,6 @@ export default function PlanPage() {
   const [date, setDate] = useState(() => todayISO());
 
   const today = todayISO();
-  const weekday = new Date(`${date}T12:00:00`).getDay();
 
   const items = useMemo(
     () =>
@@ -59,14 +58,6 @@ export default function PlanPage() {
 
   const scheduled = items.filter((p) => p.start != null);
   const loose = items.filter((p) => p.start == null);
-
-  const habits = store.habits.filter(
-    (h) =>
-      h.archivedAt == null &&
-      date >= h.createdAt &&
-      (h.weekdays.length === 0 || h.weekdays.includes(weekday)),
-  );
-  const done = store.days.find((d) => d.date === date)?.habitsDone ?? [];
 
   if (!store.ready) return <div className="h-64" aria-busy="true" />;
 
@@ -153,7 +144,7 @@ export default function PlanPage() {
 
         <div className="flex flex-col gap-6">
           <Loose date={date} items={loose} />
-          <Habits date={date} habits={habits} done={done} />
+          <Habits date={date} />
 
           <FromTasks date={date} />
         </div>
@@ -577,78 +568,6 @@ function FromTasks({ date }: { date: string }) {
           );
         })}
       </Panel>
-    </section>
-  );
-}
-
-/**
- * Today's habits, and the place to change what they are.
- *
- * They were in Settings, which is where you go once and then never again —
- * exactly wrong for the thing you tick every morning and revise every few
- * weeks. Editing lives behind a toggle so the daily view stays a checklist.
- */
-function Habits({ date, habits, done }: { date: string; habits: Habit[]; done: string[] }) {
-  const store = useStore();
-  const [editing, setEditing] = useState(false);
-
-  const kept = habits.filter((h) => done.includes(h.id)).length;
-
-  return (
-    <section>
-      <SectionTitle
-        right={
-          <button
-            onClick={() => setEditing((v) => !v)}
-            className="text-xs text-ink-3 transition-colors hover:text-ink"
-          >
-            {editing ? "Done" : "Edit"}
-          </button>
-        }
-      >
-        Habits{habits.length > 0 && ` · ${kept}/${habits.length}`}
-      </SectionTitle>
-
-      {editing ? (
-        <HabitSection />
-      ) : habits.length === 0 ? (
-        <Panel className="px-3.5 py-5 text-center">
-          <p className="text-[13px] text-ink-2">No habits for today.</p>
-          <button
-            onClick={() => setEditing(true)}
-            className="mt-1 text-xs text-accent-text hover:underline"
-          >
-            Add one
-          </button>
-        </Panel>
-      ) : (
-        <Panel className="divide-y divide-[var(--border)]">
-          {habits.map((habit) => {
-            const ticked = done.includes(habit.id);
-            const category = store.categories.find((c) => c.id === habit.categoryId);
-            return (
-              <label
-                key={habit.id}
-                className="flex cursor-pointer items-center gap-2.5 px-3.5 py-2.5"
-              >
-                <Tick checked={ticked} onChange={() => store.toggleHabit(date, habit.id)} />
-                <span
-                  className={`flex-1 text-[13px] ${ticked ? "text-ink-3 line-through" : ""}`}
-                >
-                  {habit.name}
-                </span>
-                {category && (
-                  <span
-                    aria-hidden
-                    className="size-1.5 shrink-0 rounded-full"
-                    style={{ background: courseColor(category.color) }}
-                  />
-                )}
-              </label>
-            );
-          })}
-        </Panel>
-      )}
     </section>
   );
 }

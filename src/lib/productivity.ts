@@ -1,5 +1,6 @@
-import { AppData, Habit } from "./types";
+import { AppData } from "./types";
 import { addDays, todayISO } from "./dates";
+import { appliesOn } from "./habits";
 
 /**
  * How consistently the student is actually running their own system.
@@ -176,14 +177,6 @@ function measure(data: AppData, days: string[]): Signal[] {
       weight: WEIGHTS.weight,
     },
   ];
-}
-
-/** Whether a habit was expected on a date, given its weekdays and its age. */
-function appliesOn(habit: Habit, date: string): boolean {
-  if (date < habit.createdAt) return false;
-  if (habit.archivedAt != null && date > habit.archivedAt) return false;
-  if (habit.weekdays.length === 0) return true;
-  return habit.weekdays.includes(new Date(`${date}T12:00:00`).getDay());
 }
 
 /** Any sign of life: a weigh-in, a reflection, a habit, or a finished plan. */
