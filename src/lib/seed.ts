@@ -19,6 +19,46 @@ export function seedData(): AppData {
     memory: [],
     insights: [],
     reflectedAt: null,
+    habits: [
+      {
+        id: "h-read",
+        name: "Read 20 pages",
+        categoryId: "cat-personal",
+        weekdays: [],
+        createdAt: t,
+        archivedAt: null,
+      },
+      {
+        id: "h-train",
+        name: "Training",
+        categoryId: "cat-personal",
+        weekdays: [1, 3, 5],
+        createdAt: t,
+        archivedAt: null,
+      },
+    ],
+    plan: [
+      {
+        id: "p1",
+        date: t,
+        title: "Integration exercises",
+        start: "16:00",
+        minutes: 90,
+        done: false,
+        categoryId: "cat-school",
+        taskId: "t1",
+      },
+      {
+        id: "p2",
+        date: t,
+        title: "Physics reading",
+        start: "18:30",
+        minutes: 45,
+        done: false,
+        categoryId: "cat-school",
+        taskId: null,
+      },
+    ],
     courses: [
       {
         id: "c-math",
@@ -293,7 +333,7 @@ function block(type: Block["type"], text: string, done = false): Block {
 }
 
 function day(date: string, weight: number | null, reflection: Block[]): Day {
-  return { date, weight, reflection };
+  return { date, weight, reflection, habitsDone: [] };
 }
 
 function task(

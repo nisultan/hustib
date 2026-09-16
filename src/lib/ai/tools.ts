@@ -202,6 +202,29 @@ export const TOOL_DECLARATIONS = [
     },
   },
   {
+    name: "schedule",
+    description:
+      "Put something on a day's plan — a block of time, or an intention with no particular hour. " +
+      "Use when the student says when they will do something, or asks you to plan their day. " +
+      "Pass taskId when the block is time set aside for a task already on their list, so ticking " +
+      "it finishes the task.",
+    parameters: {
+      type: "OBJECT",
+      properties: {
+        title: { ...STR, description: "What they will be doing." },
+        date: { ...STR, description: "YYYY-MM-DD. Defaults to today." },
+        start: { ...STR, description: "HH:MM, 24-hour. Omit for something with no set time." },
+        minutes: { type: "NUMBER", description: "How long. Defaults to 45." },
+        taskId: {
+          ...STR,
+          description: "Task id from the context, when this block is that task.",
+        },
+        categoryId: { ...STR, description: "Category id from the context." },
+      },
+      required: ["title"],
+    },
+  },
+  {
     name: "remember",
     description:
       "Record something durable you have learned about the student that is not already " +

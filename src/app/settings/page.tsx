@@ -9,6 +9,7 @@ import { openTour } from "@/components/Tour";
 import { PasswordSection } from "@/components/PasswordSection";
 import { MemorySection } from "@/components/MemorySection";
 import { CategorySection } from "@/components/CategorySection";
+import { HabitSection } from "@/components/HabitSection";
 import { AccountSection } from "@/components/AccountSection";
 
 export default function SettingsPage() {
@@ -145,6 +146,10 @@ export default function SettingsPage() {
           </p>
           <Button onClick={openTour}>Replay the tour</Button>
         </Panel>
+      </section>
+
+      <section className="mb-8">
+        <HabitSection />
       </section>
 
       <section className="mb-8">

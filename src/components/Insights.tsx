@@ -55,7 +55,11 @@ export function Insights({ limit }: { limit?: number }) {
       ) : (
         <div className="grid gap-2">
           {shown.map((insight) => (
-            <Card key={insight.id} insight={insight} onDismiss={() => store.dismissInsight(insight.id)} />
+            <Card
+              key={insight.id}
+              insight={insight}
+              onDismiss={() => store.dismissInsight(insight.id)}
+            />
           ))}
         </div>
       )}
@@ -130,7 +134,9 @@ function Kind({ kind }: { kind: Insight["kind"] }) {
         : "border-line bg-panel-2 text-ink-3";
 
   return (
-    <span className={`rounded border px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide ${tone}`}>
+    <span
+      className={`rounded border px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide ${tone}`}
+    >
       {INSIGHT_LABEL[kind]}
     </span>
   );

@@ -43,8 +43,8 @@ export function MemorySection() {
         <div>
           <h2 className="text-sm font-semibold tracking-tight">What LifeOS knows about you</h2>
           <p className="mt-0.5 text-xs leading-relaxed text-ink-2">
-            Built up from your tasks, grades and reflections over time, and used to tailor what it
-            suggests. Correct anything that is wrong — it shapes real advice.
+            Built up from your tasks, grades and reflections over time, and used to tailor what
+            it suggests. Correct anything that is wrong — it shapes real advice.
           </p>
         </div>
         <Button
@@ -110,7 +110,11 @@ export function MemorySection() {
                     <button
                       onClick={() => store.updateMemoryNote(note.id, { pinned: !note.pinned })}
                       aria-pressed={note.pinned}
-                      title={note.pinned ? "Unpin — allow this to be revised" : "Pin — never revise this"}
+                      title={
+                        note.pinned
+                          ? "Unpin — allow this to be revised"
+                          : "Pin — never revise this"
+                      }
                       aria-label={note.pinned ? "Unpin note" : "Pin note"}
                       className={`mt-px grid size-6 shrink-0 place-items-center rounded-md transition-colors hover:bg-panel-2 ${
                         note.pinned ? "text-accent" : "text-ink-3"

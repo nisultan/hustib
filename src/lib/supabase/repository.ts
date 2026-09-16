@@ -7,6 +7,8 @@ import {
   Category,
   Course,
   Day,
+  Habit,
+  PlanItem,
   Grade,
   Insight,
   InsightKind,
@@ -20,6 +22,8 @@ import {
   CategoryRow,
   CourseRow,
   DayRow,
+  HabitRow,
+  PlanItemRow,
   GradeRow,
   InsightRow,
   LessonRow,
@@ -164,6 +168,8 @@ export async function fetchAll(): Promise<AppData> {
     universities,
     days,
     categories,
+    plan,
+    habits,
     memory,
     insights,
   ] = await Promise.all([
@@ -175,6 +181,8 @@ export async function fetchAll(): Promise<AppData> {
     supabase.from("universities").select("*").order("deadline", { nullsFirst: false }),
     supabase.from("days").select("*").order("date", { ascending: false }),
     supabase.from("categories").select("*").order("created_at"),
+    supabase.from("plan_items").select("*").order("date", { ascending: false }),
+    supabase.from("habits").select("*").order("created_at"),
     supabase.from("memory_notes").select("*").order("created_at"),
     supabase.from("insights").select("*").order("created_at", { ascending: false }),
   ]);
@@ -193,7 +201,7 @@ export async function fetchAll(): Promise<AppData> {
   // arrived after the rest of the schema, and a database still on the earlier
   // migration must load a student's courses and grades exactly as before
   // rather than failing the entire hub over a table it has never heard of.
-  for (const optional of [categories, memory, insights]) {
+  for (const optional of [categories, plan, habits, memory, insights]) {
     if (optional.error && !isMissingSchema(optional.error)) throw optional.error;
   }
 
@@ -214,10 +222,13 @@ export async function fetchAll(): Promise<AppData> {
     universities: ((universities.data ?? []) as UniversityRow[]).map(toUniversity),
     days: ((days.data ?? []) as DayRow[]).map(toDay),
     categories: ((categories.data ?? []) as CategoryRow[]).map(toCategory),
+    plan: ((plan.data ?? []) as PlanItemRow[]).map(toPlanItem),
+    habits: ((habits.data ?? []) as HabitRow[]).map(toHabit),
     memory: ((memory.data ?? []) as MemoryNoteRow[]).map(toMemory),
     insights: ((insights.data ?? []) as InsightRow[]).map(toInsight),
     // Undefined on a pre-migration database, which reads as "never reflected".
-    reflectedAt: (profile.data as { reflected_at?: string | null } | null)?.reflected_at ?? null,
+    reflectedAt:
+      (profile.data as { reflected_at?: string | null } | null)?.reflected_at ?? null,
   };
 }
 
@@ -449,6 +460,7 @@ export async function upsertDay(
   };
   if (patch.weight !== undefined) row.weight = patch.weight;
   if (patch.reflection !== undefined) row.reflection = patch.reflection;
+  if (patch.habitsDone !== undefined) row.habits_done = patch.habitsDone;
 
   const { error } = await supabase.from("days").upsert(row, { onConflict: "user_id,date" });
   if (error) throw error;
@@ -462,6 +474,70 @@ export async function deleteDay(date: string): Promise<void> {
 /* -------------------------------------------------------------------------- */
 /* Profile                                                                    */
 /* -------------------------------------------------------------------------- */
+
+/* ------------------------------ Plan & habits ---------------------------- */
+
+export async function createPlanItem(p: Omit<PlanItem, "id">): Promise<PlanItem | null> {
+  const { data, error } = await client()
+    .from("plan_items")
+    .insert({
+      date: p.date,
+      title: p.title,
+      start_time: p.start,
+      minutes: p.minutes,
+      done: p.done,
+      category_id: p.categoryId,
+      task_id: p.taskId,
+    })
+    .select()
+    .single();
+  if (error) {
+    if (isMissingSchema(error)) return null;
+    throw error;
+  }
+  return toPlanItem(data as PlanItemRow);
+}
+
+export async function updatePlanItem(id: string, patch: Partial<PlanItem>): Promise<void> {
+  const row: Partial<PlanItemRow> = {};
+  if (patch.title !== undefined) row.title = patch.title;
+  if (patch.start !== undefined) row.start_time = patch.start;
+  if (patch.minutes !== undefined) row.minutes = patch.minutes;
+  if (patch.done !== undefined) row.done = patch.done;
+  if (patch.date !== undefined) row.date = patch.date;
+  if (patch.categoryId !== undefined) row.category_id = patch.categoryId;
+  if (patch.taskId !== undefined) row.task_id = patch.taskId;
+  if (Object.keys(row).length === 0) return;
+
+  const { error } = await client().from("plan_items").update(row).eq("id", id);
+  if (error && !isMissingSchema(error)) throw error;
+}
+
+export async function deletePlanItem(id: string): Promise<void> {
+  const { error } = await client().from("plan_items").delete().eq("id", id);
+  if (error && !isMissingSchema(error)) throw error;
+}
+
+export async function createHabit(h: Habit): Promise<void> {
+  const { error } = await client().from("habits").insert({
+    name: h.name,
+    category_id: h.categoryId,
+    weekdays: h.weekdays,
+  });
+  if (error && !isMissingSchema(error)) throw error;
+}
+
+export async function updateHabit(id: string, patch: Partial<Habit>): Promise<void> {
+  const row: Partial<HabitRow> = {};
+  if (patch.name !== undefined) row.name = patch.name;
+  if (patch.categoryId !== undefined) row.category_id = patch.categoryId;
+  if (patch.weekdays !== undefined) row.weekdays = patch.weekdays;
+  if (patch.archivedAt !== undefined) row.archived_at = patch.archivedAt;
+  if (Object.keys(row).length === 0) return;
+
+  const { error } = await client().from("habits").update(row).eq("id", id);
+  if (error && !isMissingSchema(error)) throw error;
+}
 
 /* --------------------------------- Categories ---------------------------- */
 
@@ -672,20 +748,35 @@ function toGrade(row: GradeRow): Grade {
   };
 }
 
-const BLOCK_TYPES = [
-  "text",
-  "h2",
-  "h3",
-  "bullet",
-  "todo",
-  "quote",
-  "divider",
-  "image",
-  "link",
-];
+const BLOCK_TYPES = ["text", "h2", "h3", "bullet", "todo", "quote", "divider", "image", "link"];
 
 const MEMORY_SOURCES = ["reflection", "conversation", "pattern"];
 const INSIGHT_KINDS = ["takeaway", "recommendation", "pattern"];
+
+function toPlanItem(row: PlanItemRow): PlanItem {
+  return {
+    id: row.id,
+    date: row.date,
+    title: row.title,
+    // Postgres `time` is "HH:MM:SS"; the app works in "HH:MM".
+    start: row.start_time ? row.start_time.slice(0, 5) : null,
+    minutes: Number(row.minutes) || 30,
+    done: Boolean(row.done),
+    categoryId: row.category_id,
+    taskId: row.task_id,
+  };
+}
+
+function toHabit(row: HabitRow): Habit {
+  return {
+    id: row.id,
+    name: row.name,
+    categoryId: row.category_id,
+    weekdays: Array.isArray(row.weekdays) ? row.weekdays : [],
+    createdAt: row.created_at,
+    archivedAt: row.archived_at,
+  };
+}
 
 function toCategory(row: CategoryRow): Category {
   return { id: row.id, name: row.name, color: row.color };
@@ -698,7 +789,9 @@ function toMemory(row: MemoryNoteRow): MemoryNote {
     note: row.note,
     // Written by a model through an older client, so the column is plain text
     // rather than an enum; an unrecognised value degrades instead of breaking.
-    source: (MEMORY_SOURCES.includes(row.source) ? row.source : "pattern") as MemoryNote["source"],
+    source: (MEMORY_SOURCES.includes(row.source)
+      ? row.source
+      : "pattern") as MemoryNote["source"],
     pinned: Boolean(row.pinned),
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -725,6 +818,7 @@ function toDay(row: DayRow): Day {
     // jsonb is whatever was written to it, and an older client may have
     // written a type this build does not know. Falling back to plain text
     // keeps the words rather than dropping the block.
+    habitsDone: Array.isArray(row.habits_done) ? row.habits_done : [],
     reflection: (Array.isArray(row.reflection) ? row.reflection : []).map((b): Block => ({
       id: String(b?.id ?? Math.random().toString(36).slice(2)),
       type: (BLOCK_TYPES.includes(b?.type) ? b.type : "text") as BlockType,

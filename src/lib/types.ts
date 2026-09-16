@@ -146,6 +146,53 @@ export interface University {
   website: string;
 }
 
+/**
+ * Something the student has set aside time for on a particular day.
+ *
+ * Deliberately not the same thing as a Task. A task is work that exists until
+ * it is done and carries a deadline; a plan item is an intention about one
+ * day, and it stops mattering when that day ends. Conflating them is why
+ * to-do lists become guilt archives — yesterday's unfinished plan should not
+ * follow you around, but an unfinished essay should.
+ *
+ * `taskId` links the two when a block is time set aside for real work, so
+ * ticking the block can finish the task.
+ */
+export interface PlanItem {
+  id: ID;
+  /** "YYYY-MM-DD". */
+  date: string;
+  title: string;
+  /** "HH:MM". Null means it belongs to the day but not to an hour. */
+  start: string | null;
+  /** How long it is expected to take. */
+  minutes: number;
+  done: boolean;
+  categoryId: ID | null;
+  taskId: ID | null;
+}
+
+/**
+ * Something meant to happen regularly.
+ *
+ * Kept separate from plan items rather than generating one per day forever:
+ * a habit is a rule, and writing out a year of rows to represent a rule makes
+ * changing your mind expensive. Which days it was actually done lives on the
+ * day itself.
+ */
+export interface Habit {
+  id: ID;
+  name: string;
+  categoryId: ID | null;
+  /** Weekdays it applies to, 0 = Sunday. Empty means every day. */
+  weekdays: number[];
+  createdAt: string;
+  /** Set rather than deleted, so past completions stay honest. */
+  archivedAt: string | null;
+}
+
+export const WEEKDAY_LABEL = ["S", "M", "T", "W", "T", "F", "S"];
+
 export interface Profile {
   name: string;
 }
@@ -206,6 +253,8 @@ export interface Day {
   /** Kilograms. Null when the day has a reflection but no weigh-in. */
   weight: number | null;
   reflection: Block[];
+  /** Ids of the habits ticked off on this day. */
+  habitsDone: ID[];
 }
 
 /**
@@ -270,6 +319,8 @@ export interface AppData {
   grades: Grade[];
   universities: University[];
   days: Day[];
+  plan: PlanItem[];
+  habits: Habit[];
   memory: MemoryNote[];
   insights: Insight[];
   /** When the hub last sat down and thought about the student. ISO datetime. */

@@ -14,6 +14,8 @@ import {
   AppData,
   Category,
   Course,
+  Habit,
+  PlanItem,
   Day,
   Grade,
   Insight,
@@ -24,6 +26,7 @@ import {
   ID,
 } from "./types";
 import { seedData } from "./seed";
+import { todayISO } from "./dates";
 import { isSupabaseConfigured } from "./supabase/client";
 import * as repo from "./supabase/repository";
 import {
@@ -100,6 +103,18 @@ export interface Store extends AppData {
   updateTask(id: ID, patch: Partial<Task>): void;
   deleteTask(id: ID): void;
   toggleTask(id: ID): void;
+
+  addPlanItem(p: Omit<PlanItem, "id">): void;
+  updatePlanItem(id: ID, patch: Partial<PlanItem>): void;
+  deletePlanItem(id: ID): void;
+  /** Ticking a block that stands for a task finishes the task too. */
+  togglePlanItem(id: ID): void;
+
+  addHabit(h: Omit<Habit, "id" | "createdAt" | "archivedAt">): void;
+  updateHabit(id: ID, patch: Partial<Habit>): void;
+  /** Archives rather than deletes, so past completions stay honest. */
+  archiveHabit(id: ID): void;
+  toggleHabit(date: string, habitId: ID): void;
 
   addCategory(c: Omit<Category, "id">): void;
   updateCategory(id: ID, patch: Partial<Category>): void;
@@ -216,6 +231,8 @@ function emptyData(): AppData {
     grades: [],
     universities: [],
     days: [],
+    plan: [],
+    habits: [],
     memory: [],
     insights: [],
     reflectedAt: null,
@@ -249,6 +266,10 @@ function parseData(raw: string | null): AppData {
       // Saved before categories existed: the field is absent rather than null.
       tasks: (parsed.tasks ?? []).map((t) => ({ ...t, categoryId: t.categoryId ?? null })),
       categories: parsed.categories ?? [],
+      plan: parsed.plan ?? [],
+      habits: parsed.habits ?? [],
+      // Saved before habits existed: the field is absent rather than empty.
+      days: (parsed.days ?? []).map((d) => ({ ...d, habitsDone: d.habitsDone ?? [] })),
     });
   } catch {
     // Corrupt or unreadable storage. Starting empty loses nothing that could
@@ -453,7 +474,28 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       });
   }, [cloud, data, lockState]);
 
-  const mutate = useCallback((fn: (d: AppData) => AppData) => setData(fn), []);
+  /**
+   * The current data, readable synchronously — including between a mutation
+   * and the render that follows it.
+   *
+   * Mutators that read before they write cannot use `data` from the render
+   * closure: two clicks inside one frame both see the state as it was before
+   * either, and the second silently overwrites the first. Ticking two habits
+   * quickly lost one of them, which is exactly the kind of bug that makes
+   * someone stop trusting a tracker.
+   *
+   * `mutate` therefore advances this ref itself, before React has re-rendered,
+   * so a second call in the same frame reads the result of the first.
+   */
+  const latest = useRef(data);
+  // Keeps the ref honest when data arrives from somewhere other than a
+  // mutation — the initial load, a cloud fetch, a reset.
+  latest.current = data;
+
+  const mutate = useCallback((fn: (d: AppData) => AppData) => {
+    latest.current = fn(latest.current);
+    setData(latest.current);
+  }, []);
 
   /**
    * Sends a write to the server behind a fire-and-forget mutator.
@@ -531,6 +573,76 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         };
         mutate((d) => ({ ...d, tasks: upsert(d.tasks, id, patch) }));
         if (cloud) push(repo.updateTask(id, patch));
+      },
+
+      addPlanItem: (item) => {
+        const created = { ...item, id: uid() };
+        mutate((d) => ({ ...d, plan: [...d.plan, created] }));
+        if (cloud) push(repo.createPlanItem(item));
+      },
+      updatePlanItem: (id, patch) => {
+        mutate((d) => ({ ...d, plan: upsert(d.plan, id, patch) }));
+        if (cloud) push(repo.updatePlanItem(id, patch));
+      },
+      deletePlanItem: (id) => {
+        mutate((d) => ({ ...d, plan: d.plan.filter((p) => p.id !== id) }));
+        if (cloud) push(repo.deletePlanItem(id));
+      },
+      togglePlanItem: (id) => {
+        const item = latest.current.plan.find((p) => p.id === id);
+        if (!item) return;
+        const done = !item.done;
+
+        mutate((d) => ({ ...d, plan: upsert(d.plan, id, { done }) }));
+        if (cloud) push(repo.updatePlanItem(id, { done }));
+
+        // Finishing the block finishes the work it stood for. Unticking does
+        // not reopen the task: deciding a block was not really done says
+        // nothing about whether the essay is still finished.
+        const task = item.taskId
+          ? latest.current.tasks.find((t) => t.id === item.taskId)
+          : null;
+        if (done && task && task.status !== "completed") {
+          const completedAt = todayISO();
+          mutate((d) => ({
+            ...d,
+            tasks: upsert(d.tasks, task.id, { status: "completed", completedAt }),
+          }));
+          if (cloud) push(repo.updateTask(task.id, { status: "completed", completedAt }));
+        }
+      },
+
+      addHabit: (h) => {
+        const created = { ...h, id: uid(), createdAt: todayISO(), archivedAt: null };
+        mutate((d) => ({ ...d, habits: [...d.habits, created] }));
+        if (cloud) push(repo.createHabit(created));
+      },
+      updateHabit: (id, patch) => {
+        mutate((d) => ({ ...d, habits: upsert(d.habits, id, patch) }));
+        if (cloud) push(repo.updateHabit(id, patch));
+      },
+      archiveHabit: (id) => {
+        const archivedAt = todayISO();
+        mutate((d) => ({ ...d, habits: upsert(d.habits, id, { archivedAt }) }));
+        if (cloud) push(repo.updateHabit(id, { archivedAt }));
+      },
+      toggleHabit: (date, habitId) => {
+        const existing = latest.current.days.find((x) => x.date === date);
+        const current = existing?.habitsDone ?? [];
+        const habitsDone = current.includes(habitId)
+          ? current.filter((h) => h !== habitId)
+          : [...current, habitId];
+
+        mutate((d) => {
+          const day: Day = existing
+            ? { ...existing, habitsDone }
+            : { date, weight: null, reflection: [], habitsDone };
+          return {
+            ...d,
+            days: existing ? d.days.map((x) => (x.date === date ? day : x)) : [day, ...d.days],
+          };
+        });
+        if (cloud) push(repo.upsertDay(date, { habitsDone }));
       },
 
       addCategory: (c) => {
@@ -625,7 +737,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           const existing = d.days.find((x) => x.date === date);
           const next: Day = existing
             ? { ...existing, ...patch }
-            : { date, weight: null, reflection: [], ...patch };
+            : { date, weight: null, reflection: [], habitsDone: [], ...patch };
           const days = existing
             ? d.days.map((x) => (x.date === date ? next : x))
             : [...d.days, next];
@@ -646,7 +758,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       },
 
       setMemory: (notes) => {
-        const before = data.memory;
+        const before = latest.current.memory;
         mutate((d) => ({ ...d, memory: notes }));
         if (!cloud) return;
 
@@ -695,7 +807,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       },
 
       clearInsights: () => {
-        const existing = data.insights;
+        const existing = latest.current.insights;
         mutate((d) => ({ ...d, insights: [] }));
         if (cloud) for (const i of existing) push(repo.deleteInsight(i.id));
       },

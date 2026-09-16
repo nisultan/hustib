@@ -351,6 +351,35 @@ function runTool(call: ToolCall, store: Store, router: Router): ToolResult {
         );
       }
 
+      case "schedule": {
+        const title = str(a.title);
+        if (!title) return fail("A plan item needs a title.");
+
+        const categoryId = optionalCategory(a.categoryId, store);
+        if (categoryId === INVALID) return fail("That category is not in the hub.");
+
+        const taskId = str(a.taskId);
+        const task = taskId ? store.tasks.find((t) => t.id === taskId) : null;
+        if (taskId && !task) return fail("No task with that id.");
+
+        const when = date(a.date) ?? todayISO();
+        const start = time(a.start);
+        const minutes = Math.min(24 * 60, Math.max(5, num(a.minutes) ?? 45));
+
+        store.addPlanItem({
+          date: when,
+          title,
+          start,
+          minutes,
+          done: false,
+          // A block standing in for a task inherits its category, so the plan
+          // is coloured the same way the task list is.
+          categoryId: categoryId ?? task?.categoryId ?? null,
+          taskId: task?.id ?? null,
+        });
+        return ok(`Planned "${title}"${start ? ` at ${start}` : ""} on ${when}`);
+      }
+
       case "remember": {
         const note = str(a.note);
         if (!note) return fail("Nothing to remember.");

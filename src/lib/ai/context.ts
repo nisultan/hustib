@@ -1,6 +1,7 @@
 import { AppData, Block, PRIORITY_RANK, Task } from "@/lib/types";
 import { courseAverage, overallAverage, trend } from "@/lib/grades";
 import { daysUntil, todayISO } from "@/lib/dates";
+import { productivity } from "@/lib/productivity";
 
 /**
  * The student's whole hub, flattened into something a model can read.
@@ -49,6 +50,9 @@ export function buildContext(data: AppData): string {
   out.push(section("RECENTLY COMPLETED", doneTasks(data)));
   out.push(section("GRADES", grades(data)));
   out.push(section("UNIVERSITIES", universities(data)));
+  out.push(section("TODAY'S PLAN", plan(data, today)));
+  out.push(section("HABITS", habits(data)));
+  out.push(section("CONSISTENCY", consistency(data, today)));
   out.push(section("JOURNAL", journal(data)));
   out.push(section("WHAT YOU HAVE LEARNED ABOUT THEM", memory(data)));
 
@@ -180,6 +184,52 @@ function universities(data: AppData): string {
     .join("\n");
 }
 
+/** What the student actually set aside time for today, and whether it happened. */
+function plan(data: AppData, today: string): string {
+  return data.plan
+    .filter((p) => p.date === today)
+    .sort((a, b) => (a.start ?? "99:99").localeCompare(b.start ?? "99:99"))
+    .map((p) => {
+      const when = p.start ? p.start : "no time set";
+      return `- ${p.done ? "[done]" : "[ ]"} ${p.title} (${when}, ${p.minutes}min)`;
+    })
+    .join("\n");
+}
+
+function habits(data: AppData): string {
+  const live = data.habits.filter((h) => h.archivedAt == null);
+  if (live.length === 0) return "";
+
+  // Recent keep-rate rather than a bare list: "reads most days, has not
+  // trained in a week" is the useful shape, and a list of names is not.
+  const recent = [...data.days].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 14);
+  return live
+    .map((h) => {
+      const kept = recent.filter((d) => d.habitsDone.includes(h.id)).length;
+      const days =
+        h.weekdays.length === 0
+          ? "every day"
+          : h.weekdays
+              .map((d) => ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][d])
+              .join("/");
+      return `- ${h.name} (${days}) — kept on ${kept} of the last ${recent.length} recorded days`;
+    })
+    .join("\n");
+}
+
+function consistency(data: AppData, today: string): string {
+  const result = productivity(data, today);
+  if (result.score == null) return "";
+
+  const lines = [`Consistency score: ${result.score}/100 over ${result.windowDays} days`];
+  if (result.streak > 0)
+    lines.push(`Current streak: ${result.streak} days (best ${result.bestStreak})`);
+  for (const s of result.signals) {
+    if (s.rate != null) lines.push(`- ${s.label}: ${s.detail}`);
+  }
+  return lines.join("\n");
+}
+
 /**
  * The journal is where the model earns its keep: it is the only place the app
  * holds how the student actually felt, and connecting "exhausted all week" to
@@ -251,10 +301,10 @@ function blocksToText(blocks: Block[]): string {
         if (b.type === "todo") return `[${b.done ? "x" : " "}] ${b.text}`;
         if (b.type === "bullet") return `• ${b.text}`;
         if (b.type === "quote") return `> ${b.text}`;
-      // The picture itself is useless here and would swamp everything else;
-      // the caption is the part that carries meaning.
-      if (b.type === "image") return b.text ? `[image: ${b.text}]` : "[image]";
-      if (b.type === "link") return `[link: ${b.text || b.href || ""}]`;
+        // The picture itself is useless here and would swamp everything else;
+        // the caption is the part that carries meaning.
+        if (b.type === "image") return b.text ? `[image: ${b.text}]` : "[image]";
+        if (b.type === "link") return `[link: ${b.text || b.href || ""}]`;
         if (b.type === "h2" || b.type === "h3") return `## ${b.text}`;
         return b.text;
       })

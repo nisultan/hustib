@@ -42,6 +42,27 @@ const PRIMARY: NavItem[] = [
     ),
   },
   {
+    href: "/plan",
+    label: "Plan",
+    icon: (
+      <Icon>
+        <rect x="3" y="4.5" width="14" height="12.5" rx="2" {...stroke} />
+        <path d="M3 8h14M7 2.5v3M13 2.5v3" {...stroke} />
+        <path d="M6.5 11.5h3M6.5 14h5" {...stroke} />
+      </Icon>
+    ),
+  },
+  {
+    href: "/school",
+    label: "School",
+    icon: (
+      <Icon>
+        <path d="M10 3.5 18 7l-8 3.5L2 7z" {...stroke} />
+        <path d="M5.5 8.8V13c0 1.4 2 2.5 4.5 2.5s4.5-1.1 4.5-2.5V8.8" {...stroke} />
+      </Icon>
+    ),
+  },
+  {
     href: "/tasks",
     label: "Tasks",
     icon: (
@@ -264,15 +285,28 @@ export function NavToggle() {
   );
 }
 
+/**
+ * The five that earn a slot on a phone.
+ *
+ * The sidebar can hold everything; a bottom bar cannot, and cramming eight
+ * items into it makes all eight unreadable. These are the ones a student opens
+ * during a day rather than during a planning session — the rest stay one tap
+ * away in the header.
+ */
+const MOBILE_PRIMARY = ["/", "/plan", "/tasks", "/school", "/grades"];
+
 export function MobileNav() {
   const pathname = usePathname();
+  const items = MOBILE_PRIMARY.map((href) => PRIMARY.find((p) => p.href === href)).filter(
+    (item): item is NavItem => item != null,
+  );
 
   return (
     <nav
       className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-5 border-t border-line bg-panel/95 pb-[env(safe-area-inset-bottom)] shadow-[0_-4px_16px_-8px_rgba(0,0,0,0.18)] backdrop-blur-md md:hidden"
       aria-label="Main"
     >
-      {PRIMARY.map((item) => {
+      {items.map((item) => {
         const active = isActive(pathname, item.href);
         return (
           <Link
@@ -302,7 +336,11 @@ export function MobileHeaderLinks() {
 
   return (
     <div className="flex items-center gap-0.5 md:hidden">
-      {[...SECONDARY, ...TERTIARY].map((item) => {
+      {[
+        ...PRIMARY.filter((p) => !MOBILE_PRIMARY.includes(p.href)),
+        ...SECONDARY,
+        ...TERTIARY,
+      ].map((item) => {
         const active = isActive(pathname, item.href);
         return (
           <Link

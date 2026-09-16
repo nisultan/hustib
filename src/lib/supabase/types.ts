@@ -102,6 +102,8 @@ export type DayRow = {
   /** numeric over the wire, so it can arrive as a string. */
   weight: number | string | null;
   reflection: BlockJson[];
+  /** Ids of habits ticked on this day. Absent before the habits migration. */
+  habits_done?: string[] | null;
   created_at: string;
   updated_at: string;
 };
@@ -112,6 +114,31 @@ export type CategoryRow = {
   name: string;
   color: string;
   created_at: string;
+};
+
+export type PlanItemRow = {
+  id: string;
+  user_id: string;
+  date: string;
+  title: string;
+  /** Postgres `time`, so it arrives as "HH:MM:SS". */
+  start_time: string | null;
+  minutes: number;
+  done: boolean;
+  category_id: string | null;
+  task_id: string | null;
+  created_at: string;
+};
+
+export type HabitRow = {
+  id: string;
+  user_id: string;
+  name: string;
+  category_id: string | null;
+  /** Empty means every day. */
+  weekdays: number[];
+  created_at: string;
+  archived_at: string | null;
 };
 
 export type MemoryNoteRow = {
@@ -182,6 +209,8 @@ export interface Database {
       universities: Table<UniversityRow>;
       days: Table<DayRow>;
       categories: Table<CategoryRow>;
+      plan_items: Table<PlanItemRow>;
+      habits: Table<HabitRow>;
       memory_notes: Table<MemoryNoteRow>;
       insights: Table<InsightRow>;
     };

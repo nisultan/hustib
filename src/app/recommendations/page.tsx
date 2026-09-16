@@ -7,6 +7,7 @@ import { recommend } from "@/lib/recommendations";
 import { daysUntil, todayISO } from "@/lib/dates";
 import { EmptyState, PageHeader, Panel, SectionTitle } from "@/components/ui";
 import { Insights } from "@/components/Insights";
+import { Productivity } from "@/components/Productivity";
 
 export default function RecommendationsPage() {
   const store = useStore();
@@ -32,6 +33,8 @@ export default function RecommendationsPage() {
       />
 
       <Insights />
+
+      <Productivity />
 
       <div className="mb-8 grid grid-cols-3 gap-3">
         <Panel className="px-4 py-3">
