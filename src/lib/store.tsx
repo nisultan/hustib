@@ -221,8 +221,32 @@ function loadPlain(): AppData {
   }
 }
 
+/**
+ * A readable reason for the sync banner.
+ *
+ * Supabase rejections are plain `PostgrestError` objects, not `Error`
+ * instances, so the obvious `String(e)` renders them as "[object Object]" —
+ * a banner that tells the student something broke and nothing else, and tells
+ * whoever has to debug it even less. The message and code are both worth
+ * showing: the code is what makes a missing migration identifiable.
+ */
 function message(e: unknown): string {
-  return e instanceof Error ? e.message : String(e);
+  if (e instanceof Error) return e.message;
+
+  if (e !== null && typeof e === "object") {
+    const { message: m, code, details, hint } = e as Record<string, unknown>;
+    const text = [m, details, hint].find((v) => typeof v === "string" && v.trim() !== "");
+    if (typeof text === "string") {
+      return typeof code === "string" && code !== "" ? `${text} (${code})` : text;
+    }
+    try {
+      return JSON.stringify(e);
+    } catch {
+      return "Unknown error";
+    }
+  }
+
+  return String(e);
 }
 
 export function StoreProvider({ children }: { children: ReactNode }) {

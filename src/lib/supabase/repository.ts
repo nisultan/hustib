@@ -122,6 +122,23 @@ export async function currentUser() {
   return data.user;
 }
 
+/**
+ * Whether an error means "this feature's migration has not been run here"
+ * rather than "this write failed".
+ *
+ * A database one migration behind the code is a normal state — the app deploys
+ * before someone runs the SQL, and both halves have to survive the gap. The
+ * feature that needs the missing table goes quiet; everything else keeps
+ * working, and the student is never shown a sync failure they cannot act on.
+ *
+ * Postgres reports the undefined table or column; PostgREST reports its own
+ * schema cache missing them.
+ */
+function isMissingSchema(error: { code?: string } | null): boolean {
+  const code = error?.code;
+  return code === "42P01" || code === "42703" || code === "PGRST205" || code === "PGRST204";
+}
+
 /* -------------------------------------------------------------------------- */
 /* Reads                                                                      */
 /* -------------------------------------------------------------------------- */
@@ -156,10 +173,16 @@ export async function fetchAll(): Promise<AppData> {
     tasks.error ??
     grades.error ??
     universities.error ??
-    days.error ??
-    memory.error ??
-    insights.error;
+    days.error;
   if (firstError) throw firstError;
+
+  // Memory and insights are deliberately excluded from the check above. They
+  // arrived after the rest of the schema, and a database still on the earlier
+  // migration must load a student's courses and grades exactly as before
+  // rather than failing the entire hub over a table it has never heard of.
+  for (const optional of [memory, insights]) {
+    if (optional.error && !isMissingSchema(optional.error)) throw optional.error;
+  }
 
   const lessonsByCourse = new Map<string, string[]>();
   for (const l of (lessons.data ?? []) as LessonRow[]) {
@@ -179,6 +202,7 @@ export async function fetchAll(): Promise<AppData> {
     days: ((days.data ?? []) as DayRow[]).map(toDay),
     memory: ((memory.data ?? []) as MemoryNoteRow[]).map(toMemory),
     insights: ((insights.data ?? []) as InsightRow[]).map(toInsight),
+    // Undefined on a pre-migration database, which reads as "never reflected".
     reflectedAt: (profile.data as { reflected_at?: string | null } | null)?.reflected_at ?? null,
   };
 }
@@ -438,7 +462,10 @@ export async function createMemory(m: Omit<MemoryNote, "id">): Promise<MemoryNot
     })
     .select()
     .single();
-  if (error) throw error;
+  if (error) {
+    if (isMissingSchema(error)) return { ...m, id: "" };
+    throw error;
+  }
   return toMemory(data as MemoryNoteRow);
 }
 
@@ -449,12 +476,12 @@ export async function updateMemory(id: string, patch: Partial<MemoryNote>): Prom
   if (patch.pinned !== undefined) row.pinned = patch.pinned;
 
   const { error } = await client().from("memory_notes").update(row).eq("id", id);
-  if (error) throw error;
+  if (error && !isMissingSchema(error)) throw error;
 }
 
 export async function deleteMemory(id: string): Promise<void> {
   const { error } = await client().from("memory_notes").delete().eq("id", id);
-  if (error) throw error;
+  if (error && !isMissingSchema(error)) throw error;
 }
 
 export async function createInsight(i: Omit<Insight, "id">): Promise<Insight> {
@@ -471,18 +498,21 @@ export async function createInsight(i: Omit<Insight, "id">): Promise<Insight> {
     })
     .select()
     .single();
-  if (error) throw error;
+  if (error) {
+    if (isMissingSchema(error)) return { ...i, id: "" };
+    throw error;
+  }
   return toInsight(data as InsightRow);
 }
 
 export async function dismissInsight(id: string, at: string | null): Promise<void> {
   const { error } = await client().from("insights").update({ dismissed_at: at }).eq("id", id);
-  if (error) throw error;
+  if (error && !isMissingSchema(error)) throw error;
 }
 
 export async function deleteInsight(id: string): Promise<void> {
   const { error } = await client().from("insights").delete().eq("id", id);
-  if (error) throw error;
+  if (error && !isMissingSchema(error)) throw error;
 }
 
 export async function setReflectedAt(at: string): Promise<void> {
@@ -493,7 +523,7 @@ export async function setReflectedAt(at: string): Promise<void> {
     .from("profiles")
     .update({ reflected_at: at })
     .eq("id", user.user.id);
-  if (error) throw error;
+  if (error && !isMissingSchema(error)) throw error;
 }
 
 export async function updateProfileName(name: string): Promise<void> {
