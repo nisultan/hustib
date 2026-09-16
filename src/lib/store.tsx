@@ -576,9 +576,18 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       },
 
       addPlanItem: (item) => {
-        const created = { ...item, id: uid() };
-        mutate((d) => ({ ...d, plan: [...d.plan, created] }));
-        if (cloud) push(repo.createPlanItem(item));
+        // On cloud the id is Postgres's to assign. Inventing one here and
+        // inserting anyway leaves the screen holding an id the database has
+        // never seen, and the next edit to that row fails as a malformed uuid.
+        if (cloud) {
+          push(
+            repo.createPlanItem(item).then((created) => {
+              if (created) mutate((d) => ({ ...d, plan: [...d.plan, created] }));
+            }),
+          );
+          return;
+        }
+        mutate((d) => ({ ...d, plan: [...d.plan, { ...item, id: uid() }] }));
       },
       updatePlanItem: (id, patch) => {
         mutate((d) => ({ ...d, plan: upsert(d.plan, id, patch) }));
@@ -613,9 +622,16 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       },
 
       addHabit: (h) => {
-        const created = { ...h, id: uid(), createdAt: todayISO(), archivedAt: null };
-        mutate((d) => ({ ...d, habits: [...d.habits, created] }));
-        if (cloud) push(repo.createHabit(created));
+        const base = { ...h, createdAt: todayISO(), archivedAt: null };
+        if (cloud) {
+          push(
+            repo.createHabit(base).then((created) => {
+              if (created) mutate((d) => ({ ...d, habits: [...d.habits, created] }));
+            }),
+          );
+          return;
+        }
+        mutate((d) => ({ ...d, habits: [...d.habits, { ...base, id: uid() }] }));
       },
       updateHabit: (id, patch) => {
         mutate((d) => ({ ...d, habits: upsert(d.habits, id, patch) }));
@@ -646,9 +662,15 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       },
 
       addCategory: (c) => {
-        const created = { ...c, id: uid() };
-        mutate((d) => ({ ...d, categories: [...d.categories, created] }));
-        if (cloud) push(repo.createCategory(c));
+        if (cloud) {
+          push(
+            repo.createCategory(c).then((created) => {
+              if (created) mutate((d) => ({ ...d, categories: [...d.categories, created] }));
+            }),
+          );
+          return;
+        }
+        mutate((d) => ({ ...d, categories: [...d.categories, { ...c, id: uid() }] }));
       },
       updateCategory: (id, patch) => {
         mutate((d) => ({ ...d, categories: upsert(d.categories, id, patch) }));
@@ -772,7 +794,20 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         for (const note of notes) {
           const previous = before.find((n) => n.id === note.id);
           if (!previous) {
-            push(repo.createMemory(note));
+            // Replaces the locally-invented id with the one Postgres assigned,
+            // or the next edit to this note fails as a malformed uuid.
+            push(
+              repo.createMemory(note).then((created) => {
+                if (created?.id) {
+                  mutate((d) => ({
+                    ...d,
+                    memory: d.memory.map((n) =>
+                      n.id === note.id ? { ...n, id: created.id } : n,
+                    ),
+                  }));
+                }
+              }),
+            );
           } else if (previous.note !== note.note || previous.topic !== note.topic) {
             push(repo.updateMemory(note.id, note));
           }
@@ -790,9 +825,20 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       },
 
       addInsights: (incoming) => {
-        const created = incoming.map((i) => ({ ...i, id: uid() }));
-        mutate((d) => ({ ...d, insights: [...created, ...d.insights] }));
-        if (cloud) for (const i of incoming) push(repo.createInsight(i));
+        if (cloud) {
+          for (const i of incoming) {
+            push(
+              repo.createInsight(i).then((created) => {
+                if (created) mutate((d) => ({ ...d, insights: [created, ...d.insights] }));
+              }),
+            );
+          }
+          return;
+        }
+        mutate((d) => ({
+          ...d,
+          insights: [...incoming.map((i) => ({ ...i, id: uid() })), ...d.insights],
+        }));
       },
 
       dismissInsight: (id) => {

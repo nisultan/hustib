@@ -83,16 +83,6 @@ const PRIMARY: NavItem[] = [
     ),
   },
   {
-    href: "/grades",
-    label: "Grades",
-    icon: (
-      <Icon>
-        <path d="M3 16.5h14" {...stroke} />
-        <path d="M5.5 16.5v-5M10 16.5v-9M14.5 16.5v-3" {...stroke} />
-      </Icon>
-    ),
-  },
-  {
     href: "/universities",
     label: "Universities",
     icon: (
@@ -293,7 +283,7 @@ export function NavToggle() {
  * during a day rather than during a planning session — the rest stay one tap
  * away in the header.
  */
-const MOBILE_PRIMARY = ["/", "/plan", "/tasks", "/school", "/grades"];
+const MOBILE_PRIMARY = ["/", "/plan", "/school", "/tasks", "/reflection"];
 
 export function MobileNav() {
   const pathname = usePathname();

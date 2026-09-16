@@ -518,13 +518,17 @@ export async function deletePlanItem(id: string): Promise<void> {
   if (error && !isMissingSchema(error)) throw error;
 }
 
-export async function createHabit(h: Habit): Promise<void> {
-  const { error } = await client().from("habits").insert({
-    name: h.name,
-    category_id: h.categoryId,
-    weekdays: h.weekdays,
-  });
-  if (error && !isMissingSchema(error)) throw error;
+export async function createHabit(h: Omit<Habit, "id">): Promise<Habit | null> {
+  const { data, error } = await client()
+    .from("habits")
+    .insert({ name: h.name, category_id: h.categoryId, weekdays: h.weekdays })
+    .select()
+    .single();
+  if (error) {
+    if (isMissingSchema(error)) return null;
+    throw error;
+  }
+  return toHabit(data as HabitRow);
 }
 
 export async function updateHabit(id: string, patch: Partial<Habit>): Promise<void> {

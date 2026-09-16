@@ -178,7 +178,7 @@ export default function HomePage() {
           <section>
             <SectionTitle
               right={
-                <Link href="/grades" className="text-xs text-ink-3 hover:text-ink">
+                <Link href="/school" className="text-xs text-ink-3 hover:text-ink">
                   Details
                 </Link>
               }

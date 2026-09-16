@@ -7,8 +7,20 @@ import { courseAverage, trend } from "@/lib/grades";
 import { daysUntil, relativeLabel, todayISO } from "@/lib/dates";
 import { PRIORITY_RANK, Task } from "@/lib/types";
 import { courseColor } from "@/lib/appearance";
-import { EmptyState, PageHeader, Panel, SectionTitle, TrendLabel } from "@/components/ui";
+import {
+  Button,
+  EmptyState,
+  PageHeader,
+  Panel,
+  SectionTitle,
+  TrendLabel,
+} from "@/components/ui";
 import { TaskItem } from "@/components/TaskItem";
+import { GradeDialog, WhatIf } from "@/components/GradeDialog";
+import { overallAverage, series } from "@/lib/grades";
+import { GradeChart } from "@/components/GradeChart";
+import { Grade } from "@/lib/types";
+import { useState } from "react";
 
 /**
  * Schoolwork, organised the way school actually is: by subject.
@@ -22,6 +34,7 @@ import { TaskItem } from "@/components/TaskItem";
 export default function SchoolPage() {
   const store = useStore();
   const today = todayISO();
+  const [editing, setEditing] = useState<Grade | "new" | null>(null);
 
   const open = useMemo(
     () => store.tasks.filter((t) => t.status !== "completed"),
@@ -63,6 +76,8 @@ export default function SchoolPage() {
   return (
     <div className="page-in">
       <PageHeader title="School" subtitle="Every subject, with its work and its grade." />
+
+      <Overall />
 
       {overdue.length > 0 && (
         <Panel className="mb-6 border-[var(--urgent)]/30 bg-[var(--urgent)]/5 px-4 py-3">
@@ -124,11 +139,64 @@ export default function SchoolPage() {
                   ))}
                 </div>
               )}
+
+              <div className="flex flex-wrap items-center gap-3 border-t border-line px-4 py-3">
+                {courseGrades.length > 0 && (
+                  <div className="min-w-[120px] flex-1">
+                    <GradeChart points={series(courseGrades)} height={44} showAxis={false} />
+                  </div>
+                )}
+                <div className="flex flex-wrap items-center gap-1.5">
+                  {[...courseGrades]
+                    .sort((a, b) => b.date.localeCompare(a.date))
+                    .slice(0, 4)
+                    .map((g) => (
+                      <button
+                        key={g.id}
+                        onClick={() => setEditing(g)}
+                        title={`${g.assessment} — ${g.date}`}
+                        className="nums rounded border border-line px-1.5 py-0.5 text-[11px] text-ink-2 transition-colors hover:border-line-strong hover:text-ink"
+                      >
+                        {g.score}%
+                      </button>
+                    ))}
+                  <Button size="sm" onClick={() => setEditing("new")}>
+                    Add grade
+                  </Button>
+                </div>
+              </div>
             </Panel>
           );
         })}
       </div>
+
+      <div className="mt-8">
+        <WhatIf />
+      </div>
+
+      <GradeDialog
+        open={editing != null}
+        grade={editing === "new" ? undefined : (editing ?? undefined)}
+        onClose={() => setEditing(null)}
+      />
     </div>
+  );
+}
+
+/** The one figure that answers "how am I doing", above the subject breakdown. */
+function Overall() {
+  const store = useStore();
+  const avg = overallAverage(store.grades, store.courses);
+  if (avg.value == null) return null;
+
+  return (
+    <Panel className="mb-6 flex items-end gap-3 px-4 py-3">
+      <p className="nums text-2xl font-semibold leading-none tracking-tight">{avg.value}%</p>
+      <p className="pb-0.5 text-xs text-ink-3">
+        across {avg.count} {avg.count === 1 ? "grade" : "grades"}
+        {avg.weighted ? ", weighted" : ""}
+      </p>
+    </Panel>
   );
 }
 

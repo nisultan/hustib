@@ -8,6 +8,9 @@ import { BlockEditor } from "@/components/BlockEditor";
 import { DateField } from "@/components/DateField";
 import { Button, PageHeader, Panel, SectionTitle } from "@/components/ui";
 
+/** Where the wide-column preference is kept. */
+const WIDE_KEY = "iblearner.reflectionWide";
+
 export default function ReflectionPage() {
   const store = useStore();
   const [date, setDate] = useState(() => todayISO());
@@ -207,9 +210,38 @@ function FocusMode({
   onDate: (date: string) => void;
   onClose: () => void;
 }) {
+  // Remembered per device: whether someone writes in a column or across the
+  // whole screen is a standing preference, not a per-session decision.
+  const [wide, setWide] = useState(() => {
+    try {
+      return localStorage.getItem(WIDE_KEY) === "1";
+    } catch {
+      return false;
+    }
+  });
+
+  // The write stays outside the updater. React invokes updaters twice in
+  // development to surface exactly this kind of side effect, which toggled the
+  // value twice and left it unchanged — the button appeared dead.
+  const toggleWide = () => {
+    const next = !wide;
+    setWide(next);
+    try {
+      localStorage.setItem(WIDE_KEY, next ? "1" : "0");
+    } catch {
+      // Private browsing. The choice still holds for this session.
+    }
+  };
+
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto bg-bg">
-      <div className="mx-auto w-full max-w-2xl px-5 py-10 sm:px-8 sm:py-16">
+      {/* The width is a computed value rather than a utility class: Tailwind
+          does not generate an arbitrary `min()` with a comma in it, so the
+          class was applied and silently did nothing. */}
+      <div
+        className="mx-auto w-full px-5 py-10 transition-[max-width] duration-300 sm:px-8 sm:py-16"
+        style={{ maxWidth: wide ? "min(1400px, 92vw)" : "42rem" }}
+      >
         <div className="mb-8 flex items-center justify-between gap-3">
           <div className="flex items-center gap-1">
             <Step
@@ -233,23 +265,55 @@ function FocusMode({
             )}
           </div>
 
-          <button
-            onClick={onClose}
-            className="flex shrink-0 items-center gap-1.5 rounded-lg px-2 py-1.5 text-xs text-ink-3 transition-colors hover:bg-panel-2 hover:text-ink"
-          >
-            <svg viewBox="0 0 16 16" aria-hidden className="size-3.5">
-              <path
-                d="M2 6h4V2M14 6h-4V2M2 10h4v4M14 10h-4v4"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
-            Exit
-            <kbd className="ml-0.5 rounded border border-line px-1 text-[10px]">Esc</kbd>
-          </button>
+          <div className="flex shrink-0 items-center gap-1">
+            <button
+              onClick={toggleWide}
+              aria-pressed={wide}
+              aria-label={wide ? "Narrow column" : "Wide column"}
+              title={wide ? "Narrow column" : "Wide column"}
+              className="grid size-8 place-items-center rounded-lg text-ink-3 transition-colors hover:bg-panel-2 hover:text-ink"
+            >
+              <svg viewBox="0 0 16 16" aria-hidden className="size-4">
+                {wide ? (
+                  <path
+                    d="M5.5 4 3 8l2.5 4M10.5 4 13 8l-2.5 4M8 2.5v11"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                ) : (
+                  <path
+                    d="M2.5 4 5 8l-2.5 4M13.5 4 11 8l2.5 4M8 2.5v11"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                )}
+              </svg>
+            </button>
+
+            <button
+              onClick={onClose}
+              className="flex shrink-0 items-center gap-1.5 rounded-lg px-2 py-1.5 text-xs text-ink-3 transition-colors hover:bg-panel-2 hover:text-ink"
+            >
+              <svg viewBox="0 0 16 16" aria-hidden className="size-3.5">
+                <path
+                  d="M2 6h4V2M14 6h-4V2M2 10h4v4M14 10h-4v4"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+              Exit
+              <kbd className="ml-0.5 rounded border border-line px-1 text-[10px]">Esc</kbd>
+            </button>
+          </div>
         </div>
 
         <BlockEditor

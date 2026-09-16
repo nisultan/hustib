@@ -150,7 +150,7 @@ export default function CoursePage({ params }: { params: Promise<{ id: string }>
           <section>
             <SectionTitle
               right={
-                <Link href="/grades" className="text-xs text-ink-3 hover:text-ink">
+                <Link href="/school" className="text-xs text-ink-3 hover:text-ink">
                   Manage
                 </Link>
               }

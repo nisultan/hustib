@@ -3,10 +3,11 @@
 import { useMemo, useState } from "react";
 import { useStore } from "@/lib/store";
 import { addDays, daysUntil, formatDate, pastLabel, todayISO } from "@/lib/dates";
-import { PlanItem } from "@/lib/types";
+import { Habit, PlanItem } from "@/lib/types";
 import { courseColor } from "@/lib/appearance";
 import { Button, PageHeader, Panel, SectionTitle } from "@/components/ui";
 import { DateField } from "@/components/DateField";
+import { HabitSection } from "@/components/HabitSection";
 import { TimeField } from "@/components/TimeField";
 
 /**
@@ -82,6 +83,7 @@ export default function PlanPage() {
               {finished} of {items.length} done
             </p>
           )}
+          <CarryOver date={date} />
           <div className="w-[190px]">
             <DateField value={date} onChange={(v) => setDate(v || today)} />
           </div>
@@ -108,45 +110,40 @@ export default function PlanPage() {
 
         <div className="flex flex-col gap-6">
           <Loose date={date} items={loose} />
-          {habits.length > 0 && (
-            <section>
-              <SectionTitle>Habits</SectionTitle>
-              <Panel className="divide-y divide-[var(--border)]">
-                {habits.map((habit) => {
-                  const ticked = done.includes(habit.id);
-                  const category = store.categories.find((c) => c.id === habit.categoryId);
-                  return (
-                    <label
-                      key={habit.id}
-                      className="flex cursor-pointer items-center gap-2.5 px-3.5 py-2.5"
-                    >
-                      <Tick
-                        checked={ticked}
-                        onChange={() => store.toggleHabit(date, habit.id)}
-                      />
-                      <span
-                        className={`flex-1 text-[13px] ${ticked ? "text-ink-3 line-through" : ""}`}
-                      >
-                        {habit.name}
-                      </span>
-                      {category && (
-                        <span
-                          aria-hidden
-                          className="size-1.5 shrink-0 rounded-full"
-                          style={{ background: courseColor(category.color) }}
-                        />
-                      )}
-                    </label>
-                  );
-                })}
-              </Panel>
-              <p className="mt-2 text-[11px] text-ink-3">Manage habits in Settings.</p>
-            </section>
-          )}
+          <Habits date={date} habits={habits} done={done} />
+
           <FromTasks date={date} />
         </div>
       </div>
     </div>
+  );
+}
+
+/**
+ * Yesterday's unfinished intentions, brought forward in one click.
+ *
+ * The alternative is retyping them, which is what makes people stop planning
+ * after a week. Deliberately explicit rather than automatic: a plan that
+ * silently refills itself with last week's failures is a guilt archive, and
+ * choosing to carry something forward is the moment you decide it still
+ * matters.
+ */
+function CarryOver({ date }: { date: string }) {
+  const store = useStore();
+  const yesterday = addDays(date, -1);
+
+  const left = store.plan.filter((p) => p.date === yesterday && !p.done);
+  if (left.length === 0) return null;
+
+  return (
+    <button
+      onClick={() => {
+        for (const item of left) store.updatePlanItem(item.id, { date });
+      }}
+      className="rounded-lg border border-line px-2 py-1 text-xs text-ink-2 transition-colors hover:border-line-strong hover:bg-panel-2 hover:text-ink"
+    >
+      Carry over {left.length}
+    </button>
   );
 }
 
@@ -241,6 +238,39 @@ function Item({ item }: { item: PlanItem }) {
           onChange={(v) => store.updatePlanItem(item.id, { start: v || null })}
         />
       </div>
+
+      {/* Length matters for a plan that is meant to fit in a day, and typing
+          a number is slower than picking from the handful anyone uses. */}
+      <select
+        value={item.minutes}
+        onChange={(e) => store.updatePlanItem(item.id, { minutes: Number(e.target.value) })}
+        aria-label="How long"
+        className="shrink-0 cursor-pointer appearance-none bg-transparent text-[11px] text-ink-3 outline-none hover:text-ink"
+      >
+        {[15, 30, 45, 60, 90, 120, 180].map((m) => (
+          <option key={m} value={m}>
+            {m < 60 ? `${m}m` : `${m / 60}h`}
+          </option>
+        ))}
+      </select>
+
+      <button
+        onClick={() => store.updatePlanItem(item.id, { date: addDays(item.date, 1) })}
+        aria-label="Move to tomorrow"
+        title="Move to tomorrow"
+        className="grid size-5 shrink-0 place-items-center rounded text-ink-3 opacity-0 transition-opacity hover:text-ink group-hover:opacity-100"
+      >
+        <svg viewBox="0 0 16 16" aria-hidden className="size-3">
+          <path
+            d="M3 8h9M8.5 4.5 12 8l-3.5 3.5"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.6"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </svg>
+      </button>
 
       <button
         onClick={() => store.deletePlanItem(item.id)}
@@ -370,6 +400,78 @@ function FromTasks({ date }: { date: string }) {
           );
         })}
       </Panel>
+    </section>
+  );
+}
+
+/**
+ * Today's habits, and the place to change what they are.
+ *
+ * They were in Settings, which is where you go once and then never again —
+ * exactly wrong for the thing you tick every morning and revise every few
+ * weeks. Editing lives behind a toggle so the daily view stays a checklist.
+ */
+function Habits({ date, habits, done }: { date: string; habits: Habit[]; done: string[] }) {
+  const store = useStore();
+  const [editing, setEditing] = useState(false);
+
+  const kept = habits.filter((h) => done.includes(h.id)).length;
+
+  return (
+    <section>
+      <SectionTitle
+        right={
+          <button
+            onClick={() => setEditing((v) => !v)}
+            className="text-xs text-ink-3 transition-colors hover:text-ink"
+          >
+            {editing ? "Done" : "Edit"}
+          </button>
+        }
+      >
+        Habits{habits.length > 0 && ` · ${kept}/${habits.length}`}
+      </SectionTitle>
+
+      {editing ? (
+        <HabitSection />
+      ) : habits.length === 0 ? (
+        <Panel className="px-3.5 py-5 text-center">
+          <p className="text-[13px] text-ink-2">No habits for today.</p>
+          <button
+            onClick={() => setEditing(true)}
+            className="mt-1 text-xs text-accent-text hover:underline"
+          >
+            Add one
+          </button>
+        </Panel>
+      ) : (
+        <Panel className="divide-y divide-[var(--border)]">
+          {habits.map((habit) => {
+            const ticked = done.includes(habit.id);
+            const category = store.categories.find((c) => c.id === habit.categoryId);
+            return (
+              <label
+                key={habit.id}
+                className="flex cursor-pointer items-center gap-2.5 px-3.5 py-2.5"
+              >
+                <Tick checked={ticked} onChange={() => store.toggleHabit(date, habit.id)} />
+                <span
+                  className={`flex-1 text-[13px] ${ticked ? "text-ink-3 line-through" : ""}`}
+                >
+                  {habit.name}
+                </span>
+                {category && (
+                  <span
+                    aria-hidden
+                    className="size-1.5 shrink-0 rounded-full"
+                    style={{ background: courseColor(category.color) }}
+                  />
+                )}
+              </label>
+            );
+          })}
+        </Panel>
+      )}
     </section>
   );
 }
