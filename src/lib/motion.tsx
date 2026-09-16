@@ -33,6 +33,21 @@ export const springSnappy: Transition = {
   mass: 0.7,
 };
 
+/**
+ * The nav highlight travelling between links.
+ *
+ * Looser than `springSnappy` on purpose: this shape crosses most of the
+ * sidebar's height, and a move that long needs to be readable as a move. It
+ * still settles without a visible bounce — the sidebar is furniture, not a
+ * toy.
+ */
+export const springNav: Transition = {
+  type: "spring",
+  stiffness: 480,
+  damping: 38,
+  mass: 0.9,
+};
+
 /** For opacity and colour, where a spring has nothing to overshoot into. */
 export const ease: Transition = { duration: 0.22, ease: [0.22, 1, 0.36, 1] };
 

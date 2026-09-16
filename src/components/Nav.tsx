@@ -2,11 +2,11 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ReactNode } from "react";
+import { ReactNode, useState } from "react";
 import { motion } from "motion/react";
 import { Logo } from "./Logo";
 import { useNavCollapsed } from "@/lib/use-nav";
-import { springSnappy } from "@/lib/motion";
+import { springNav, springSnappy } from "@/lib/motion";
 
 interface NavItem {
   href: string;
@@ -158,9 +158,14 @@ function isActive(pathname: string, href: string): boolean {
 export function Sidebar() {
   const pathname = usePathname();
   const [collapsed] = useNavCollapsed();
+  // Which link the pointer (or keyboard focus) is on, so the hover highlight
+  // can be one shared element that moves rather than one per link.
+  const [hover, setHover] = useState<string | null>(null);
 
   const link = (item: NavItem) => {
     const active = isActive(pathname, item.href);
+    const hovered = hover === item.href && !active;
+
     return (
       <Link
         key={item.href}
@@ -170,28 +175,63 @@ export function Sidebar() {
         // it is what screen readers announce, and animating its width is what
         // makes the collapse a movement instead of a jump.
         title={collapsed ? item.label : undefined}
-        className={`relative flex items-center gap-2.5 rounded-lg py-[7px] text-[13px] font-medium transition-[color,padding,gap] duration-[var(--nav-dur)] ease-[var(--nav-ease)] ${
+        onMouseEnter={() => setHover(item.href)}
+        onMouseLeave={() => setHover((h) => (h === item.href ? null : h))}
+        onFocus={() => setHover(item.href)}
+        onBlur={() => setHover((h) => (h === item.href ? null : h))}
+        className={`relative isolate flex items-center gap-2.5 rounded-lg py-[7px] text-[13px] font-medium transition-[color,padding,gap] duration-[var(--nav-dur)] ease-[var(--nav-ease)] ${
           collapsed ? "justify-center gap-0 px-0" : "px-2.5"
-        } ${active ? "text-accent-text" : "text-ink-2 hover:bg-panel-2 hover:text-ink"}`}
+        } ${active ? "text-accent-text" : "text-ink-2 hover:text-ink"}`}
       >
         {/*
-          One highlight for the whole sidebar, handed from link to link.
-          Fading a background in on the new item and out on the old one says
-          "something changed"; moving the same shape says "you went there" —
-          and the rail travelling with it is what makes the two feel like one
-          object rather than two effects that happen to agree.
+          Two travelling highlights, not eight fading ones.
+
+          The pill marks where you are and the softer one follows the pointer,
+          and both are a single element handed between links by `layoutId`.
+          Fading a background in on one item and out on another says "something
+          changed"; moving the same shape down the rail says "you went there" —
+          and because the hover shape slides out of the pill it left, the two
+          read as one object being passed around rather than two effects that
+          happen to agree.
         */}
+        {hovered && (
+          <motion.span
+            layoutId="sidebar-hover"
+            transition={springNav}
+            aria-hidden
+            className="absolute inset-0 -z-10 rounded-lg bg-panel-2"
+          />
+        )}
         {active && (
           <motion.span
             layoutId="sidebar-active"
-            transition={springSnappy}
+            transition={springNav}
             aria-hidden
             className="absolute inset-0 -z-10 rounded-lg bg-accent-soft"
           >
-            <span className="absolute inset-y-1.5 left-0 w-[3px] rounded-full bg-accent" />
+            {/* The rail is inside the pill, so it travels with it instead of
+                being redrawn at the destination. It grows out of nothing on
+                arrival, which is what gives the move a direction. */}
+            <motion.span
+              layoutId="sidebar-rail"
+              transition={springNav}
+              className="absolute inset-y-1.5 left-0 w-[3px] rounded-full bg-accent"
+            />
           </motion.span>
         )}
-        {item.icon}
+
+        {/* The icon leads: it lifts a little when the pill arrives under it,
+            and gives way under a press. */}
+        <motion.span
+          className="grid shrink-0 place-items-center"
+          animate={{ scale: active ? 1.08 : 1 }}
+          whileHover={{ scale: 1.12 }}
+          whileTap={{ scale: 0.9 }}
+          transition={springNav}
+        >
+          {item.icon}
+        </motion.span>
+
         <span
           className={`overflow-hidden whitespace-nowrap transition-[max-width,opacity] duration-[var(--nav-dur)] ease-[var(--nav-ease)] ${
             collapsed ? "max-w-0 opacity-0 duration-150" : "max-w-[140px] opacity-100"
