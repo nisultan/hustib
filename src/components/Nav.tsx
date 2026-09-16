@@ -144,7 +144,7 @@ function isActive(pathname: string, href: string): boolean {
 
 export function Sidebar() {
   const pathname = usePathname();
-  const [collapsed, toggle] = useNavCollapsed();
+  const [collapsed] = useNavCollapsed();
 
   const link = (item: NavItem) => {
     const active = isActive(pathname, item.href);
@@ -157,8 +157,8 @@ export function Sidebar() {
         // it is what screen readers announce, and animating its width is what
         // makes the collapse a movement instead of a jump.
         title={collapsed ? item.label : undefined}
-        className={`relative flex items-center gap-2.5 rounded-lg py-[7px] text-[13px] font-medium transition-[background-color,color,padding] duration-200 ${
-          collapsed ? "justify-center px-0" : "px-2.5"
+        className={`relative flex items-center gap-2.5 rounded-lg py-[7px] text-[13px] font-medium transition-[background-color,color,padding,gap] duration-[var(--nav-dur)] ease-[var(--nav-ease)] ${
+          collapsed ? "justify-center gap-0 px-0" : "px-2.5"
         } ${
           active
             ? "bg-accent-soft text-accent-text before:absolute before:inset-y-1.5 before:left-0 before:w-[3px] before:rounded-full before:bg-accent"
@@ -167,8 +167,8 @@ export function Sidebar() {
       >
         {item.icon}
         <span
-          className={`overflow-hidden whitespace-nowrap transition-[max-width,opacity] duration-200 ${
-            collapsed ? "max-w-0 opacity-0" : "max-w-[140px] opacity-100"
+          className={`overflow-hidden whitespace-nowrap transition-[max-width,opacity] duration-[var(--nav-dur)] ease-[var(--nav-ease)] ${
+            collapsed ? "max-w-0 opacity-0 duration-150" : "max-w-[140px] opacity-100"
           }`}
         >
           {item.label}
@@ -179,18 +179,20 @@ export function Sidebar() {
 
   return (
     <aside
-      className={`fixed inset-y-0 left-0 z-40 hidden w-[var(--nav-w)] flex-col overflow-hidden border-r border-line bg-panel py-4 shadow-[var(--shadow)] transition-[width,padding] duration-200 md:flex ${
+      className={`fixed inset-y-0 left-0 z-40 hidden w-[var(--nav-w)] flex-col overflow-hidden border-r border-line bg-panel py-4 shadow-[var(--shadow)] transition-[width,padding] duration-[var(--nav-dur)] ease-[var(--nav-ease)] md:flex ${
         collapsed ? "px-2" : "px-3"
       }`}
     >
       <Link
         href="/"
-        className={`mb-6 flex items-center gap-2 ${collapsed ? "justify-center" : "px-2.5"}`}
+        className={`mb-6 flex items-center gap-2 transition-[padding,gap] duration-[var(--nav-dur)] ease-[var(--nav-ease)] ${
+          collapsed ? "justify-center gap-0" : "px-2.5"
+        }`}
       >
         <Logo />
         <span
-          className={`overflow-hidden whitespace-nowrap text-[13px] font-semibold tracking-tight transition-[max-width,opacity] duration-200 ${
-            collapsed ? "max-w-0 opacity-0" : "max-w-[140px] opacity-100"
+          className={`overflow-hidden whitespace-nowrap text-[13px] font-semibold tracking-tight transition-[max-width,opacity] duration-[var(--nav-dur)] ease-[var(--nav-ease)] ${
+            collapsed ? "max-w-0 opacity-0 duration-150" : "max-w-[140px] opacity-100"
           }`}
         >
           LifeOS
@@ -204,42 +206,61 @@ export function Sidebar() {
 
       <div className="mt-auto border-t border-line pt-3">
         <nav className="flex flex-col gap-0.5">{TERTIARY.map(link)}</nav>
-
-        <button
-          onClick={toggle}
-          aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-          title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-          aria-expanded={!collapsed}
-          className={`mt-1 flex w-full items-center gap-2.5 rounded-lg py-[7px] text-[13px] font-medium text-ink-3 transition-colors hover:bg-panel-2 hover:text-ink ${
-            collapsed ? "justify-center px-0" : "px-2.5"
-          }`}
-        >
-          <svg
-            viewBox="0 0 16 16"
-            aria-hidden
-            className={`size-4 shrink-0 transition-transform duration-200 ${
-              collapsed ? "rotate-180" : ""
-            }`}
-          >
-            <path
-              d="M10 3.5 L5.5 8 L10 12.5"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.6"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          </svg>
-          <span
-            className={`overflow-hidden whitespace-nowrap transition-[max-width,opacity] duration-200 ${
-              collapsed ? "max-w-0 opacity-0" : "max-w-[140px] opacity-100"
-            }`}
-          >
-            Collapse
-          </span>
-        </button>
       </div>
     </aside>
+  );
+}
+
+/**
+ * Collapses the sidebar, from the header.
+ *
+ * It sits at the top rather than at the foot of the sidebar because a control
+ * that hides its own container is easier to find above the thing it acts on —
+ * and when collapsed, a button pinned to the bottom of a 60px rail is the
+ * last place anyone looks for the way back.
+ *
+ * Desktop only: on mobile the nav is the bottom bar, which does not collapse.
+ */
+export function NavToggle() {
+  const [collapsed, toggle] = useNavCollapsed();
+
+  return (
+    <button
+      type="button"
+      onClick={toggle}
+      aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+      title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+      aria-expanded={!collapsed}
+      className="hidden size-9 shrink-0 place-items-center rounded-lg text-ink-3 transition-colors hover:bg-panel-2 hover:text-ink md:grid"
+    >
+      <svg viewBox="0 0 16 16" aria-hidden className="size-[17px]">
+        <rect
+          x="1.75"
+          y="2.75"
+          width="12.5"
+          height="10.5"
+          rx="2"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.5"
+        />
+        {/* The rail, filled so the icon reads as a sidebar at a glance. */}
+        <path d="M6 2.75v10.5" stroke="currentColor" strokeWidth="1.5" />
+        {/* Rotating one chevron beats swapping two glyphs: the button never
+            changes shape, it just turns. */}
+        <path
+          d="M11 6.25 9.25 8 11 9.75"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          className={`origin-[10px_8px] transition-transform duration-[var(--nav-dur)] ease-[var(--nav-ease)] ${
+            collapsed ? "rotate-180" : ""
+          }`}
+        />
+      </svg>
+    </button>
   );
 }
 

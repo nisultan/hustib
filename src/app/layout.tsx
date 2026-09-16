@@ -1,7 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { StoreProvider } from "@/lib/store";
-import { MobileHeaderLinks, MobileNav, Sidebar } from "@/components/Nav";
+import { MobileHeaderLinks, MobileNav, NavToggle, Sidebar } from "@/components/Nav";
 import { GlobalSearch } from "@/components/Search";
 import { AddTaskButton } from "@/components/TaskDialog";
 import { ThemeToggle } from "@/components/ThemeToggle";
@@ -38,9 +38,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <Lock>
             <Sidebar />
 
-            <div className="transition-[padding] duration-200 md:pl-[var(--nav-w)]">
+            <div className="transition-[padding] duration-[var(--nav-dur)] ease-[var(--nav-ease)] md:pl-[var(--nav-w)]">
               <header className="sticky top-0 z-30 flex items-center gap-3 border-b border-line bg-bg/85 px-4 py-2.5 backdrop-blur-md md:px-8">
                 <Logo className="md:hidden" />
+                <NavToggle />
                 <div className="flex-1 md:flex-none">
                   <GlobalSearch />
                 </div>

@@ -47,10 +47,29 @@
    * two can never disagree. Set before first paint from the saved choice.
    */
   --nav-w: 232px;
+
+  /*
+   * One duration and one curve for the collapse, shared by the sidebar, the
+   * content beside it and the labels inside it. Declared here rather than
+   * repeated per component because the three have to move as one object —
+   * a sidebar and a page edge on different easings read as two things
+   * sliding past each other, which is what makes a collapse feel cheap.
+   *
+   * The curve leaves fast and settles long, so the eye tracks the edge the
+   * whole way instead of seeing it stop.
+   */
+  --nav-dur: 300ms;
+  --nav-ease: cubic-bezier(0.32, 0.72, 0, 1);
 }
 
 :root[data-nav="collapsed"] {
   --nav-w: 60px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --nav-dur: 0.01ms;
+  }
 }
 
 @media (prefers-color-scheme: dark) {
