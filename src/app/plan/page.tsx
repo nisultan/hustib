@@ -1,12 +1,13 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { ReactNode, useMemo, useRef, useState } from "react";
 import { useStore } from "@/lib/store";
 import { addDays, daysUntil, formatDate, pastLabel, todayISO } from "@/lib/dates";
 import { Habit, PlanItem, Priority, PRIORITIES, PRIORITY_LABEL } from "@/lib/types";
 import { courseColor } from "@/lib/appearance";
 import { Button, PageHeader, Panel, PriorityDot, SectionTitle } from "@/components/ui";
 import { DateField } from "@/components/DateField";
+import { Popover } from "@/components/Popover";
 import { Habits } from "@/components/Habits";
 import { TimeField } from "@/components/TimeField";
 import { DayGrid, toClock } from "@/components/DayGrid";
@@ -31,6 +32,9 @@ import { DayGrid, toClock } from "@/components/DayGrid";
  * handler rather than one per source.
  */
 const DRAG_TYPE = "application/x-lifeos-plan";
+
+/** Where the day/sidebar split is remembered. */
+const SPLIT_KEY = "iblearner.planSplit";
 
 function dragPayload(kind: "plan" | "task", id: string): string {
   return `${kind}:${id}`;
@@ -99,7 +103,7 @@ export default function PlanPage() {
         </div>
       </Panel>
 
-      <div className="grid gap-6 lg:grid-cols-[1.6fr_1fr]">
+      <Split>
         <section>
           <SectionTitle
             right={
@@ -148,7 +152,79 @@ export default function PlanPage() {
 
           <FromTasks date={date} />
         </div>
+      </Split>
+    </div>
+  );
+}
+
+/**
+ * The day beside its sidebar, with a handle between them.
+ *
+ * How much room a calendar wants is not a thing a designer can decide for
+ * someone else: it depends on the screen, and on whether today is three blocks
+ * or thirty. The split is remembered per device, because nobody wants to drag
+ * it back every morning.
+ *
+ * Below the large breakpoint the two stack and the handle disappears — a
+ * resizable split on a phone is a way to make one column unusable.
+ */
+function Split({ children }: { children: ReactNode }) {
+  const [left, right] = Array.isArray(children) ? children : [children, null];
+  const frame = useRef<HTMLDivElement>(null);
+  const [percent, setPercent] = useState(() => {
+    try {
+      const saved = Number(localStorage.getItem(SPLIT_KEY));
+      return Number.isFinite(saved) && saved >= 35 && saved <= 80 ? saved : 62;
+    } catch {
+      return 62;
+    }
+  });
+
+  const drag = (e: React.PointerEvent) => {
+    e.preventDefault();
+    const box = frame.current?.getBoundingClientRect();
+    if (!box) return;
+
+    const onMove = (move: PointerEvent) => {
+      const next = Math.min(80, Math.max(35, ((move.clientX - box.left) / box.width) * 100));
+      setPercent(next);
+    };
+    const onUp = (up: PointerEvent) => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+      const next = Math.min(80, Math.max(35, ((up.clientX - box.left) / box.width) * 100));
+      try {
+        localStorage.setItem(SPLIT_KEY, String(Math.round(next)));
+      } catch {
+        // Private browsing. The width still holds for this session.
+      }
+    };
+
+    // Listeners on the window, not the handle: the pointer routinely leaves a
+    // 6px strip mid-drag, and a handler bound to it would stop tracking.
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+  };
+
+  return (
+    <div ref={frame} className="flex flex-col gap-6 lg:flex-row lg:gap-0">
+      <div className="min-w-0 lg:pr-3" style={{ flexBasis: `${percent}%` }}>
+        {left}
       </div>
+
+      <div
+        onPointerDown={drag}
+        onDoubleClick={() => setPercent(62)}
+        role="separator"
+        aria-orientation="vertical"
+        aria-label="Resize the day column. Double-click to reset."
+        title="Drag to resize · double-click to reset"
+        className="group hidden w-1.5 shrink-0 cursor-col-resize items-center justify-center lg:flex"
+      >
+        <span className="h-16 w-0.5 rounded-full bg-[var(--border)] transition-colors group-hover:bg-accent" />
+      </div>
+
+      <div className="min-w-0 flex-1 lg:pl-3">{right}</div>
     </div>
   );
 }
@@ -192,6 +268,7 @@ function CarryOver({ date }: { date: string }) {
  */
 function CopyDay({ date, items }: { date: string; items: PlanItem[] }) {
   const store = useStore();
+  const anchor = useRef<HTMLButtonElement>(null);
   const [open, setOpen] = useState(false);
 
   if (items.length === 0) return null;
@@ -215,51 +292,55 @@ function CopyDay({ date, items }: { date: string; items: PlanItem[] }) {
   };
 
   return (
-    <span className="relative">
+    <>
       <button
+        ref={anchor}
         onClick={() => setOpen((v) => !v)}
         className="rounded-lg border border-line px-2 py-1 text-xs text-ink-2 transition-colors hover:border-line-strong hover:bg-panel-2 hover:text-ink"
       >
         Copy day
       </button>
 
-      {open && (
-        <>
-          <span className="fixed inset-0 z-30" onClick={() => setOpen(false)} aria-hidden />
-          <span className="absolute right-0 top-8 z-40 flex w-44 flex-col gap-0.5 rounded-lg border border-line bg-panel p-1 shadow-[var(--shadow-md)]">
-            {[
-              { label: "Tomorrow", days: 1 },
-              { label: "In 2 days", days: 2 },
-              { label: "Next week", days: 7 },
-            ].map((option) => (
-              <button
-                key={option.days}
-                onClick={() => copyTo(addDays(date, option.days))}
-                className="rounded px-2 py-1.5 text-left text-xs text-ink-2 transition-colors hover:bg-panel-2 hover:text-ink"
-              >
-                {option.label}
-                <span className="ml-1 text-ink-3">
-                  {formatDate(addDays(date, option.days))}
-                </span>
-              </button>
-            ))}
+      {/* Through the shared Popover rather than an absolutely-positioned child:
+          the page's entry animation leaves a transform on an ancestor, and a
+          transform creates a stacking context that any z-index inside it
+          cannot escape — the menu opened underneath the column beside it. */}
+      <Popover
+        anchorRef={anchor}
+        open={open}
+        onClose={() => setOpen(false)}
+        align="end"
+        maxHeight={260}
+      >
+        {[
+          { label: "Tomorrow", days: 1 },
+          { label: "In 2 days", days: 2 },
+          { label: "Next week", days: 7 },
+        ].map((option) => (
+          <button
+            key={option.days}
+            onClick={() => copyTo(addDays(date, option.days))}
+            className="flex w-full items-center justify-between gap-3 rounded px-2 py-1.5 text-left text-xs text-ink-2 transition-colors hover:bg-panel-2 hover:text-ink"
+          >
+            {option.label}
+            <span className="text-ink-3">{formatDate(addDays(date, option.days))}</span>
+          </button>
+        ))}
 
-            <span className="mt-1 border-t border-line px-2 pb-1 pt-2 text-[10px] text-ink-3">
-              Copies {items.length} {items.length === 1 ? "block" : "blocks"}, unticked.
-            </span>
+        <p className="border-t border-line px-2 pb-1 pt-2 text-[10px] text-ink-3">
+          Copies {items.length} {items.length === 1 ? "block" : "blocks"}, unticked.
+        </p>
 
-            <span className="px-1 pb-1">
-              <DateField
-                value=""
-                onChange={(v) => {
-                  if (v) copyTo(v);
-                }}
-              />
-            </span>
-          </span>
-        </>
-      )}
-    </span>
+        <div className="p-1">
+          <DateField
+            value=""
+            onChange={(v) => {
+              if (v) copyTo(v);
+            }}
+          />
+        </div>
+      </Popover>
+    </>
   );
 }
 
@@ -594,42 +675,39 @@ function PriorityPicker({
   value: Priority;
   onChange: (p: Priority) => void;
 }) {
+  const anchor = useRef<HTMLButtonElement>(null);
   const [open, setOpen] = useState(false);
 
   return (
-    <span className="relative shrink-0">
+    <>
       <button
+        ref={anchor}
         onClick={() => setOpen((v) => !v)}
         aria-label={`Priority: ${PRIORITY_LABEL[value]}`}
         title={PRIORITY_LABEL[value]}
-        className="grid size-4 place-items-center rounded transition-colors hover:bg-panel"
+        className="grid size-4 shrink-0 place-items-center rounded transition-colors hover:bg-panel"
       >
         <PriorityDot priority={value} />
       </button>
 
-      {open && (
-        <>
-          <span className="fixed inset-0 z-10" onClick={() => setOpen(false)} aria-hidden />
-          <span className="absolute left-0 top-5 z-20 flex flex-col gap-0.5 rounded-lg border border-line bg-panel p-1 shadow-[var(--shadow-md)]">
-            {PRIORITIES.map((p) => (
-              <button
-                key={p}
-                onClick={() => {
-                  onChange(p);
-                  setOpen(false);
-                }}
-                className={`flex items-center gap-1.5 rounded px-1.5 py-1 text-left text-[11px] transition-colors hover:bg-panel-2 ${
-                  p === value ? "text-ink" : "text-ink-2"
-                }`}
-              >
-                <PriorityDot priority={p} />
-                {PRIORITY_LABEL[p]}
-              </button>
-            ))}
-          </span>
-        </>
-      )}
-    </span>
+      <Popover anchorRef={anchor} open={open} onClose={() => setOpen(false)} maxHeight={180}>
+        {PRIORITIES.map((p) => (
+          <button
+            key={p}
+            onClick={() => {
+              onChange(p);
+              setOpen(false);
+            }}
+            className={`flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-xs transition-colors hover:bg-panel-2 ${
+              p === value ? "text-ink" : "text-ink-2"
+            }`}
+          >
+            <PriorityDot priority={p} />
+            {PRIORITY_LABEL[p]}
+          </button>
+        ))}
+      </Popover>
+    </>
   );
 }
 

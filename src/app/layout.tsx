@@ -10,6 +10,7 @@ import { TourHost } from "@/components/Tour";
 import { Lock } from "@/components/Lock";
 import { SyncBanner } from "@/components/SyncBanner";
 import { PageTransition } from "@/components/PageTransition";
+import { Main } from "@/components/Main";
 import { APPEARANCE_INIT_SCRIPT } from "@/lib/appearance";
 import { Logo } from "@/components/Logo";
 
@@ -56,9 +57,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 
               <SyncBanner />
 
-              <main className="mx-auto w-full max-w-5xl px-4 pb-24 pt-6 md:px-8 md:pb-16 md:pt-8">
+              <Main>
                 <PageTransition>{children}</PageTransition>
-              </main>
+              </Main>
             </div>
 
             <MobileNav />
