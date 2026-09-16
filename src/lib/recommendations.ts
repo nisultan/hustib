@@ -194,7 +194,7 @@ export function recommend(data: AppData, limit = 4): Recommendation[] {
       id: `untested-${untested.id}`,
       kind: "untested",
       weight: 32,
-      href: "/grades",
+      href: "/school",
       text: `${untested.name} has no grades recorded, so it is missing from your average and from every suggestion here. Add one when a mark comes back.`,
     });
   }

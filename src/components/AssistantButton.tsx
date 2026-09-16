@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { motion } from "motion/react";
 import { Assistant, ASSISTANT_NAME } from "./Assistant";
 import { springSnappy } from "@/lib/motion";
+import { useModifierKey } from "@/lib/shortcut";
 
 /**
  * Owns whether the assistant is open, and the two ways to open it.
@@ -15,6 +16,7 @@ import { springSnappy } from "@/lib/motion";
 export function AssistantButton() {
   const [open, setOpen] = useState(false);
   const [everOpened, setEverOpened] = useState(false);
+  const modifier = useModifierKey();
 
   const show = useCallback(() => {
     setEverOpened(true);
@@ -23,7 +25,7 @@ export function AssistantButton() {
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      // ⌘J / Ctrl+J. Search already owns K, and J is next to it.
+      // Ctrl+J, or ⌘J on a Mac. Search already owns K, and J is next to it.
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "j") {
         e.preventDefault();
         setEverOpened(true);
@@ -40,7 +42,7 @@ export function AssistantButton() {
         type="button"
         onClick={show}
         aria-label={`Open ${ASSISTANT_NAME}`}
-        title={`${ASSISTANT_NAME}  ⌘J`}
+        title={modifier ? `${ASSISTANT_NAME}  ${modifier} J` : ASSISTANT_NAME}
         // The spark turns a little as you reach for it: the one control in the
         // header that opens something with an opinion should look awake.
         whileHover={{ rotate: 12, scale: 1.08 }}

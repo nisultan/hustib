@@ -259,9 +259,10 @@ export const TOOL_DECLARATIONS = [
         path: enumOf(
           [
             "/",
+            "/plan",
             "/tasks",
             "/courses",
-            "/grades",
+            "/school",
             "/universities",
             "/weight",
             "/reflection",

@@ -178,9 +178,10 @@ type Router = ReturnType<typeof useRouter>;
 
 const PAGES = [
   "/",
+  "/plan",
   "/tasks",
   "/courses",
-  "/grades",
+  "/school",
   "/universities",
   "/weight",
   "/reflection",
