@@ -40,19 +40,32 @@ interface Drag {
   /** Live values, so the block follows the pointer without a store write per pixel. */
   previewStart: number;
   previewMinutes: number;
+  /** The day the block started on, and the one it is currently over. */
+  fromDate: string;
+  previewDate: string;
 }
 
 export function DayGrid({
-  date,
+  dates,
   today,
   items,
   onOpenDrag,
+  onOpenDay,
 }: {
-  date: string;
+  /**
+   * One date for the day view, seven for the week.
+   *
+   * The same surface draws both: a week is a day repeated sideways, and the
+   * alternative — a second component with its own copy of the drag, resize and
+   * overlap arithmetic — is two things to keep in agreement forever.
+   */
+  dates: string[];
   today: string;
   items: PlanItem[];
   /** Reads a drag coming from outside the grid, e.g. a task being scheduled. */
-  onOpenDrag: (e: React.DragEvent, minutesFromMidnight: number) => void;
+  onOpenDrag: (e: React.DragEvent, minutesFromMidnight: number, date: string) => void;
+  /** Opening one day out of a week. Absent in the day view, which is already there. */
+  onOpenDay?: (date: string) => void;
 }) {
   const store = useStore();
   const surface = useRef<HTMLDivElement>(null);
@@ -83,6 +96,8 @@ export function DayGrid({
       minutes: item.minutes,
       previewStart: startMin,
       previewMinutes: item.minutes,
+      fromDate: item.date,
+      previewDate: item.date,
     });
   };
 
@@ -97,7 +112,9 @@ export function DayGrid({
         GRID_START,
         GRID_START + GRID_MIN - drag.minutes,
       );
-      setDrag({ ...drag, previewStart: start });
+      // Sideways changes the day. In the day view there is only one column, so
+      // this always resolves back to the same date.
+      setDrag({ ...drag, previewStart: start, previewDate: dateAt(e.clientX) });
     } else {
       const minutes = clamp(
         drag.minutes + deltaMin,
@@ -112,13 +129,27 @@ export function DayGrid({
   // hundred rows through the store and, on the cloud backend, the network.
   const end = () => {
     if (!drag) return;
-    if (drag.mode === "move" && drag.previewStart !== drag.startMin) {
-      store.updatePlanItem(drag.id, { start: toClock(drag.previewStart) });
+    if (
+      drag.mode === "move" &&
+      (drag.previewStart !== drag.startMin || drag.previewDate !== drag.fromDate)
+    ) {
+      store.updatePlanItem(drag.id, {
+        start: toClock(drag.previewStart),
+        date: drag.previewDate,
+      });
     }
     if (drag.mode === "resize" && drag.previewMinutes !== drag.minutes) {
       store.updatePlanItem(drag.id, { minutes: drag.previewMinutes });
     }
     setDrag(null);
+  };
+
+  /** The date under a horizontal position. In the day view, always the one. */
+  const dateAt = (clientX: number): string => {
+    const box = surface.current?.getBoundingClientRect();
+    if (!box || dates.length === 1) return dates[0];
+    const index = Math.floor(((clientX - box.left) / box.width) * dates.length);
+    return dates[clamp(index, 0, dates.length - 1)];
   };
 
   const minutesAt = (clientY: number): number => {
@@ -131,13 +162,40 @@ export function DayGrid({
     );
   };
 
-  const laid = layout(items);
   const now = new Date();
   const nowMin = now.getHours() * 60 + now.getMinutes();
-  const showNow = date === today && nowMin >= GRID_START && nowMin <= GRID_START + GRID_MIN;
+  const showNow = dates.includes(today) && nowMin >= GRID_START && nowMin <= GRID_START + GRID_MIN;
 
   return (
-    <div className="flex overflow-hidden rounded-xl border border-line bg-panel shadow-[var(--shadow),var(--edge)]">
+    <div className="overflow-hidden rounded-xl border border-line bg-panel shadow-[var(--shadow),var(--edge)]">
+      {dates.length > 1 && (
+        <div className="flex border-b border-line">
+          <div className="w-14 shrink-0 border-r border-line" />
+          {dates.map((date) => {
+            const isToday = date === today;
+            return (
+              <button
+                key={date}
+                onClick={() => onOpenDay?.(date)}
+                className="flex-1 border-r border-line py-1.5 text-center transition-colors last:border-r-0 hover:bg-panel-2"
+              >
+                <span className="block text-[10px] uppercase tracking-wide text-ink-3">
+                  {new Date(`${date}T12:00:00`).toLocaleDateString(undefined, { weekday: "short" })}
+                </span>
+                <span
+                  className={`nums mx-auto mt-0.5 grid size-6 place-items-center rounded-full text-[12px] font-medium ${
+                    isToday ? "bg-accent text-white" : "text-ink"
+                  }`}
+                >
+                  {Number(date.slice(8, 10))}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      <div className="flex">
       <div className="w-14 shrink-0 border-r border-line">
         {hours().map((hour) => (
           <div
@@ -165,14 +223,14 @@ export function DayGrid({
         onDrop={(e) => {
           const at = minutesAt(e.clientY);
           setDropAt(null);
-          onOpenDrag(e, at);
+          onOpenDrag(e, at, dateAt(e.clientX));
         }}
         onDoubleClick={(e) => {
           // Double-click on empty space is how a calendar makes a new entry,
           // and it lands where the pointer is rather than at a fixed hour.
           if (e.target !== surface.current) return;
           store.addPlanItem({
-            date,
+            date: dateAt(e.clientX),
             title: "",
             start: toClock(minutesAt(e.clientY)),
             minutes: 60,
@@ -194,11 +252,38 @@ export function DayGrid({
           />
         ))}
 
+        {dates.slice(1).map((date, i) => (
+          <div
+            key={date}
+            aria-hidden
+            style={{ left: `${((i + 1) / dates.length) * 100}%` }}
+            className="pointer-events-none absolute inset-y-0 border-l border-line"
+          />
+        ))}
+
+        {/* Weekends get a wash, so the shape of a week is readable before
+            reading any of it. */}
+        {dates.length > 1 &&
+          dates.map((date, i) =>
+            [5, 6].includes((new Date(`${date}T12:00:00`).getDay() + 6) % 7) ? (
+              <div
+                key={`wknd-${date}`}
+                aria-hidden
+                style={{ left: `${(i / dates.length) * 100}%`, width: `${100 / dates.length}%` }}
+                className="pointer-events-none absolute inset-y-0 bg-panel-2/40"
+              />
+            ) : null,
+          )}
+
         {showNow && (
           <div
             aria-hidden
-            style={{ top: (nowMin - GRID_START) * PX_PER_MIN }}
-            className="pointer-events-none absolute inset-x-0 z-20 border-t-2 border-accent"
+            style={{
+              top: (nowMin - GRID_START) * PX_PER_MIN,
+              left: `${(dates.indexOf(today) / dates.length) * 100}%`,
+              width: `${100 / dates.length}%`,
+            }}
+            className="pointer-events-none absolute z-20 border-t-2 border-accent"
           >
             <span className="absolute -left-1 -top-[5px] size-2 rounded-full bg-accent" />
           </div>
@@ -212,12 +297,19 @@ export function DayGrid({
           />
         )}
 
-        {laid.map(({ item, column, columns }) => {
-          const active = drag?.id === item.id;
-          const startMin = active ? drag.previewStart : toMinutes(item.start ?? "00:00");
-          const minutes = active ? drag.previewMinutes : item.minutes;
-          const category = store.categories.find((c) => c.id === item.categoryId);
-          const width = 100 / columns;
+        {dates.flatMap((date, dayIndex) =>
+          layout(items.filter((i) => (drag?.id === i.id ? drag.previewDate : i.date) === date)).map(
+            ({ item, column, columns }) => {
+              const active = drag?.id === item.id;
+              const startMin = active ? drag.previewStart : toMinutes(item.start ?? "00:00");
+              const minutes = active ? drag.previewMinutes : item.minutes;
+              const category = store.categories.find((c) => c.id === item.categoryId);
+
+              // The block sits inside its day's slice of the surface, and
+              // inside that, inside its overlap column.
+              const dayWidth = 100 / dates.length;
+              const dayLeft = dayIndex * dayWidth;
+              const width = dayWidth / columns;
 
           return (
             <div
@@ -235,8 +327,8 @@ export function DayGrid({
               style={{
                 top: (startMin - GRID_START) * PX_PER_MIN,
                 height: Math.max(minutes * PX_PER_MIN, 18),
-                left: `calc(${column * width}% + 4px)`,
-                width: `calc(${width}% - 8px)`,
+                left: `calc(${dayLeft + column * width}% + 3px)`,
+                width: `calc(${width}% - 6px)`,
                 borderLeftColor: category ? courseColor(category.color) : undefined,
               }}
               className={`group absolute z-10 cursor-grab overflow-hidden rounded-md border border-l-[3px] bg-panel-2 px-1.5 py-1 transition-shadow active:cursor-grabbing ${
@@ -297,8 +389,12 @@ export function DayGrid({
                 <span className="mx-auto block h-0.5 w-6 translate-y-0.5 rounded-full bg-ink-3" />
               </span>
             </div>
-          );
-        })}
+              );
+            },
+          ),
+        )}
+      </div>
+
       </div>
 
       {menu && (

@@ -13,6 +13,8 @@ import { TimeRange } from "@/components/TimeRange";
 import { TimeField } from "@/components/TimeField";
 import { PlanItemMenu } from "@/components/PlanItemMenu";
 import { DayGrid, toClock } from "@/components/DayGrid";
+import { MonthGrid } from "@/components/MonthGrid";
+import { weekOf, monthLabel, addMonths, startOfWeek } from "@/lib/calendar";
 
 /**
  * One day at a time, as a column of hours.
@@ -38,6 +40,11 @@ const DRAG_TYPE = "application/x-lifeos-plan";
 /** Where the day/sidebar split is remembered. */
 const SPLIT_KEY = "iblearner.planSplit";
 
+type View = "day" | "week" | "month";
+
+/** Which zoom the student left it on. */
+const VIEW_KEY = "iblearner.planView";
+
 function dragPayload(kind: "plan" | "task", id: string): string {
   return `${kind}:${id}`;
 }
@@ -51,8 +58,33 @@ function readDrag(e: React.DragEvent): { kind: string; id: string } | null {
 export default function PlanPage() {
   const store = useStore();
   const [date, setDate] = useState(() => todayISO());
+  const [view, setView] = useState<View>(() => {
+    try {
+      const saved = localStorage.getItem(VIEW_KEY);
+      return saved === "week" || saved === "month" ? saved : "day";
+    } catch {
+      return "day";
+    }
+  });
 
   const today = todayISO();
+
+  const pick = (next: View) => {
+    setView(next);
+    try {
+      localStorage.setItem(VIEW_KEY, next);
+    } catch {
+      // Private browsing. The choice still holds for this session.
+    }
+  };
+
+  // The week and month draw from every day on screen, not just the open one.
+  const visible = view === "week" ? weekOf(date) : [date];
+  const weekItems = useMemo(
+    () => store.plan.filter((p) => visible.includes(p.date)),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [store.plan, visible.join(",")],
+  );
 
   const items = useMemo(
     () =>
@@ -78,32 +110,61 @@ export default function PlanPage() {
 
       <Panel className="mb-6 flex flex-wrap items-center justify-between gap-3 px-4 py-3">
         <div className="flex items-center gap-1">
-          <Step label="Previous day" onClick={() => setDate(addDays(date, -1))} back />
-          <div className="min-w-[150px] text-center">
-            <p className="text-sm font-semibold tracking-tight">{formatDate(date)}</p>
-            <p className="text-xs text-ink-3">{pastLabel(date)}</p>
+          <Step label="Previous" onClick={() => setDate(step(date, view, -1))} back />
+          <div className="min-w-[170px] text-center">
+            <p className="text-sm font-semibold tracking-tight">{heading(date, view)}</p>
+            <p className="text-xs text-ink-3">{view === "day" ? pastLabel(date) : subheading(date, view)}</p>
           </div>
-          <Step label="Next day" onClick={() => setDate(addDays(date, 1))} />
-          {date !== today && (
+          <Step label="Next" onClick={() => setDate(step(date, view, 1))} />
+          {!isCurrent(date, view, today) && (
             <Button size="sm" onClick={() => setDate(today)}>
               Today
             </Button>
           )}
         </div>
 
-        <div className="flex items-center gap-3">
-          {items.length > 0 && (
+        <div className="flex flex-wrap items-center gap-3">
+          {view === "day" && items.length > 0 && (
             <p className="nums text-xs text-ink-3">
               {finished} of {items.length} done
             </p>
           )}
-          <CopyDay date={date} items={items} />
+          {view === "day" && <CopyDay date={date} items={items} />}
+
+          <div className="flex rounded-lg border border-line p-0.5">
+            {(["day", "week", "month"] as View[]).map((option) => (
+              <button
+                key={option}
+                onClick={() => pick(option)}
+                aria-pressed={view === option}
+                className={`rounded-md px-2.5 py-1 text-xs font-medium capitalize transition-colors ${
+                  view === option
+                    ? "bg-accent-soft text-accent-text"
+                    : "text-ink-3 hover:text-ink"
+                }`}
+              >
+                {option}
+              </button>
+            ))}
+          </div>
+
           <div className="w-[190px]">
             <DateField value={date} onChange={(v) => setDate(v || today)} />
           </div>
         </div>
       </Panel>
 
+      {view === "month" && (
+        <MonthGrid
+          month={date}
+          onOpen={(day) => {
+            setDate(day);
+            pick("day");
+          }}
+        />
+      )}
+
+      {view !== "month" && (
       <Split>
         <section>
           <SectionTitle
@@ -113,24 +174,28 @@ export default function PlanPage() {
               </span>
             }
           >
-            The day
+            {view === "week" ? "The week" : "The day"}
           </SectionTitle>
           <DayGrid
-            date={date}
+            dates={visible}
             today={today}
-            items={scheduled}
-            onOpenDrag={(e, at) => {
+            items={view === "week" ? weekItems.filter((p) => p.start != null) : scheduled}
+            onOpenDay={(day) => {
+              setDate(day);
+              pick("day");
+            }}
+            onOpenDrag={(e, at, onDate) => {
               const payload = readDrag(e);
               if (!payload) return;
 
               if (payload.kind === "plan") {
-                store.updatePlanItem(payload.id, { start: toClock(at), date });
+                store.updatePlanItem(payload.id, { start: toClock(at), date: onDate });
                 return;
               }
               const task = store.tasks.find((t) => t.id === payload.id);
               if (!task) return;
               store.addPlanItem({
-                date,
+                date: onDate,
                 title: task.title,
                 start: toClock(at),
                 minutes: 45,
@@ -142,9 +207,11 @@ export default function PlanPage() {
             }}
           />
 
-          <div className="mt-3">
-            <Scheduled date={date} items={scheduled} />
-          </div>
+          {view === "day" && (
+            <div className="mt-3">
+              <Scheduled date={date} items={scheduled} />
+            </div>
+          )}
         </section>
 
         <div className="flex flex-col gap-6">
@@ -154,8 +221,42 @@ export default function PlanPage() {
           <FromTasks date={date} />
         </div>
       </Split>
+      )}
     </div>
   );
+}
+
+/* --------------------------- Moving through time -------------------------
+   The arrows, the heading and the "Today" button all mean something different
+   at each zoom, and spelling that out once here keeps the header itself from
+   turning into three nested conditionals.
+------------------------------------------------------------------------- */
+
+function step(date: string, view: View, direction: number): string {
+  if (view === "month") return addMonths(date, direction);
+  return addDays(date, direction * (view === "week" ? 7 : 1));
+}
+
+function heading(date: string, view: View): string {
+  if (view === "month") return monthLabel(date);
+  if (view === "week") {
+    const week = weekOf(date);
+    return `${formatDate(week[0])} – ${formatDate(week[6])}`;
+  }
+  return formatDate(date);
+}
+
+function subheading(date: string, view: View): string {
+  if (view === "month") return "";
+  const week = weekOf(date);
+  return week.includes(todayISO()) ? "This week" : "";
+}
+
+/** Whether the current view already contains today, which is when the button is pointless. */
+function isCurrent(date: string, view: View, today: string): boolean {
+  if (view === "day") return date === today;
+  if (view === "week") return startOfWeek(date) === startOfWeek(today);
+  return date.slice(0, 7) === today.slice(0, 7);
 }
 
 /**
