@@ -29,6 +29,7 @@ export function ImportantDayDialog({
   day,
   date,
   onClose,
+  onSaved,
 }: {
   open: boolean;
   /** Present when editing. Absent when adding. */
@@ -36,6 +37,14 @@ export function ImportantDayDialog({
   /** The day the calendar was showing, used as the default date. */
   date?: string;
   onClose: () => void;
+  /**
+   * The date that was just saved.
+   *
+   * The calendar follows it. Adding something for March while looking at
+   * September otherwise saves it correctly and shows nothing, which is
+   * indistinguishable from losing it.
+   */
+  onSaved?: (date: string) => void;
 }) {
   const store = useStore();
 
@@ -45,12 +54,21 @@ export function ImportantDayDialog({
   const [note, setNote] = useState("");
   const [repeatsYearly, setRepeatsYearly] = useState(false);
 
-  // Seeded when the dialog opens rather than in an effect, so the fields are
-  // right on the first render instead of flashing the previous day's values.
-  const [seededFor, setSeededFor] = useState<string | null>(null);
-  const key = `${open}-${day?.id ?? date ?? "new"}`;
-  if (open && seededFor !== key) {
-    setSeededFor(key);
+  /*
+    Seeded when the dialog opens rather than in an effect, so the fields are
+    right on the first render instead of flashing the previous day's values.
+
+    The seed is cleared on close rather than compared against the day being
+    edited. Keying it on the content meant that opening "new day" twice on the
+    same date produced the same key both times, so the second open kept
+    whatever was left in the form — including the previous entry's date. The
+    day was then written to that old date, and never appeared on the one being
+    looked at.
+  */
+  const [seeded, setSeeded] = useState(false);
+  if (!open && seeded) setSeeded(false);
+  if (open && !seeded) {
+    setSeeded(true);
     setTitle(day?.title ?? "");
     setOn(day?.date ?? date ?? "");
     setKind(day?.kind ?? "exam");
@@ -72,6 +90,7 @@ export function ImportantDayDialog({
     const payload = { title: clean, date: on, kind, note: note.trim(), repeatsYearly };
     if (day) store.updateImportantDay(day.id, payload);
     else store.addImportantDay(payload);
+    onSaved?.(on);
     onClose();
   };
 

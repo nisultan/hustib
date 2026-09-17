@@ -43,12 +43,18 @@ export function GoalDialog({
   const [tracking, setTracking] = useState(false);
   const [progress, setProgress] = useState(0);
 
-  // Seeded when the dialog opens rather than in an effect, so the fields are
-  // right on the first render instead of flashing the previous goal's values.
-  const [seededFor, setSeededFor] = useState<string | null>(null);
-  const key = `${open}-${goal?.id ?? "new"}`;
-  if (open && seededFor !== key) {
-    setSeededFor(key);
+  /*
+    Seeded when the dialog opens rather than in an effect, so the fields are
+    right on the first render instead of flashing the previous goal's values.
+
+    Cleared on close rather than keyed on the goal: "new goal" produced the
+    same key every time, so opening it a second time kept the last goal's
+    half-finished form.
+  */
+  const [seeded, setSeeded] = useState(false);
+  if (!open && seeded) setSeeded(false);
+  if (open && !seeded) {
+    setSeeded(true);
     setTitle(goal?.title ?? "");
     setNote(goal?.note ?? "");
     setImage(goal?.image ?? null);

@@ -261,6 +261,7 @@ export default function PlanPage() {
         open={dayEdit != null}
         day={dayEdit?.id ? store.importantDays.find((d) => d.id === dayEdit.id) : undefined}
         date={dayEdit?.date}
+        onSaved={(saved) => setDate(saved)}
         onClose={() => setDayEdit(null)}
       />
 
