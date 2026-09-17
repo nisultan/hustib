@@ -143,6 +143,23 @@ export type HabitRow = {
   archived_at: string | null;
 };
 
+export type GoalRow = {
+  id: string;
+  user_id: string;
+  title: string;
+  note: string;
+  /** A data URL. text, not bytea: the picture travels with the row. */
+  image: string | null;
+  deadline: string | null;
+  priority: TaskPriority;
+  status: string;
+  progress: number | null;
+  category_id: string | null;
+  position: number;
+  created_at: string;
+  achieved_at: string | null;
+};
+
 export type MemoryNoteRow = {
   id: string;
   user_id: string;
@@ -213,6 +230,7 @@ export interface Database {
       categories: Table<CategoryRow>;
       plan_items: Table<PlanItemRow>;
       habits: Table<HabitRow>;
+      goals: Table<GoalRow>;
       memory_notes: Table<MemoryNoteRow>;
       insights: Table<InsightRow>;
     };

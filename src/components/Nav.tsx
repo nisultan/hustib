@@ -85,6 +85,17 @@ const PRIMARY: NavItem[] = [
     ),
   },
   {
+    href: "/goals",
+    label: "Goals",
+    icon: (
+      <Icon>
+        <circle cx="10" cy="10" r="7" {...stroke} />
+        <circle cx="10" cy="10" r="3.4" {...stroke} />
+        <circle cx="10" cy="10" r="0.9" fill="currentColor" stroke="none" />
+      </Icon>
+    ),
+  },
+  {
     href: "/universities",
     label: "Universities",
     icon: (

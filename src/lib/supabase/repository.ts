@@ -7,6 +7,8 @@ import {
   Category,
   Course,
   Day,
+  Goal,
+  GoalStatus,
   Habit,
   PlanItem,
   Grade,
@@ -22,6 +24,7 @@ import {
   CategoryRow,
   CourseRow,
   DayRow,
+  GoalRow,
   HabitRow,
   PlanItemRow,
   GradeRow,
@@ -170,6 +173,7 @@ export async function fetchAll(): Promise<AppData> {
     categories,
     plan,
     habits,
+    goals,
     memory,
     insights,
   ] = await Promise.all([
@@ -183,6 +187,7 @@ export async function fetchAll(): Promise<AppData> {
     supabase.from("categories").select("*").order("created_at"),
     supabase.from("plan_items").select("*").order("date", { ascending: false }),
     supabase.from("habits").select("*").order("created_at"),
+    supabase.from("goals").select("*").order("position"),
     supabase.from("memory_notes").select("*").order("created_at"),
     supabase.from("insights").select("*").order("created_at", { ascending: false }),
   ]);
@@ -201,7 +206,7 @@ export async function fetchAll(): Promise<AppData> {
   // arrived after the rest of the schema, and a database still on the earlier
   // migration must load a student's courses and grades exactly as before
   // rather than failing the entire hub over a table it has never heard of.
-  for (const optional of [categories, plan, habits, memory, insights]) {
+  for (const optional of [categories, plan, habits, goals, memory, insights]) {
     if (optional.error && !isMissingSchema(optional.error)) throw optional.error;
   }
 
@@ -224,6 +229,7 @@ export async function fetchAll(): Promise<AppData> {
     categories: ((categories.data ?? []) as CategoryRow[]).map(toCategory),
     plan: ((plan.data ?? []) as PlanItemRow[]).map(toPlanItem),
     habits: ((habits.data ?? []) as HabitRow[]).map(toHabit),
+    goals: ((goals.data ?? []) as GoalRow[]).map(toGoal),
     memory: ((memory.data ?? []) as MemoryNoteRow[]).map(toMemory),
     insights: ((insights.data ?? []) as InsightRow[]).map(toInsight),
     // Undefined on a pre-migration database, which reads as "never reflected".
@@ -474,6 +480,54 @@ export async function deleteDay(date: string): Promise<void> {
 /* -------------------------------------------------------------------------- */
 /* Profile                                                                    */
 /* -------------------------------------------------------------------------- */
+
+/* ----------------------------------- Goals ------------------------------- */
+
+export async function createGoal(g: Omit<Goal, "id">): Promise<Goal | null> {
+  const { data, error } = await client()
+    .from("goals")
+    .insert({
+      title: g.title,
+      note: g.note,
+      image: g.image,
+      deadline: g.deadline,
+      priority: g.priority,
+      status: g.status,
+      progress: g.progress,
+      category_id: g.categoryId,
+      position: g.position,
+    })
+    .select()
+    .single();
+  if (error) {
+    if (isMissingSchema(error)) return null;
+    throw error;
+  }
+  return toGoal(data as GoalRow);
+}
+
+export async function updateGoal(id: string, patch: Partial<Goal>): Promise<void> {
+  const row: Partial<GoalRow> = {};
+  if (patch.title !== undefined) row.title = patch.title;
+  if (patch.note !== undefined) row.note = patch.note;
+  if (patch.image !== undefined) row.image = patch.image;
+  if (patch.deadline !== undefined) row.deadline = patch.deadline;
+  if (patch.priority !== undefined) row.priority = patch.priority;
+  if (patch.status !== undefined) row.status = patch.status;
+  if (patch.progress !== undefined) row.progress = patch.progress;
+  if (patch.categoryId !== undefined) row.category_id = patch.categoryId;
+  if (patch.position !== undefined) row.position = patch.position;
+  if (patch.achievedAt !== undefined) row.achieved_at = patch.achievedAt;
+  if (Object.keys(row).length === 0) return;
+
+  const { error } = await client().from("goals").update(row).eq("id", id);
+  if (error && !isMissingSchema(error)) throw error;
+}
+
+export async function deleteGoal(id: string): Promise<void> {
+  const { error } = await client().from("goals").delete().eq("id", id);
+  if (error && !isMissingSchema(error)) throw error;
+}
 
 /* ------------------------------ Plan & habits ---------------------------- */
 
@@ -792,6 +846,25 @@ function toHabit(row: HabitRow): Habit {
     // the app treats these as calendar days.
     createdAt: row.created_at.slice(0, 10),
     archivedAt: row.archived_at ? row.archived_at.slice(0, 10) : null,
+  };
+}
+
+const GOAL_STATUSES = ["active", "achieved", "paused"];
+
+function toGoal(row: GoalRow): Goal {
+  return {
+    id: row.id,
+    title: row.title,
+    note: row.note ?? "",
+    image: row.image,
+    deadline: row.deadline,
+    priority: row.priority ?? "medium",
+    status: (GOAL_STATUSES.includes(row.status) ? row.status : "active") as GoalStatus,
+    progress: row.progress,
+    categoryId: row.category_id,
+    createdAt: row.created_at.slice(0, 10),
+    achievedAt: row.achieved_at ? row.achieved_at.slice(0, 10) : null,
+    position: Number(row.position) || 0,
   };
 }
 

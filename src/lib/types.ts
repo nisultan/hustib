@@ -202,6 +202,48 @@ export interface Habit {
 
 export const WEEKDAY_LABEL = ["S", "M", "T", "W", "T", "F", "S"];
 
+export type GoalStatus = "active" | "achieved" | "paused";
+
+export const GOAL_STATUSES: GoalStatus[] = ["active", "achieved", "paused"];
+
+export const GOAL_STATUS_LABEL: Record<GoalStatus, string> = {
+  active: "Working on it",
+  achieved: "Achieved",
+  paused: "On hold",
+};
+
+/**
+ * Something the student is aiming at.
+ *
+ * Not a task and not a habit. A task is finished by doing it once, a habit by
+ * doing it repeatedly; a goal is the thing both of those are for, and it is
+ * usually too big to tick. It gets a picture because a goal you can see is a
+ * different kind of reminder from one you can read — a photograph of the
+ * campus does work that "apply to NYU Abu Dhabi" does not.
+ *
+ * The deadline is optional on purpose. Plenty of what matters has no date, and
+ * inventing one to satisfy a form turns an ambition into an overdue item.
+ */
+export interface Goal {
+  id: ID;
+  title: string;
+  /** Why it matters, in their words. Markdown is not parsed; it is prose. */
+  note: string;
+  /** A picture, as a data URL. Null when they have not added one. */
+  image: string | null;
+  /** "YYYY-MM-DD", or null for something with no date attached. */
+  deadline: string | null;
+  priority: Priority;
+  status: GoalStatus;
+  /** 0-100, set by hand. Null when the student is not tracking it that way. */
+  progress: number | null;
+  categoryId: ID | null;
+  createdAt: string;
+  achievedAt: string | null;
+  /** Keeps a hand-arranged order stable. */
+  position: number;
+}
+
 export interface Profile {
   name: string;
 }
@@ -330,6 +372,7 @@ export interface AppData {
   days: Day[];
   plan: PlanItem[];
   habits: Habit[];
+  goals: Goal[];
   memory: MemoryNote[];
   insights: Insight[];
   /** When the hub last sat down and thought about the student. ISO datetime. */

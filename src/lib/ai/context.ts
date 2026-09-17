@@ -49,6 +49,7 @@ export function buildContext(data: AppData): string {
   out.push(section("OPEN TASKS", openTasks(data)));
   out.push(section("RECENTLY COMPLETED", doneTasks(data)));
   out.push(section("GRADES", grades(data)));
+  out.push(section("GOALS", goals(data, today)));
   out.push(section("UNIVERSITIES", universities(data)));
   out.push(section("TODAY'S PLAN", plan(data, today)));
   out.push(section("HABITS", habits(data)));
@@ -170,6 +171,23 @@ function grades(data: AppData): string {
   }
 
   return lines.join("\n");
+}
+
+/** What the student is aiming at, which is the point of everything else here. */
+function goals(data: AppData, today: string): string {
+  return data.goals
+    .filter((g) => g.status !== "paused")
+    .sort((a, b) => a.position - b.position)
+    .map((g) => {
+      const bits: string[] = [g.priority];
+      if (g.status === "achieved")
+        bits.push(`ACHIEVED${g.achievedAt ? ` ${g.achievedAt}` : ""}`);
+      if (g.deadline) bits.push(`deadline ${g.deadline} (in ${daysUntil(g.deadline)}d)`);
+      if (g.progress != null) bits.push(`${g.progress}% done`);
+      const why = g.note.trim() ? ` — ${truncate(g.note, 200)}` : "";
+      return `- "${g.title}" (id ${g.id}) · ${bits.join(" · ")}${why}`;
+    })
+    .join("\n");
 }
 
 function universities(data: AppData): string {

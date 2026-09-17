@@ -14,6 +14,8 @@ import {
   AppData,
   Category,
   Course,
+  Goal,
+  GoalStatus,
   Habit,
   PlanItem,
   Day,
@@ -109,6 +111,12 @@ export interface Store extends AppData {
   deletePlanItem(id: ID): void;
   /** Ticking a block that stands for a task finishes the task too. */
   togglePlanItem(id: ID): void;
+
+  addGoal(g: Omit<Goal, "id" | "createdAt" | "achievedAt" | "position">): void;
+  updateGoal(id: ID, patch: Partial<Goal>): void;
+  deleteGoal(id: ID): void;
+  /** Marking one achieved stamps the date, so "since when" survives. */
+  setGoalStatus(id: ID, status: GoalStatus): void;
 
   addHabit(h: Omit<Habit, "id" | "createdAt" | "archivedAt">): void;
   updateHabit(id: ID, patch: Partial<Habit>): void;
@@ -233,6 +241,7 @@ function emptyData(): AppData {
     days: [],
     plan: [],
     habits: [],
+    goals: [],
     memory: [],
     insights: [],
     reflectedAt: null,
@@ -268,6 +277,7 @@ function parseData(raw: string | null): AppData {
       categories: parsed.categories ?? [],
       plan: parsed.plan ?? [],
       habits: parsed.habits ?? [],
+      goals: parsed.goals ?? [],
       // Saved before habits existed: the field is absent rather than empty.
       days: (parsed.days ?? []).map((d) => ({ ...d, habitsDone: d.habitsDone ?? [] })),
     });
@@ -619,6 +629,39 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           }));
           if (cloud) push(repo.updateTask(task.id, { status: "completed", completedAt }));
         }
+      },
+
+      addGoal: (g) => {
+        const base = {
+          ...g,
+          createdAt: todayISO(),
+          achievedAt: null,
+          // New goals go to the top: the thing just written down is the thing
+          // on someone's mind.
+          position: Math.min(0, ...latest.current.goals.map((x) => x.position)) - 1,
+        };
+        if (cloud) {
+          push(
+            repo.createGoal(base).then((created) => {
+              if (created) mutate((d) => ({ ...d, goals: [created, ...d.goals] }));
+            }),
+          );
+          return;
+        }
+        mutate((d) => ({ ...d, goals: [{ ...base, id: uid() }, ...d.goals] }));
+      },
+      updateGoal: (id, patch) => {
+        mutate((d) => ({ ...d, goals: upsert(d.goals, id, patch) }));
+        if (cloud) push(repo.updateGoal(id, patch));
+      },
+      deleteGoal: (id) => {
+        mutate((d) => ({ ...d, goals: d.goals.filter((g) => g.id !== id) }));
+        if (cloud) push(repo.deleteGoal(id));
+      },
+      setGoalStatus: (id, status) => {
+        const achievedAt = status === "achieved" ? todayISO() : null;
+        mutate((d) => ({ ...d, goals: upsert(d.goals, id, { status, achievedAt }) }));
+        if (cloud) push(repo.updateGoal(id, { status, achievedAt }));
       },
 
       addHabit: (h) => {
