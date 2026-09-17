@@ -9,10 +9,23 @@ import { addDays } from "./dates";
  * the moment one of them learns about archiving or weekday rules.
  */
 
+/**
+ * A calendar day, whatever shape the value arrived in.
+ *
+ * `createdAt` is a day everywhere in the app, but Postgres stores it as a
+ * timestamptz and hands back "2026-09-17T08:12:33Z". Compared as strings
+ * against "2026-09-17" that sorts *after* the day it happened on, so a habit
+ * was not due on the day it was created — the checkbox was dead until
+ * tomorrow, which is exactly when someone gives up on a tracker.
+ */
+function dayOf(value: string): string {
+  return value.slice(0, 10);
+}
+
 /** Whether the habit was expected on a date, given its weekdays and its age. */
 export function appliesOn(habit: Habit, date: string): boolean {
-  if (date < habit.createdAt) return false;
-  if (habit.archivedAt != null && date > habit.archivedAt) return false;
+  if (date < dayOf(habit.createdAt)) return false;
+  if (habit.archivedAt != null && date > dayOf(habit.archivedAt)) return false;
   if (habit.weekdays.length === 0) return true;
   return habit.weekdays.includes(weekdayOf(date));
 }
@@ -36,7 +49,7 @@ export function streakOf(habit: Habit, days: Map<string, Day>, today: string): n
   let date = today;
 
   for (let guard = 0; guard < 400; guard += 1) {
-    if (date < habit.createdAt) break;
+    if (date < dayOf(habit.createdAt)) break;
 
     if (appliesOn(habit, date)) {
       const done = days.get(date)?.habitsDone.includes(habit.id) ?? false;

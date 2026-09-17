@@ -788,8 +788,10 @@ function toHabit(row: HabitRow): Habit {
     name: row.name,
     categoryId: row.category_id,
     weekdays: Array.isArray(row.weekdays) ? row.weekdays : [],
-    createdAt: row.created_at,
-    archivedAt: row.archived_at,
+    // Trimmed to the day: the column is a timestamptz but every comparison in
+    // the app treats these as calendar days.
+    createdAt: row.created_at.slice(0, 10),
+    archivedAt: row.archived_at ? row.archived_at.slice(0, 10) : null,
   };
 }
 

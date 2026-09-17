@@ -27,16 +27,21 @@ export function TimeRange({
 
   return (
     <div className="flex shrink-0 items-center gap-1">
-      <div className="w-[88px]">
-        <TimeField value={start ?? ""} onChange={(v) => onChange({ start: v || null })} />
+      <div className="w-[62px]">
+        <TimeField
+          compact
+          value={start ?? ""}
+          onChange={(v) => onChange({ start: v || null })}
+        />
       </div>
 
       <span aria-hidden className="text-[11px] text-ink-3">
         –
       </span>
 
-      <div className="w-[88px]">
+      <div className="w-[62px]">
         <TimeField
+          compact
           value={end}
           onChange={(v) => {
             if (!v || !start) return;

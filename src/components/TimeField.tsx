@@ -19,33 +19,43 @@ export function TimeField({
   onChange,
   disabled,
   id,
+  compact = false,
 }: {
   /** "HH:MM", or "" for unset. */
   value: string;
   onChange: (value: string) => void;
   disabled?: boolean;
   id?: string;
+  /**
+   * For a time sitting inside a row rather than on a form.
+   *
+   * Drops the two trailing buttons and shows 24-hour time. In a dense row the
+   * clear and clock buttons reserve 64px of a field barely wider than that,
+   * which left about twelve pixels of text and rendered "5:00 PM" as "5:".
+   * The picker still opens on focus, so nothing is actually lost.
+   */
+  compact?: boolean;
 }) {
   const wrapRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const [open, setOpen] = useState(false);
-  const [text, setText] = useState(() => format(value));
+  const [text, setText] = useState(() => format(value, compact));
 
   // Follow the value when it changes from outside — opening the dialog on a
   // different task, or the quick-add parser filling it in.
   useEffect(() => {
-    setText(format(value));
-  }, [value]);
+    setText(format(value, compact));
+  }, [value, compact]);
 
   const commitText = () => {
     const parsed = parse(text);
     if (parsed == null) {
       // Unparseable input reverts rather than silently clearing a real time.
-      setText(format(value));
+      setText(format(value, compact));
       return;
     }
     onChange(parsed);
-    setText(format(parsed));
+    setText(format(parsed, compact));
   };
 
   return (
@@ -58,7 +68,7 @@ export function TimeField({
         autoComplete="off"
         disabled={disabled}
         value={text}
-        placeholder="e.g. 16:30 or 4pm"
+        placeholder={compact ? "--:--" : "e.g. 16:30 or 4pm"}
         onChange={(e) => setText(e.target.value)}
         onFocus={() => setOpen(true)}
         onBlur={commitText}
@@ -74,10 +84,16 @@ export function TimeField({
             setOpen(true);
           }
         }}
-        className="w-full rounded-lg border border-line bg-panel-2 py-2 pl-3 pr-16 text-sm text-ink placeholder:text-ink-3 transition-[background-color,border-color,box-shadow] duration-150 hover:border-line-strong focus:border-accent focus:bg-panel focus:shadow-[0_0_0_3px_var(--accent-soft)] focus:outline-none disabled:opacity-40"
+        className={`w-full rounded-lg border border-line bg-panel-2 text-ink placeholder:text-ink-3 transition-[background-color,border-color,box-shadow] duration-150 hover:border-line-strong focus:border-accent focus:bg-panel focus:shadow-[0_0_0_3px_var(--accent-soft)] focus:outline-none disabled:opacity-40 ${
+          compact ? "nums px-2 py-1 text-center text-xs" : "py-2 pl-3 pr-16 text-sm"
+        }`}
       />
 
-      <div className="pointer-events-none absolute inset-y-0 right-2 flex items-center gap-0.5">
+      <div
+        className={`pointer-events-none absolute inset-y-0 right-2 flex items-center gap-0.5 ${
+          compact ? "hidden" : ""
+        }`}
+      >
         {value && !disabled && (
           <button
             type="button"
@@ -178,9 +194,13 @@ function nearestQuarter(): string {
 }
 
 /** "16:30" → "4:30 PM". Empty stays empty. */
-function format(value: string): string {
+function format(value: string, compact = false): string {
   const m = /^(\d{1,2}):(\d{2})/.exec(value);
   if (!m) return "";
+  // 24-hour when compact: it is four characters instead of eight, and it
+  // matches the hour labels down the side of the grid.
+  if (compact) return `${m[1].padStart(2, "0")}:${m[2]}`;
+
   const h = Number(m[1]);
   const suffix = h < 12 ? "AM" : "PM";
   const h12 = h % 12 === 0 ? 12 : h % 12;
