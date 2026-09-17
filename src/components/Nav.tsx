@@ -109,6 +109,18 @@ const PRIMARY: NavItem[] = [
 
 const SECONDARY: NavItem[] = [
   {
+    href: "/progress",
+    label: "Progress",
+    icon: (
+      <Icon>
+        <path d="M3 16.5h14" {...stroke} />
+        <rect x="4" y="10" width="3.2" height="5" rx="1" {...stroke} />
+        <rect x="8.4" y="6.5" width="3.2" height="8.5" rx="1" {...stroke} />
+        <rect x="12.8" y="3.5" width="3.2" height="11.5" rx="1" {...stroke} />
+      </Icon>
+    ),
+  },
+  {
     href: "/weight",
     label: "Weight",
     icon: (

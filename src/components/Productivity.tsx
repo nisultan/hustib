@@ -15,7 +15,21 @@ import { Panel, SectionTitle } from "./ui";
  * Signals they do not use are not shown as zeros — someone who never logs
  * weight is not failing at weight, it simply is not part of how they work.
  */
-export function Productivity({ compact = false }: { compact?: boolean }) {
+export function Productivity({
+  compact = false,
+  showStreak = true,
+}: {
+  compact?: boolean;
+  /**
+   * Off where the page already counts the streak itself.
+   *
+   * This one counts back from yesterday and only from the signals the score
+   * uses; the Progress page's counts back from today and from everything.
+   * Both are defensible and they disagree by a day, which on one screen just
+   * reads as a bug.
+   */
+  showStreak?: boolean;
+}) {
   const store = useStore();
   const result = useMemo(() => productivity(store), [store]);
 
@@ -45,7 +59,7 @@ export function Productivity({ compact = false }: { compact?: boolean }) {
     <section className="mb-8">
       <SectionTitle
         right={
-          result.streak > 0 ? (
+          showStreak && result.streak > 0 ? (
             <span className="text-xs text-ink-3">
               {result.streak}-day streak
               {result.bestStreak > result.streak && ` · best ${result.bestStreak}`}

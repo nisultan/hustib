@@ -1,6 +1,7 @@
 "use client";
 
-import { ReactNode, useMemo, useRef, useState } from "react";
+import { ReactNode, Suspense, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { useStore } from "@/lib/store";
 import { addDays, daysUntil, formatDate, pastLabel, todayISO } from "@/lib/dates";
 import { Habit, PlanItem, Priority, PRIORITIES, PRIORITY_LABEL } from "@/lib/types";
@@ -69,9 +70,33 @@ function readDrag(e: React.DragEvent): { kind: string; id: string } | null {
   return at === -1 ? null : { kind: raw.slice(0, at), id: raw.slice(at + 1) };
 }
 
+/**
+ * Suspense is not decoration here: `useSearchParams` reads something that only
+ * exists per request, so Next refuses to prerender a page using it unless the
+ * part that reads it sits behind a boundary.
+ */
 export default function PlanPage() {
+  return (
+    <Suspense fallback={<div className="h-64" aria-busy="true" />}>
+      <PlanView />
+    </Suspense>
+  );
+}
+
+function PlanView() {
   const store = useStore();
-  const [date, setDate] = useState(() => todayISO());
+  /*
+    Opened on a particular day when something sent us to one — the Progress
+    heatmap links a square here, and landing on today instead of the day that
+    was clicked makes the square look broken.
+
+    Only the initial value. After that the date belongs to this page, so paging
+    to next week must not be undone by a stale parameter still in the URL.
+  */
+  const asked = useSearchParams().get("date");
+  const [date, setDate] = useState(() =>
+    asked && /^\d{4}-\d{2}-\d{2}$/.test(asked) ? asked : todayISO(),
+  );
   const [view, setView] = useState<View>(() => {
     try {
       const saved = localStorage.getItem(VIEW_KEY);
