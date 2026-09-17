@@ -4,6 +4,7 @@ import { useRef, useState } from "react";
 import { useStore } from "@/lib/store";
 import { PlanItem } from "@/lib/types";
 import { courseColor } from "@/lib/appearance";
+import { PlanItemMenu } from "./PlanItemMenu";
 
 /**
  * The day as a surface, not a list of rows.
@@ -57,6 +58,8 @@ export function DayGrid({
   const surface = useRef<HTMLDivElement>(null);
   const [drag, setDrag] = useState<Drag | null>(null);
   const [dropAt, setDropAt] = useState<number | null>(null);
+  const [menu, setMenu] = useState<{ id: string; x: number; y: number } | null>(null);
+  const [renaming, setRenaming] = useState<string | null>(null);
 
   const begin = (e: React.PointerEvent, item: PlanItem, mode: Drag["mode"]) => {
     if (item.start == null) return;
@@ -219,7 +222,16 @@ export function DayGrid({
           return (
             <div
               key={item.id}
-              onPointerDown={(e) => begin(e, item, "move")}
+              onPointerDown={(e) => {
+                // Right-click and two-finger tap both arrive as button 2, and
+                // starting a drag from one leaves a block stuck to the pointer.
+                if (e.button !== 0) return;
+                begin(e, item, "move");
+              }}
+              onContextMenu={(e) => {
+                e.preventDefault();
+                setMenu({ id: item.id, x: e.clientX, y: e.clientY });
+              }}
               style={{
                 top: (startMin - GRID_START) * PX_PER_MIN,
                 height: Math.max(minutes * PX_PER_MIN, 18),
@@ -237,13 +249,37 @@ export function DayGrid({
                   className="mt-[3px] size-1.5 shrink-0 rounded-full"
                   style={{ background: `var(--${item.priority})` }}
                 />
-                <p
-                  className={`min-w-0 flex-1 truncate text-[11px] font-medium leading-tight ${
-                    item.done ? "text-ink-3 line-through" : ""
-                  }`}
-                >
-                  {item.title || "Untitled"}
-                </p>
+                {renaming === item.id ? (
+                  <input
+                    autoFocus
+                    defaultValue={item.title}
+                    onPointerDown={(e) => e.stopPropagation()}
+                    onBlur={(e) => {
+                      store.updatePlanItem(item.id, { title: e.target.value });
+                      setRenaming(null);
+                    }}
+                    onKeyDown={(e) => {
+                      // Saves outright rather than by blurring: losing a rename
+                      // because focus moved somewhere unexpected is the kind of
+                      // thing that only shows up once someone has typed a
+                      // sentence they did not want to type twice.
+                      if (e.key === "Enter") {
+                        store.updatePlanItem(item.id, { title: e.currentTarget.value });
+                        setRenaming(null);
+                      }
+                      if (e.key === "Escape") setRenaming(null);
+                    }}
+                    className="min-w-0 flex-1 rounded border border-accent bg-bg px-1 text-[11px] font-medium outline-none"
+                  />
+                ) : (
+                  <p
+                    className={`min-w-0 flex-1 truncate text-[11px] font-medium leading-tight ${
+                      item.done ? "text-ink-3 line-through" : ""
+                    }`}
+                  >
+                    {item.title || "Untitled"}
+                  </p>
+                )}
               </div>
               {minutes >= 40 && (
                 <p className="nums mt-0.5 text-[10px] text-ink-3">
@@ -264,6 +300,19 @@ export function DayGrid({
           );
         })}
       </div>
+
+      {menu && (
+        <PlanItemMenu
+          item={items.find((i) => i.id === menu.id)}
+          x={menu.x}
+          y={menu.y}
+          onClose={() => setMenu(null)}
+          onRename={() => {
+            setRenaming(menu.id);
+            setMenu(null);
+          }}
+        />
+      )}
     </div>
   );
 }

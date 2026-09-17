@@ -9,7 +9,9 @@ import { Button, PageHeader, Panel, PriorityDot, SectionTitle } from "@/componen
 import { DateField } from "@/components/DateField";
 import { Popover } from "@/components/Popover";
 import { Habits } from "@/components/Habits";
+import { TimeRange } from "@/components/TimeRange";
 import { TimeField } from "@/components/TimeField";
+import { PlanItemMenu } from "@/components/PlanItemMenu";
 import { DayGrid, toClock } from "@/components/DayGrid";
 
 /**
@@ -95,7 +97,6 @@ export default function PlanPage() {
               {finished} of {items.length} done
             </p>
           )}
-          <CarryOver date={date} />
           <CopyDay date={date} items={items} />
           <div className="w-[190px]">
             <DateField value={date} onChange={(v) => setDate(v || today)} />
@@ -254,34 +255,6 @@ function Split({ children }: { children: ReactNode }) {
 }
 
 /**
- * Yesterday's unfinished intentions, brought forward in one click.
- *
- * The alternative is retyping them, which is what makes people stop planning
- * after a week. Deliberately explicit rather than automatic: a plan that
- * silently refills itself with last week's failures is a guilt archive, and
- * choosing to carry something forward is the moment you decide it still
- * matters.
- */
-function CarryOver({ date }: { date: string }) {
-  const store = useStore();
-  const yesterday = addDays(date, -1);
-
-  const left = store.plan.filter((p) => p.date === yesterday && !p.done);
-  if (left.length === 0) return null;
-
-  return (
-    <button
-      onClick={() => {
-        for (const item of left) store.updatePlanItem(item.id, { date });
-      }}
-      className="rounded-lg border border-line px-2 py-1 text-xs text-ink-2 transition-colors hover:border-line-strong hover:bg-panel-2 hover:text-ink"
-    >
-      Carry over {left.length}
-    </button>
-  );
-}
-
-/**
  * Repeating a day forward.
  *
  * A student's week is mostly the same shape — the same training, the same
@@ -400,124 +373,122 @@ function Item({ item }: { item: PlanItem }) {
   const task = item.taskId ? store.tasks.find((t) => t.id === item.taskId) : null;
 
   // Only the grip starts a drag. With the whole row draggable, selecting text
-  // in the title drags the block instead, which makes renaming impossible.
+  // in the title drags the row instead, which makes renaming impossible.
   const [dragging, setDragging] = useState(false);
   const [armed, setArmed] = useState(false);
+  const [menu, setMenu] = useState<{ x: number; y: number } | null>(null);
 
   return (
-    <div
-      draggable={armed}
-      onDragStart={(e) => {
-        e.dataTransfer.setData(DRAG_TYPE, dragPayload("plan", item.id));
-        e.dataTransfer.effectAllowed = "move";
-        setDragging(true);
-      }}
-      onDragEnd={() => {
-        setDragging(false);
-        setArmed(false);
-      }}
-      className={`group flex items-center gap-2 rounded-md border border-line bg-panel-2 px-2 py-1.5 transition-opacity ${
-        dragging ? "opacity-40" : ""
-      }`}
-      style={category ? { borderLeft: `2px solid ${courseColor(category.color)}` } : undefined}
-    >
-      <span
-        onPointerDown={() => setArmed(true)}
-        onPointerUp={() => setArmed(false)}
-        aria-hidden
-        title="Drag to another time"
-        className="-ml-0.5 shrink-0 cursor-grab select-none px-0.5 text-ink-3 opacity-0 transition-opacity group-hover:opacity-100 active:cursor-grabbing"
-      >
-        <svg viewBox="0 0 16 16" className="size-3">
-          <path
-            d="M6 4h.01M6 8h.01M6 12h.01M10 4h.01M10 8h.01M10 12h.01"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-          />
-        </svg>
-      </span>
-
-      <Tick checked={item.done} onChange={() => store.togglePlanItem(item.id)} />
-
-      <PriorityPicker
-        value={item.priority}
-        onChange={(priority) => store.updatePlanItem(item.id, { priority })}
-      />
-
-      <input
-        value={item.title}
-        onChange={(e) => store.updatePlanItem(item.id, { title: e.target.value })}
-        placeholder="What are you doing?"
-        autoFocus={item.title === ""}
-        className={`min-w-0 flex-1 border-0 bg-transparent text-[13px] outline-none placeholder:text-ink-3 ${
-          item.done ? "text-ink-3 line-through" : ""
+    <>
+      <div
+        draggable={armed}
+        onDragStart={(e) => {
+          e.dataTransfer.setData(DRAG_TYPE, dragPayload("plan", item.id));
+          e.dataTransfer.effectAllowed = "move";
+          setDragging(true);
+        }}
+        onDragEnd={() => {
+          setDragging(false);
+          setArmed(false);
+        }}
+        onContextMenu={(e) => {
+          e.preventDefault();
+          setMenu({ x: e.clientX, y: e.clientY });
+        }}
+        className={`group flex items-center gap-2.5 rounded-lg border border-line bg-panel px-2.5 py-2 transition-[opacity,border-color] hover:border-line-strong ${
+          dragging ? "opacity-40" : ""
         }`}
-      />
-
-      {task && (
-        <span className="shrink-0 text-[10px] text-ink-3" title={`Linked to "${task.title}"`}>
-          task
+        style={
+          category ? { borderLeft: `3px solid ${courseColor(category.color)}` } : undefined
+        }
+      >
+        <span
+          onPointerDown={() => setArmed(true)}
+          onPointerUp={() => setArmed(false)}
+          aria-hidden
+          title="Drag to another time"
+          className="-ml-1 shrink-0 cursor-grab select-none text-ink-3 opacity-0 transition-opacity group-hover:opacity-100 active:cursor-grabbing"
+        >
+          <svg viewBox="0 0 16 16" className="size-3">
+            <path
+              d="M6 4h.01M6 8h.01M6 12h.01M10 4h.01M10 8h.01M10 12h.01"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+            />
+          </svg>
         </span>
-      )}
 
-      <div className="w-[104px] shrink-0">
-        <TimeField
-          value={item.start ?? ""}
-          onChange={(v) => store.updatePlanItem(item.id, { start: v || null })}
+        <Tick checked={item.done} onChange={() => store.togglePlanItem(item.id)} />
+
+        <PriorityPicker
+          value={item.priority}
+          onChange={(priority) => store.updatePlanItem(item.id, { priority })}
         />
+
+        <input
+          value={item.title}
+          onChange={(e) => store.updatePlanItem(item.id, { title: e.target.value })}
+          placeholder="What are you doing?"
+          autoFocus={item.title === ""}
+          className={`min-w-0 flex-1 border-0 bg-transparent text-[13px] outline-none placeholder:text-ink-3 ${
+            item.done ? "text-ink-3 line-through" : ""
+          }`}
+        />
+
+        {task && (
+          <span
+            className="shrink-0 rounded bg-panel-2 px-1.5 py-0.5 text-[10px] text-ink-3"
+            title={`Linked to the task "${task.title}"`}
+          >
+            task
+          </span>
+        )}
+
+        {/* Times only, and the length reads out of them. The row used to carry
+            a time field, a duration select, a move button and a delete button
+            all at once, which made four controls compete for a glance that was
+            only ever checking when something starts. The rest moved to the
+            right-click menu. */}
+        {item.start != null ? (
+          <>
+            <TimeRange
+              start={item.start}
+              minutes={item.minutes}
+              onChange={(patch) => store.updatePlanItem(item.id, patch)}
+            />
+            <span className="nums w-8 shrink-0 text-right text-[11px] text-ink-3">
+              {length(item.minutes)}
+            </span>
+          </>
+        ) : (
+          <button
+            onClick={() => store.updatePlanItem(item.id, { start: "09:00" })}
+            className="shrink-0 rounded px-1.5 py-0.5 text-[11px] text-ink-3 transition-colors hover:bg-panel-2 hover:text-ink"
+          >
+            Set a time
+          </button>
+        )}
       </div>
 
-      {/* Length matters for a plan that is meant to fit in a day, and typing
-          a number is slower than picking from the handful anyone uses. */}
-      <select
-        value={item.minutes}
-        onChange={(e) => store.updatePlanItem(item.id, { minutes: Number(e.target.value) })}
-        aria-label="How long"
-        className="shrink-0 cursor-pointer appearance-none bg-transparent text-[11px] text-ink-3 outline-none hover:text-ink"
-      >
-        {[15, 30, 45, 60, 90, 120, 180].map((m) => (
-          <option key={m} value={m}>
-            {m < 60 ? `${m}m` : `${m / 60}h`}
-          </option>
-        ))}
-      </select>
-
-      <button
-        onClick={() => store.updatePlanItem(item.id, { date: addDays(item.date, 1) })}
-        aria-label="Move to tomorrow"
-        title="Move to tomorrow"
-        className="grid size-5 shrink-0 place-items-center rounded text-ink-3 opacity-0 transition-opacity hover:text-ink group-hover:opacity-100"
-      >
-        <svg viewBox="0 0 16 16" aria-hidden className="size-3">
-          <path
-            d="M3 8h9M8.5 4.5 12 8l-3.5 3.5"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.6"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </svg>
-      </button>
-
-      <button
-        onClick={() => store.deletePlanItem(item.id)}
-        aria-label="Remove"
-        className="grid size-5 shrink-0 place-items-center rounded text-ink-3 opacity-0 transition-opacity hover:text-[var(--urgent)] group-hover:opacity-100"
-      >
-        <svg viewBox="0 0 16 16" aria-hidden className="size-3">
-          <path
-            d="m4 4 8 8M12 4l-8 8"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-          />
-        </svg>
-      </button>
-    </div>
+      {menu && <PlanItemMenu item={item} x={menu.x} y={menu.y} onClose={() => setMenu(null)} />}
+    </>
   );
+}
+
+/** Minutes between two clock times on the same day. */
+function spanMinutes(from: string, to: string): number {
+  const at = (clock: string) => {
+    const [h, m] = clock.split(":").map(Number);
+    return h * 60 + (m || 0);
+  };
+  return at(to) - at(from);
+}
+
+function length(minutes: number): string {
+  if (minutes < 60) return `${minutes}m`;
+  const hours = minutes / 60;
+  return Number.isInteger(hours) ? `${hours}h` : `${hours.toFixed(1)}h`;
 }
 
 /**
@@ -529,22 +500,33 @@ function Item({ item }: { item: PlanItem }) {
 function Loose({ date, items }: { date: string; items: PlanItem[] }) {
   const store = useStore();
   const [draft, setDraft] = useState("");
+  const [from, setFrom] = useState("");
+  const [to, setTo] = useState("");
   const [over, setOver] = useState(false);
 
   const add = () => {
     const title = draft.trim();
     if (title === "") return;
+
+    // Both times are optional and independent: a start with no end is the
+    // common case, an end with no start says nothing useful, and neither is
+    // worth refusing the whole entry over.
+    const start = /^([01]\d|2[0-3]):[0-5]\d$/.test(from) ? from : null;
+    const span = start && to ? spanMinutes(start, to) : null;
+
     store.addPlanItem({
       date,
       title,
-      start: null,
-      minutes: 30,
+      start,
+      minutes: span && span > 0 ? span : start ? 45 : 30,
       done: false,
       priority: "medium",
       categoryId: null,
       taskId: null,
     });
     setDraft("");
+    setFrom("");
+    setTo("");
   };
 
   return (
@@ -590,19 +572,38 @@ function Loose({ date, items }: { date: string; items: PlanItem[] }) {
             <Item item={item} />
           </div>
         ))}
-        <div className="flex items-center gap-2 px-3.5 py-2.5">
-          <input
-            value={draft}
-            onChange={(e) => setDraft(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") add();
-            }}
-            placeholder="Add something for today…"
-            className="flex-1 border-0 bg-transparent text-[13px] outline-none placeholder:text-ink-3"
-          />
-          <Button size="sm" onClick={add} disabled={draft.trim() === ""}>
-            Add
-          </Button>
+        <div className="flex flex-col gap-2 px-3.5 py-2.5">
+          <div className="flex items-center gap-2">
+            <input
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") add();
+              }}
+              placeholder="Add something for today…"
+              className="min-w-0 flex-1 border-0 bg-transparent text-[13px] outline-none placeholder:text-ink-3"
+            />
+            <Button size="sm" onClick={add} disabled={draft.trim() === ""}>
+              Add
+            </Button>
+          </div>
+
+          {/* Only once there is something to add: two empty time fields above
+              an empty box is a form, and this should feel like typing a line. */}
+          {draft.trim() !== "" && (
+            <div className="flex items-center gap-1.5">
+              <div className="w-[86px]">
+                <TimeField value={from} onChange={setFrom} />
+              </div>
+              <span aria-hidden className="text-[11px] text-ink-3">
+                –
+              </span>
+              <div className="w-[86px]">
+                <TimeField value={to} onChange={setTo} />
+              </div>
+              <span className="text-[10px] text-ink-3">both optional</span>
+            </div>
+          )}
         </div>
       </div>
     </section>
