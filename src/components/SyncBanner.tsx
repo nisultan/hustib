@@ -17,8 +17,8 @@ export function SyncBanner() {
     <div className="sticky top-[49px] z-30 border-b border-[var(--urgent)]/30 bg-[var(--urgent)]/10 px-4 py-2 md:px-8">
       <div className="mx-auto flex w-full max-w-5xl items-center gap-3">
         <p className="flex-1 text-xs leading-relaxed text-ink">
-          <span className="font-medium">A change did not save.</span> Reload to see what is
-          actually stored. ({store.syncError})
+          <span className="font-medium">A change did not save.</span> {store.syncError} Reload
+          to see what is actually stored.
         </p>
         <button
           onClick={() => store.clearSyncError()}

@@ -621,7 +621,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           pushCreate(
             repo.createPlanItem(item),
             (created) => mutate((d) => ({ ...d, plan: [...d.plan, created] })),
-            "Planned blocks need migration 004 on this database.",
+            "Not saved: this database has no plan_items table yet. Run supabase/migrations/004_plan_habits.sql on it.",
           );
           return;
         }
@@ -672,7 +672,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           pushCreate(
             repo.createGoal(base),
             (created) => mutate((d) => ({ ...d, goals: [created, ...d.goals] })),
-            "Goals need migration 006 on this database.",
+            "Not saved: this database has no goals table yet. Run supabase/migrations/006_goals.sql on it.",
           );
           return;
         }
@@ -702,7 +702,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
                 ...data,
                 importantDays: [...data.importantDays, created],
               })),
-            "Important days need migration 007 on this database.",
+            "Not saved: this database has no important_days table yet. Run supabase/migrations/007_important_days.sql on it.",
           );
           return;
         }
@@ -726,7 +726,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           pushCreate(
             repo.createHabit(base),
             (created) => mutate((d) => ({ ...d, habits: [...d.habits, created] })),
-            "Habits need migration 004 on this database.",
+            "Not saved: this database has no habits table yet. Run supabase/migrations/004_plan_habits.sql on it.",
           );
           return;
         }
@@ -765,7 +765,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           pushCreate(
             repo.createCategory(c),
             (created) => mutate((d) => ({ ...d, categories: [...d.categories, created] })),
-            "Categories need migration 003 on this database.",
+            "Not saved: this database has no categories table yet. Run supabase/migrations/003_categories.sql on it.",
           );
           return;
         }
@@ -929,7 +929,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
             pushCreate(
               repo.createInsight(i),
               (created) => mutate((d) => ({ ...d, insights: [created, ...d.insights] })),
-              "Insights need migration 002 on this database.",
+              "Not saved: this database has no insights table yet. Run supabase/migrations/002_memory.sql on it.",
             );
           }
           return;
