@@ -16,6 +16,7 @@ import {
   Course,
   Goal,
   GoalStatus,
+  ImportantDay,
   Habit,
   PlanItem,
   Day,
@@ -117,6 +118,10 @@ export interface Store extends AppData {
   deleteGoal(id: ID): void;
   /** Marking one achieved stamps the date, so "since when" survives. */
   setGoalStatus(id: ID, status: GoalStatus): void;
+
+  addImportantDay(d: Omit<ImportantDay, "id" | "createdAt">): void;
+  updateImportantDay(id: ID, patch: Partial<ImportantDay>): void;
+  deleteImportantDay(id: ID): void;
 
   addHabit(h: Omit<Habit, "id" | "createdAt" | "archivedAt">): void;
   updateHabit(id: ID, patch: Partial<Habit>): void;
@@ -242,6 +247,7 @@ function emptyData(): AppData {
     plan: [],
     habits: [],
     goals: [],
+    importantDays: [],
     memory: [],
     insights: [],
     reflectedAt: null,
@@ -278,6 +284,7 @@ function parseData(raw: string | null): AppData {
       plan: parsed.plan ?? [],
       habits: parsed.habits ?? [],
       goals: parsed.goals ?? [],
+      importantDays: parsed.importantDays ?? [],
       // Saved before habits existed: the field is absent rather than empty.
       days: (parsed.days ?? []).map((d) => ({ ...d, habitsDone: d.habitsDone ?? [] })),
     });
@@ -662,6 +669,34 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         const achievedAt = status === "achieved" ? todayISO() : null;
         mutate((d) => ({ ...d, goals: upsert(d.goals, id, { status, achievedAt }) }));
         if (cloud) push(repo.updateGoal(id, { status, achievedAt }));
+      },
+
+      addImportantDay: (d) => {
+        const base = { ...d, createdAt: todayISO() };
+        if (cloud) {
+          push(
+            repo.createImportantDay(base).then((created) => {
+              if (created)
+                mutate((data) => ({
+                  ...data,
+                  importantDays: [...data.importantDays, created],
+                }));
+            }),
+          );
+          return;
+        }
+        mutate((data) => ({
+          ...data,
+          importantDays: [...data.importantDays, { ...base, id: uid() }],
+        }));
+      },
+      updateImportantDay: (id, patch) => {
+        mutate((d) => ({ ...d, importantDays: upsert(d.importantDays, id, patch) }));
+        if (cloud) push(repo.updateImportantDay(id, patch));
+      },
+      deleteImportantDay: (id) => {
+        mutate((d) => ({ ...d, importantDays: d.importantDays.filter((x) => x.id !== id) }));
+        if (cloud) push(repo.deleteImportantDay(id));
       },
 
       addHabit: (h) => {

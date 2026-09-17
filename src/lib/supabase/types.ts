@@ -160,6 +160,17 @@ export type GoalRow = {
   achieved_at: string | null;
 };
 
+export type ImportantDayRow = {
+  id: string;
+  user_id: string;
+  title: string;
+  date: string;
+  kind: string;
+  note: string;
+  repeats_yearly: boolean;
+  created_at: string;
+};
+
 export type MemoryNoteRow = {
   id: string;
   user_id: string;
@@ -231,6 +242,7 @@ export interface Database {
       plan_items: Table<PlanItemRow>;
       habits: Table<HabitRow>;
       goals: Table<GoalRow>;
+      important_days: Table<ImportantDayRow>;
       memory_notes: Table<MemoryNoteRow>;
       insights: Table<InsightRow>;
     };

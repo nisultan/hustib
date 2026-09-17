@@ -1,8 +1,9 @@
 "use client";
 
 import { useStore } from "@/lib/store";
-import { dayContents, monthMatrix, sameMonth, Mark } from "@/lib/calendar";
+import { dayContents, monthMatrix, sameMonth, Layer, Mark } from "@/lib/calendar";
 import { courseColor } from "@/lib/appearance";
+import { IMPORTANT_KIND_GLYPH } from "@/lib/types";
 import { todayISO } from "@/lib/dates";
 
 /**
@@ -25,11 +26,19 @@ const MAX_VISIBLE = 3;
 
 export function MonthGrid({
   month,
+  layers,
   onOpen,
+  onAddDay,
+  onEditDay,
 }: {
   /** Any date in the month to show. */
   month: string;
+  /** Which kinds of entry to draw. */
+  layers: Layer[];
   onOpen: (date: string) => void;
+  /** Adding an important day on a date, from the cell it belongs to. */
+  onAddDay: (date: string) => void;
+  onEditDay: (id: string) => void;
 }) {
   const store = useStore();
   const weeks = monthMatrix(month);
@@ -51,7 +60,7 @@ export function MonthGrid({
 
       <div className="grid grid-cols-7">
         {weeks.flat().map((date) => {
-          const contents = dayContents(store, date);
+          const contents = dayContents(store, date, layers);
           const outside = !sameMonth(date, month);
           const isToday = date === today;
           const weekend = indexInWeek(date) >= 5;
@@ -64,24 +73,63 @@ export function MonthGrid({
           const hidden = items.length - shown.length;
 
           return (
-            <button
+            /*
+              A div rather than a button, because the cell now holds buttons of
+              its own — an important day opens for editing where it sits, which
+              is where anyone would click it. A button inside a button is not
+              valid HTML, and browsers resolve it by dropping one of them.
+            */
+            <div
               key={date}
+              role="button"
+              tabIndex={0}
               onClick={() => onOpen(date)}
-              className={`group flex min-h-[104px] flex-col gap-1 border-b border-r border-line p-1.5 text-left transition-colors last:border-r-0 hover:bg-panel-2 ${
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  onOpen(date);
+                }
+              }}
+              className={`group flex min-h-[104px] cursor-pointer flex-col gap-1 border-b border-r border-line p-1.5 text-left transition-colors hover:bg-panel-2 ${
                 outside ? "opacity-40" : ""
               } ${weekend && !outside ? "bg-panel-2/40" : ""}`}
             >
-              <span
-                className={`nums mb-0.5 grid size-6 shrink-0 place-items-center rounded-full text-[11px] font-medium ${
-                  isToday ? "bg-accent text-white" : "text-ink-2"
-                }`}
-              >
-                {Number(date.slice(8, 10))}
-              </span>
+              <div className="mb-0.5 flex items-center justify-between">
+                <span
+                  className={`nums grid size-6 shrink-0 place-items-center rounded-full text-[11px] font-medium ${
+                    isToday ? "bg-accent text-white" : "text-ink-2"
+                  }`}
+                >
+                  {Number(date.slice(8, 10))}
+                </span>
+
+                {/* Only on hover: a plus on all thirty-five days is
+                    thirty-five pieces of furniture in a view whose whole job
+                    is to be scannable. */}
+                <button
+                  type="button"
+                  aria-label={`Add an important day on ${date}`}
+                  title="Add an important day"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onAddDay(date);
+                  }}
+                  className="grid size-5 shrink-0 place-items-center rounded text-ink-3 opacity-0 transition-opacity hover:bg-panel hover:text-ink focus-visible:opacity-100 group-hover:opacity-100"
+                >
+                  <svg viewBox="0 0 16 16" aria-hidden className="size-3.5">
+                    <path
+                      d="M8 3.5v9M3.5 8h9"
+                      stroke="currentColor"
+                      strokeWidth="1.6"
+                      strokeLinecap="round"
+                    />
+                  </svg>
+                </button>
+              </div>
 
               {shown.map((entry) =>
                 entry.mark ? (
-                  <MarkChip key={entry.key} mark={entry.mark} />
+                  <MarkChip key={entry.key} mark={entry.mark} onEditDay={onEditDay} />
                 ) : (
                   <PlanChip key={entry.key} item={entry.plan!} />
                 ),
@@ -90,7 +138,7 @@ export function MonthGrid({
               {hidden > 0 && (
                 <span className="px-1 text-[10px] text-ink-3">+{hidden} more</span>
               )}
-            </button>
+            </div>
           );
         })}
       </div>
@@ -98,29 +146,61 @@ export function MonthGrid({
   );
 }
 
-/** A deadline. Coloured by priority, because that is what makes a day heavy. */
-function MarkChip({ mark }: { mark: Mark }) {
-  return (
-    <span
-      className={`flex items-center gap-1 truncate rounded px-1 py-0.5 text-[10px] font-medium ${
-        mark.done ? "text-ink-3 line-through" : ""
-      }`}
-      style={
-        mark.done
-          ? undefined
-          : {
-              color: `var(--${mark.priority})`,
-              background: `color-mix(in srgb, var(--${mark.priority}) 12%, transparent)`,
-            }
-      }
-      title={mark.label}
-    >
+/** A deadline or an important day. Coloured by priority, because that is what makes a day heavy. */
+function MarkChip({ mark, onEditDay }: { mark: Mark; onEditDay: (id: string) => void }) {
+  const label = mark.year ? `${mark.label} (${ordinal(mark.year)})` : mark.label;
+
+  const body = (
+    <>
       <span aria-hidden className="shrink-0">
-        {mark.kind === "university" ? "◆" : mark.kind === "goal" ? "★" : "•"}
+        {glyph(mark)}
       </span>
-      <span className="truncate">{mark.label}</span>
+      <span className="truncate">{label}</span>
+    </>
+  );
+
+  const className = `flex w-full items-center gap-1 truncate rounded px-1 py-0.5 text-left text-[10px] font-medium ${
+    mark.done ? "text-ink-3 line-through" : ""
+  }`;
+  const style = mark.done
+    ? undefined
+    : {
+        color: `var(--${mark.priority})`,
+        background: `color-mix(in srgb, var(--${mark.priority}) 12%, transparent)`,
+      };
+
+  // An important day is the one mark edited from the calendar, because the
+  // calendar is the only place it lives. The others belong to a page of their
+  // own, and opening the day is the right way in.
+  if (mark.kind === "day") {
+    return (
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          onEditDay(mark.id);
+        }}
+        className={`${className} hover:brightness-110`}
+        style={style}
+        title={`${label} — click to edit`}
+      >
+        {body}
+      </button>
+    );
+  }
+
+  return (
+    <span className={className} style={style} title={label}>
+      {body}
     </span>
   );
+}
+
+function glyph(mark: Mark): string {
+  if (mark.kind === "day") return IMPORTANT_KIND_GLYPH[mark.dayKind ?? "other"];
+  if (mark.kind === "university") return "◆";
+  if (mark.kind === "goal") return "★";
+  return "•";
 }
 
 /** Something planned. Quieter than a deadline: it is a choice, not a limit. */
@@ -143,6 +223,13 @@ function PlanChip({ item }: { item: { title: string; categoryId: string | null; 
       <span className="truncate">{item.title || "Untitled"}</span>
     </span>
   );
+}
+
+/** "2nd", "18th" — which anniversary a yearly day has come round to. */
+function ordinal(n: number): string {
+  const rest = n % 100;
+  if (rest >= 11 && rest <= 13) return `${n}th`;
+  return `${n}${["th", "st", "nd", "rd"][n % 10] ?? "th"}`;
 }
 
 /** 0 for Monday, matching the column order. */

@@ -9,6 +9,8 @@ import {
   Day,
   Goal,
   GoalStatus,
+  ImportantDay,
+  ImportantKind,
   Habit,
   PlanItem,
   Grade,
@@ -25,6 +27,7 @@ import {
   CourseRow,
   DayRow,
   GoalRow,
+  ImportantDayRow,
   HabitRow,
   PlanItemRow,
   GradeRow,
@@ -174,6 +177,7 @@ export async function fetchAll(): Promise<AppData> {
     plan,
     habits,
     goals,
+    importantDays,
     memory,
     insights,
   ] = await Promise.all([
@@ -188,6 +192,7 @@ export async function fetchAll(): Promise<AppData> {
     supabase.from("plan_items").select("*").order("date", { ascending: false }),
     supabase.from("habits").select("*").order("created_at"),
     supabase.from("goals").select("*").order("position"),
+    supabase.from("important_days").select("*").order("date"),
     supabase.from("memory_notes").select("*").order("created_at"),
     supabase.from("insights").select("*").order("created_at", { ascending: false }),
   ]);
@@ -206,7 +211,7 @@ export async function fetchAll(): Promise<AppData> {
   // arrived after the rest of the schema, and a database still on the earlier
   // migration must load a student's courses and grades exactly as before
   // rather than failing the entire hub over a table it has never heard of.
-  for (const optional of [categories, plan, habits, goals, memory, insights]) {
+  for (const optional of [categories, plan, habits, goals, importantDays, memory, insights]) {
     if (optional.error && !isMissingSchema(optional.error)) throw optional.error;
   }
 
@@ -230,6 +235,7 @@ export async function fetchAll(): Promise<AppData> {
     plan: ((plan.data ?? []) as PlanItemRow[]).map(toPlanItem),
     habits: ((habits.data ?? []) as HabitRow[]).map(toHabit),
     goals: ((goals.data ?? []) as GoalRow[]).map(toGoal),
+    importantDays: ((importantDays.data ?? []) as ImportantDayRow[]).map(toImportantDay),
     memory: ((memory.data ?? []) as MemoryNoteRow[]).map(toMemory),
     insights: ((insights.data ?? []) as InsightRow[]).map(toInsight),
     // Undefined on a pre-migration database, which reads as "never reflected".
@@ -526,6 +532,50 @@ export async function updateGoal(id: string, patch: Partial<Goal>): Promise<void
 
 export async function deleteGoal(id: string): Promise<void> {
   const { error } = await client().from("goals").delete().eq("id", id);
+  if (error && !isMissingSchema(error)) throw error;
+}
+
+/* ------------------------------ Important days --------------------------- */
+
+export async function createImportantDay(
+  d: Omit<ImportantDay, "id">,
+): Promise<ImportantDay | null> {
+  const { data, error } = await client()
+    .from("important_days")
+    .insert({
+      title: d.title,
+      date: d.date,
+      kind: d.kind,
+      note: d.note,
+      repeats_yearly: d.repeatsYearly,
+    })
+    .select()
+    .single();
+  if (error) {
+    if (isMissingSchema(error)) return null;
+    throw error;
+  }
+  return toImportantDay(data as ImportantDayRow);
+}
+
+export async function updateImportantDay(
+  id: string,
+  patch: Partial<ImportantDay>,
+): Promise<void> {
+  const row: Partial<ImportantDayRow> = {};
+  if (patch.title !== undefined) row.title = patch.title;
+  if (patch.date !== undefined) row.date = patch.date;
+  if (patch.kind !== undefined) row.kind = patch.kind;
+  if (patch.note !== undefined) row.note = patch.note;
+  if (patch.repeatsYearly !== undefined) row.repeats_yearly = patch.repeatsYearly;
+  if (Object.keys(row).length === 0) return;
+
+  const { error } = await client().from("important_days").update(row).eq("id", id);
+  if (error && !isMissingSchema(error)) throw error;
+}
+
+export async function deleteImportantDay(id: string): Promise<void> {
+  const { error } = await client().from("important_days").delete().eq("id", id);
   if (error && !isMissingSchema(error)) throw error;
 }
 
@@ -865,6 +915,22 @@ function toGoal(row: GoalRow): Goal {
     createdAt: row.created_at.slice(0, 10),
     achievedAt: row.achieved_at ? row.achieved_at.slice(0, 10) : null,
     position: Number(row.position) || 0,
+  };
+}
+
+const IMPORTANT_KINDS = ["exam", "birthday", "holiday", "trip", "other"];
+
+function toImportantDay(row: ImportantDayRow): ImportantDay {
+  return {
+    id: row.id,
+    title: row.title,
+    // Trimmed to the day: a date column comes back as a plain day, but a
+    // database that widened it later would otherwise break every comparison.
+    date: row.date.slice(0, 10),
+    kind: (IMPORTANT_KINDS.includes(row.kind) ? row.kind : "other") as ImportantKind,
+    note: row.note ?? "",
+    repeatsYearly: row.repeats_yearly === true,
+    createdAt: row.created_at.slice(0, 10),
   };
 }
 

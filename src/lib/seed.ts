@@ -15,6 +15,28 @@ export function seedData(): AppData {
       { id: "cat-school", name: "School", color: "violet" },
       { id: "cat-personal", name: "Personal", color: "green" },
     ],
+    // Two of the things a calendar is actually for: one that is coming and
+    // cannot be moved, and one that comes back every year.
+    importantDays: [
+      {
+        id: "day-sat",
+        title: "SAT",
+        date: addDays(t, 24),
+        kind: "exam",
+        note: "Registration closes three weeks before.",
+        repeatsYearly: false,
+        createdAt: t,
+      },
+      {
+        id: "day-mum",
+        title: "Mum's birthday",
+        date: addDays(t, 61),
+        kind: "birthday",
+        note: "",
+        repeatsYearly: true,
+        createdAt: t,
+      },
+    ],
     // The hub has not met this student yet: memory is earned, never seeded.
     memory: [],
     insights: [],

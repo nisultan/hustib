@@ -244,6 +244,66 @@ export interface Goal {
   position: number;
 }
 
+export type ImportantKind = "exam" | "birthday" | "holiday" | "trip" | "other";
+
+export const IMPORTANT_KINDS: ImportantKind[] = [
+  "exam",
+  "birthday",
+  "holiday",
+  "trip",
+  "other",
+];
+
+export const IMPORTANT_KIND_LABEL: Record<ImportantKind, string> = {
+  exam: "Exam",
+  birthday: "Birthday",
+  holiday: "Holiday",
+  trip: "Trip",
+  other: "Other",
+};
+
+/** One glyph each, so a month cell can say what a day is without room for a word. */
+export const IMPORTANT_KIND_GLYPH: Record<ImportantKind, string> = {
+  exam: "◆",
+  birthday: "♥",
+  holiday: "☀",
+  trip: "✈",
+  other: "●",
+};
+
+/**
+ * A date that matters on its own.
+ *
+ * Everything else the calendar knows about is a date attached to something
+ * else — a task's deadline, a university's, a goal's, a block of time. The SAT
+ * is not work to be finished and a friend's birthday is not a goal, but both
+ * would ruin a week if they arrived unnoticed, and until now the only way to
+ * put one on the calendar was to invent a task for it and then live with it
+ * sitting in the to-do list being not-done.
+ *
+ * So it is its own collection, with no status and nothing to tick. A day like
+ * this is not completed; it simply happens.
+ */
+export interface ImportantDay {
+  id: ID;
+  title: string;
+  /** "YYYY-MM-DD". */
+  date: string;
+  kind: ImportantKind;
+  /** Anything worth remembering about it. Prose, not markdown. */
+  note: string;
+  /**
+   * Whether it comes back every year on the same month and day.
+   *
+   * Birthdays are the reason this exists: entering one as a single date means
+   * re-entering it every January, and generating sixty rows to stand for one
+   * recurring fact is the mistake habits already avoid. The stored date is the
+   * first occurrence, which keeps "whose 18th" answerable.
+   */
+  repeatsYearly: boolean;
+  createdAt: string;
+}
+
 export interface Profile {
   name: string;
 }
@@ -373,6 +433,7 @@ export interface AppData {
   plan: PlanItem[];
   habits: Habit[];
   goals: Goal[];
+  importantDays: ImportantDay[];
   memory: MemoryNote[];
   insights: Insight[];
   /** When the hub last sat down and thought about the student. ISO datetime. */

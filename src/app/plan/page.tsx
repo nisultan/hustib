@@ -14,7 +14,18 @@ import { TimeField } from "@/components/TimeField";
 import { PlanItemMenu } from "@/components/PlanItemMenu";
 import { DayGrid, toClock } from "@/components/DayGrid";
 import { MonthGrid } from "@/components/MonthGrid";
-import { weekOf, monthLabel, addMonths, startOfWeek } from "@/lib/calendar";
+import { ImportantDayDialog } from "@/components/ImportantDayDialog";
+import {
+  weekOf,
+  monthLabel,
+  addMonths,
+  startOfWeek,
+  dayContents,
+  Layer,
+  LAYERS,
+  ALL_LAYERS,
+  Mark,
+} from "@/lib/calendar";
 
 /**
  * One day at a time, as a column of hours.
@@ -45,6 +56,9 @@ type View = "day" | "week" | "month";
 /** Which zoom the student left it on. */
 const VIEW_KEY = "iblearner.planView";
 
+/** Which layers the calendar is drawing. */
+const LAYERS_KEY = "iblearner.planLayers";
+
 function dragPayload(kind: "plan" | "task", id: string): string {
   return `${kind}:${id}`;
 }
@@ -68,6 +82,48 @@ export default function PlanPage() {
   });
 
   const today = todayISO();
+
+  /*
+    Which layers the calendar is drawing.
+
+    Stored as the list that is *shown* rather than the list that is hidden, so
+    a layer added in a later version is visible by default instead of silently
+    filtered out of everyone's calendar by a saved preference that predates it.
+  */
+  const [layers, setLayers] = useState<Layer[]>(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem(LAYERS_KEY) ?? "null");
+      if (Array.isArray(saved)) {
+        const known = saved.filter((l): l is Layer => ALL_LAYERS.includes(l as Layer));
+        // An empty saved list would be a calendar showing nothing, which reads
+        // as broken rather than as filtered.
+        if (known.length > 0) return known;
+      }
+    } catch {
+      // Unreadable storage. Everything shows, which is the right default.
+    }
+    return ALL_LAYERS;
+  });
+
+  const toggleLayer = (layer: Layer) => {
+    setLayers((current) => {
+      const next = current.includes(layer)
+        ? current.filter((l) => l !== layer)
+        : [...current, layer];
+      // Turning the last one off leaves an empty grid with no way to read why,
+      // so the last layer standing cannot be switched off.
+      if (next.length === 0) return current;
+      try {
+        localStorage.setItem(LAYERS_KEY, JSON.stringify(next));
+      } catch {
+        // Private browsing. The choice still holds for this session.
+      }
+      return next;
+    });
+  };
+
+  /** The important day being added or edited, if any. `date` means adding. */
+  const [dayEdit, setDayEdit] = useState<{ id?: string; date?: string } | null>(null);
 
   const pick = (next: View) => {
     setView(next);
@@ -154,15 +210,59 @@ export default function PlanPage() {
         </div>
       </Panel>
 
+      {/*
+        The filter sits under the header rather than inside it. It belongs to
+        the grid below it, not to the date above it, and a header already
+        carrying arrows, a heading, a zoom and a date picker is where controls
+        go to become invisible.
+      */}
+      <div className="mb-4 flex flex-wrap items-center gap-2">
+        {LAYERS.map((layer) => {
+          const on = layers.includes(layer.id);
+          return (
+            <button
+              key={layer.id}
+              onClick={() => toggleLayer(layer.id)}
+              aria-pressed={on}
+              className={`rounded-full border px-2.5 py-1 text-xs font-medium transition-colors ${
+                on
+                  ? "border-accent bg-accent-soft text-accent-text"
+                  : "border-line text-ink-3 hover:text-ink"
+              }`}
+            >
+              {layer.label}
+            </button>
+          );
+        })}
+
+        <Button
+          size="sm"
+          className="ml-auto"
+          onClick={() => setDayEdit({ date })}
+        >
+          + Important day
+        </Button>
+      </div>
+
       {view === "month" && (
         <MonthGrid
           month={date}
+          layers={layers}
           onOpen={(day) => {
             setDate(day);
             pick("day");
           }}
+          onAddDay={(day) => setDayEdit({ date: day })}
+          onEditDay={(id) => setDayEdit({ id })}
         />
       )}
+
+      <ImportantDayDialog
+        open={dayEdit != null}
+        day={dayEdit?.id ? store.importantDays.find((d) => d.id === dayEdit.id) : undefined}
+        date={dayEdit?.date}
+        onClose={() => setDayEdit(null)}
+      />
 
       {view !== "month" && (
       <Split>
@@ -176,6 +276,13 @@ export default function PlanPage() {
           >
             {view === "week" ? "The week" : "The day"}
           </SectionTitle>
+
+          <Marks
+            dates={visible}
+            layers={layers}
+            onEditDay={(id) => setDayEdit({ id })}
+          />
+
           <DayGrid
             dates={visible}
             today={today}
@@ -257,6 +364,77 @@ function isCurrent(date: string, view: View, today: string): boolean {
   if (view === "day") return date === today;
   if (view === "week") return startOfWeek(date) === startOfWeek(today);
   return date.slice(0, 7) === today.slice(0, 7);
+}
+
+/**
+ * What is fixed about these days, above the hours.
+ *
+ * An exam and a deadline have no start time and no length, so putting them in
+ * the hour grid would mean inventing both. They belong above it, the way an
+ * all-day row sits above a calendar — the things the day has to work around,
+ * before any of the working-around is drawn.
+ *
+ * Renders nothing when there is nothing, rather than an empty strip: a rule
+ * across the page saying "no deadlines" is a line of furniture answering a
+ * question nobody asked.
+ */
+function Marks({
+  dates,
+  layers,
+  onEditDay,
+}: {
+  dates: string[];
+  layers: Layer[];
+  onEditDay: (id: string) => void;
+}) {
+  const store = useStore();
+
+  const rows = dates
+    .map((date) => ({ date, marks: dayContents(store, date, layers).marks }))
+    .filter((row) => row.marks.length > 0);
+
+  if (rows.length === 0) return null;
+
+  return (
+    <div className="mb-2 flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-lg border border-line bg-panel-2/40 px-2.5 py-2">
+      {rows.map((row) => (
+        <div key={row.date} className="flex flex-wrap items-center gap-1.5">
+          {dates.length > 1 && (
+            <span className="text-[11px] font-medium text-ink-3">{formatDate(row.date)}</span>
+          )}
+          {row.marks.map((mark) => (
+            <MarkPill key={`${row.date}-${mark.id}`} mark={mark} onEditDay={onEditDay} />
+          ))}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function MarkPill({ mark, onEditDay }: { mark: Mark; onEditDay: (id: string) => void }) {
+  const label = mark.year ? `${mark.label} (${mark.year} years)` : mark.label;
+  const className = `flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium ${
+    mark.done ? "text-ink-3 line-through" : ""
+  }`;
+  const style = mark.done
+    ? undefined
+    : {
+        color: `var(--${mark.priority})`,
+        background: `color-mix(in srgb, var(--${mark.priority}) 12%, transparent)`,
+      };
+
+  if (mark.kind === "day") {
+    return (
+      <button onClick={() => onEditDay(mark.id)} className={className} style={style}>
+        {label}
+      </button>
+    );
+  }
+  return (
+    <span className={className} style={style}>
+      {label}
+    </span>
+  );
 }
 
 /**

@@ -1,4 +1,4 @@
-import { AppData, PlanItem, Priority } from "./types";
+import { AppData, ImportantKind, PlanItem, Priority } from "./types";
 import { addDays, toISO, fromISO } from "./dates";
 
 /**
@@ -11,15 +11,39 @@ import { addDays, toISO, fromISO } from "./dates";
  * other and with the day.
  */
 
-export type MarkKind = "task" | "university" | "goal";
+export type MarkKind = "task" | "university" | "goal" | "day";
+
+/**
+ * A layer the calendar can be asked to show or hide.
+ *
+ * Plan blocks are a layer too, even though they are not marks: the point of
+ * filtering is to answer one question at a time — "when are my exams", "what
+ * did I actually schedule" — and a filter that hides deadlines but cannot hide
+ * a full day of blocks does not answer either.
+ */
+export type Layer = MarkKind | "plan";
+
+export const LAYERS: { id: Layer; label: string }[] = [
+  { id: "day", label: "Important days" },
+  { id: "task", label: "Tasks" },
+  { id: "university", label: "Universities" },
+  { id: "goal", label: "Goals" },
+  { id: "plan", label: "Blocks" },
+];
+
+export const ALL_LAYERS: Layer[] = LAYERS.map((l) => l.id);
 
 export interface Mark {
   kind: MarkKind;
   id: string;
   label: string;
   priority: Priority;
-  /** True once the thing it stands for is finished. */
+  /** True once the thing it stands for is finished. Never true for a day. */
   done: boolean;
+  /** Only set when `kind` is "day", and chooses the glyph. */
+  dayKind?: ImportantKind;
+  /** Only set when `kind` is "day": which anniversary this is, from the 2nd on. */
+  year?: number;
 }
 
 export interface DayContents {
@@ -28,48 +52,96 @@ export interface DayContents {
   marks: Mark[];
 }
 
-export function dayContents(data: AppData, date: string): DayContents {
-  const plan = data.plan
-    .filter((p) => p.date === date)
-    .sort((a, b) => (a.start ?? "99:99").localeCompare(b.start ?? "99:99"));
+/**
+ * Whether a yearly date falls on a given day.
+ *
+ * Compares month and day only, and refuses dates before the first occurrence —
+ * a birthday should not appear in the years before the person was born. The
+ * 29th of February simply does not come round in a common year, which is the
+ * honest answer rather than silently moving it to the 1st of March.
+ */
+function recursOn(stored: string, date: string): boolean {
+  return stored.slice(5) === date.slice(5) && stored <= date;
+}
+
+export function dayContents(
+  data: AppData,
+  date: string,
+  layers: Layer[] = ALL_LAYERS,
+): DayContents {
+  const showing = (layer: Layer) => layers.includes(layer);
+
+  const plan = showing("plan")
+    ? data.plan
+        .filter((p) => p.date === date)
+        .sort((a, b) => (a.start ?? "99:99").localeCompare(b.start ?? "99:99"))
+    : [];
 
   const marks: Mark[] = [];
 
-  for (const t of data.tasks) {
-    if (t.dueDate === date) {
+  // Important days come first: they are the only entries that cannot be
+  // rescheduled, and a cell that shows three blocks and hides the exam has
+  // its priorities backwards.
+  if (showing("day")) {
+    for (const d of data.importantDays) {
+      const falls = d.repeatsYearly ? recursOn(d.date, date) : d.date === date;
+      if (!falls) continue;
+      const year = Number(date.slice(0, 4)) - Number(d.date.slice(0, 4));
       marks.push({
-        kind: "task",
-        id: t.id,
-        label: t.title,
-        priority: t.priority,
-        done: t.status === "completed",
+        kind: "day",
+        id: d.id,
+        label: d.title,
+        // Not a to-do, so it has no priority of its own; "high" is what makes
+        // it read as something that matters without shouting over a deadline.
+        priority: "high",
+        done: false,
+        dayKind: d.kind,
+        year: d.repeatsYearly && year > 0 ? year : undefined,
       });
     }
   }
 
-  for (const u of data.universities) {
-    if (u.deadline === date) {
-      marks.push({
-        kind: "university",
-        id: u.id,
-        label: `${u.name} deadline`,
-        // A university deadline is never a low-priority day, whatever the
-        // application's own status says.
-        priority: "urgent",
-        done: u.status === "applied" || u.status === "accepted",
-      });
+  if (showing("task")) {
+    for (const t of data.tasks) {
+      if (t.dueDate === date) {
+        marks.push({
+          kind: "task",
+          id: t.id,
+          label: t.title,
+          priority: t.priority,
+          done: t.status === "completed",
+        });
+      }
     }
   }
 
-  for (const g of data.goals) {
-    if (g.deadline === date) {
-      marks.push({
-        kind: "goal",
-        id: g.id,
-        label: g.title,
-        priority: g.priority,
-        done: g.status === "achieved",
-      });
+  if (showing("university")) {
+    for (const u of data.universities) {
+      if (u.deadline === date) {
+        marks.push({
+          kind: "university",
+          id: u.id,
+          label: `${u.name} deadline`,
+          // A university deadline is never a low-priority day, whatever the
+          // application's own status says.
+          priority: "urgent",
+          done: u.status === "applied" || u.status === "accepted",
+        });
+      }
+    }
+  }
+
+  if (showing("goal")) {
+    for (const g of data.goals) {
+      if (g.deadline === date) {
+        marks.push({
+          kind: "goal",
+          id: g.id,
+          label: g.title,
+          priority: g.priority,
+          done: g.status === "achieved",
+        });
+      }
     }
   }
 
