@@ -525,6 +525,27 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     void work.catch((e) => setSyncError(message(e)));
   }, []);
 
+  /**
+   * Sends a create, and refuses to lose the row when it has nowhere to go.
+   *
+   * The repository answers null rather than throwing when the table it writes
+   * to does not exist, so that a database still on an earlier migration keeps
+   * working instead of failing the whole hub. That tolerance is right for
+   * reads and quietly destructive for writes: a null came back, the `if
+   * (created)` guard skipped the local update too, and the student watched
+   * something they had just typed evaporate with no row, no error and no
+   * banner. Saying which migration is missing costs one line and turns a
+   * disappearance into an instruction.
+   */
+  const pushCreate = useCallback(
+    <T,>(work: Promise<T | null>, apply: (created: T) => void, missing: string) => {
+      void work
+        .then((created) => (created ? apply(created) : setSyncError(missing)))
+        .catch((e) => setSyncError(message(e)));
+    },
+    [],
+  );
+
   const store = useMemo<Store>(() => {
     const upsert = <T extends { id: ID }>(list: T[], id: ID, patch: Partial<T>) =>
       list.map((x) => (x.id === id ? { ...x, ...patch } : x));
@@ -597,10 +618,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         // inserting anyway leaves the screen holding an id the database has
         // never seen, and the next edit to that row fails as a malformed uuid.
         if (cloud) {
-          push(
-            repo.createPlanItem(item).then((created) => {
-              if (created) mutate((d) => ({ ...d, plan: [...d.plan, created] }));
-            }),
+          pushCreate(
+            repo.createPlanItem(item),
+            (created) => mutate((d) => ({ ...d, plan: [...d.plan, created] })),
+            "Planned blocks need migration 004 on this database.",
           );
           return;
         }
@@ -648,10 +669,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           position: Math.min(0, ...latest.current.goals.map((x) => x.position)) - 1,
         };
         if (cloud) {
-          push(
-            repo.createGoal(base).then((created) => {
-              if (created) mutate((d) => ({ ...d, goals: [created, ...d.goals] }));
-            }),
+          pushCreate(
+            repo.createGoal(base),
+            (created) => mutate((d) => ({ ...d, goals: [created, ...d.goals] })),
+            "Goals need migration 006 on this database.",
           );
           return;
         }
@@ -674,14 +695,14 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       addImportantDay: (d) => {
         const base = { ...d, createdAt: todayISO() };
         if (cloud) {
-          push(
-            repo.createImportantDay(base).then((created) => {
-              if (created)
-                mutate((data) => ({
-                  ...data,
-                  importantDays: [...data.importantDays, created],
-                }));
-            }),
+          pushCreate(
+            repo.createImportantDay(base),
+            (created) =>
+              mutate((data) => ({
+                ...data,
+                importantDays: [...data.importantDays, created],
+              })),
+            "Important days need migration 007 on this database.",
           );
           return;
         }
@@ -702,10 +723,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       addHabit: (h) => {
         const base = { ...h, createdAt: todayISO(), archivedAt: null };
         if (cloud) {
-          push(
-            repo.createHabit(base).then((created) => {
-              if (created) mutate((d) => ({ ...d, habits: [...d.habits, created] }));
-            }),
+          pushCreate(
+            repo.createHabit(base),
+            (created) => mutate((d) => ({ ...d, habits: [...d.habits, created] })),
+            "Habits need migration 004 on this database.",
           );
           return;
         }
@@ -741,10 +762,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
       addCategory: (c) => {
         if (cloud) {
-          push(
-            repo.createCategory(c).then((created) => {
-              if (created) mutate((d) => ({ ...d, categories: [...d.categories, created] }));
-            }),
+          pushCreate(
+            repo.createCategory(c),
+            (created) => mutate((d) => ({ ...d, categories: [...d.categories, created] })),
+            "Categories need migration 003 on this database.",
           );
           return;
         }
@@ -905,10 +926,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       addInsights: (incoming) => {
         if (cloud) {
           for (const i of incoming) {
-            push(
-              repo.createInsight(i).then((created) => {
-                if (created) mutate((d) => ({ ...d, insights: [created, ...d.insights] }));
-              }),
+            pushCreate(
+              repo.createInsight(i),
+              (created) => mutate((d) => ({ ...d, insights: [created, ...d.insights] })),
+              "Insights need migration 002 on this database.",
             );
           }
           return;
@@ -1056,6 +1077,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     ready,
     mutate,
     push,
+    pushCreate,
     cloud,
     authState,
     user,
