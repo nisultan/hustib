@@ -2,6 +2,7 @@
 
 import { Theme } from "@/lib/appearance";
 import { useAppearance } from "@/lib/use-appearance";
+import { withThemeTransition } from "@/lib/theme-transition";
 
 const NEXT: Record<Theme, Theme> = {
   system: "light",
@@ -25,7 +26,9 @@ export function ThemeToggle() {
 
   return (
     <button
-      onClick={() => setTheme(NEXT[theme])}
+      onClick={(e) =>
+        withThemeTransition(() => setTheme(NEXT[theme]), { x: e.clientX, y: e.clientY })
+      }
       title={`Theme: ${LABEL[theme]}`}
       aria-label={`Theme: ${LABEL[theme]}. Switch to ${LABEL[NEXT[theme]]}.`}
       className="grid size-9 shrink-0 place-items-center rounded-lg text-ink-3 transition-colors hover:bg-panel-2 hover:text-ink"

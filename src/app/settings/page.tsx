@@ -1,5 +1,6 @@
 "use client";
 
+import { withThemeTransition } from "@/lib/theme-transition";
 import { useEffect, useState } from "react";
 import { useStore } from "@/lib/store";
 import { Button, Field, Input, PageHeader, Panel, SectionTitle } from "@/components/ui";
@@ -63,7 +64,9 @@ export default function SettingsPage() {
               {THEMES.map((t: Theme) => (
                 <button
                   key={t}
-                  onClick={() => setTheme(t)}
+                  onClick={(e) =>
+                    withThemeTransition(() => setTheme(t), { x: e.clientX, y: e.clientY })
+                  }
                   aria-pressed={theme === t}
                   className={`flex-1 rounded-lg border px-3 py-2 text-sm font-medium capitalize transition-colors ${
                     theme === t

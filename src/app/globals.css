@@ -803,3 +803,30 @@ summary {
     padding 0.18s ease,
     gap 0.18s ease;
 }
+
+/*
+ * The theme wipe.
+ *
+ * View transitions cross-fade the old and new snapshots by default, which for
+ * a theme change means every surface passing through a washed-out halfway
+ * state on the way. Both animations are turned off so the only movement is the
+ * circle clipped out of the incoming snapshot in `theme-transition.ts`, and the
+ * new theme is wiped over the old one instead.
+ *
+ * `mix-blend-mode: normal` matters: the default blending makes the overlap of
+ * the two snapshots lighten, which shows up as a bright rim chasing the edge of
+ * the circle.
+ */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation: none;
+  mix-blend-mode: normal;
+}
+
+::view-transition-old(root) {
+  z-index: 0;
+}
+
+::view-transition-new(root) {
+  z-index: 1;
+}

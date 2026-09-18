@@ -8,7 +8,8 @@ import { addDays, formatDate, todayISO } from "@/lib/dates";
 import { Heatmap } from "@/components/Heatmap";
 import { ActivityTrend } from "@/components/ActivityTrend";
 import { Productivity } from "@/components/Productivity";
-import { EmptyState, Panel, PageHeader, SectionTitle, Segmented } from "@/components/ui";
+import { ProgressGuide } from "@/components/ProgressGuide";
+import { Button, EmptyState, Panel, PageHeader, SectionTitle, Segmented } from "@/components/ui";
 
 /**
  * The year, seen from above.
@@ -37,6 +38,7 @@ export default function ProgressPage() {
   const store = useStore();
   const router = useRouter();
   const [range, setRange] = useState<Range>("53");
+  const [guide, setGuide] = useState(false);
 
   const today = todayISO();
   const weeks = Number(range);
@@ -69,7 +71,16 @@ export default function ProgressPage() {
       <PageHeader
         title="Progress"
         subtitle="What you have actually done, day by day. Not a target — a record."
+        action={
+          /* Every figure on this page is counted rather than entered, and a
+             derived number nobody can explain is a number nobody believes. */
+          <Button size="sm" onClick={() => setGuide(true)}>
+            How this works
+          </Button>
+        }
       />
+
+      <ProgressGuide open={guide} onClose={() => setGuide(false)} />
 
       {chart.total === 0 ? (
         <EmptyState
