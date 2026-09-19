@@ -1118,6 +1118,23 @@ export function useCourseMap(): Map<ID, Course> {
   return useMemo(() => new Map(courses.map((c) => [c.id, c])), [courses]);
 }
 
+/**
+ * An id for a row created on this device.
+ *
+ * A real UUID, because the same id has to be legal in Postgres the day the
+ * student turns on sync. The old twelve-character form was fine until it was
+ * sent to a uuid column, which rejected it as malformed syntax — and by then
+ * the row already existed locally, so every later edit to it failed too.
+ *
+ * `randomUUID` needs a secure context; the fallback is only for an app served
+ * over plain http on something other than localhost.
+ */
 function uid(): string {
-  return Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    return (c === "x" ? r : (r & 0x3) | 0x8).toString(16);
+  });
 }

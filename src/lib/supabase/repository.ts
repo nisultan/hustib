@@ -146,6 +146,30 @@ export async function currentUser() {
  * Postgres reports the undefined table or column; PostgREST reports its own
  * schema cache missing them.
  */
+/**
+ * Whether an id could ever name a row in Postgres.
+ *
+ * Every id column here is a uuid, so anything else is a row this device made
+ * while it was offline or before sync was switched on — along with the sample
+ * data, whose ids are readable strings like "cat-school". Sending one is not a
+ * failed write, it is an impossible one: Postgres rejects the syntax before it
+ * looks for the row, and the student gets a sync error about an id they have
+ * never seen and cannot act on.
+ *
+ * Writes against such an id are skipped, and references to one are stored as
+ * null rather than taking the whole row down with them.
+ */
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+export function isServerId(id: string | null | undefined): boolean {
+  return typeof id === "string" && UUID.test(id);
+}
+
+/** A foreign key, or null when it points at something only this device knows. */
+function ref(id: string | null | undefined): string | null {
+  return isServerId(id) ? (id as string) : null;
+}
+
 function isMissingSchema(error: { code?: string } | null): boolean {
   const code = error?.code;
   return code === "42P01" || code === "42703" || code === "PGRST205" || code === "PGRST204";
@@ -262,6 +286,7 @@ export async function createCourse(c: Omit<Course, "id">): Promise<Course> {
 }
 
 export async function updateCourse(id: string, patch: Partial<Course>): Promise<void> {
+  if (!isServerId(id)) return;
   const supabase = client();
   const { lessons, ...rest } = patch;
 
@@ -293,6 +318,7 @@ async function replaceLessons(courseId: string, lessons: string[]): Promise<void
 
 /** Tasks and grades go with it, via ON DELETE CASCADE in the schema. */
 export async function deleteCourse(id: string): Promise<void> {
+  if (!isServerId(id)) return;
   const { error } = await client().from("courses").delete().eq("id", id);
   if (error) throw error;
 }
@@ -308,8 +334,8 @@ export async function createTask(
     .from("tasks")
     .insert({
       title: t.title,
-      course_id: t.courseId,
-      category_id: t.categoryId,
+      course_id: ref(t.courseId),
+      category_id: ref(t.categoryId),
       lesson: t.lesson,
       notes: t.notes,
       due_date: t.dueDate,
@@ -326,10 +352,11 @@ export async function createTask(
 }
 
 export async function updateTask(id: string, patch: Partial<Task>): Promise<void> {
+  if (!isServerId(id)) return;
   const row: Partial<TaskRow> = {};
   if (patch.title !== undefined) row.title = patch.title;
-  if (patch.courseId !== undefined) row.course_id = patch.courseId;
-  if (patch.categoryId !== undefined) row.category_id = patch.categoryId;
+  if (patch.courseId !== undefined) row.course_id = ref(patch.courseId);
+  if (patch.categoryId !== undefined) row.category_id = ref(patch.categoryId);
   if (patch.lesson !== undefined) row.lesson = patch.lesson;
   if (patch.notes !== undefined) row.notes = patch.notes;
   if (patch.dueDate !== undefined) row.due_date = patch.dueDate;
@@ -349,6 +376,7 @@ export async function updateTask(id: string, patch: Partial<Task>): Promise<void
 }
 
 export async function deleteTask(id: string): Promise<void> {
+  if (!isServerId(id)) return;
   const { error } = await client().from("tasks").delete().eq("id", id);
   if (error) throw error;
 }
@@ -375,6 +403,7 @@ export async function createGrade(g: Omit<Grade, "id">): Promise<Grade> {
 }
 
 export async function updateGrade(id: string, patch: Partial<Grade>): Promise<void> {
+  if (!isServerId(id)) return;
   const row: Partial<GradeRow> = {};
   if (patch.courseId !== undefined) row.course_id = patch.courseId;
   if (patch.assessment !== undefined) row.assessment = patch.assessment;
@@ -389,6 +418,7 @@ export async function updateGrade(id: string, patch: Partial<Grade>): Promise<vo
 }
 
 export async function deleteGrade(id: string): Promise<void> {
+  if (!isServerId(id)) return;
   const { error } = await client().from("grades").delete().eq("id", id);
   if (error) throw error;
 }
@@ -419,6 +449,7 @@ export async function createUniversity(u: Omit<University, "id">): Promise<Unive
 }
 
 export async function updateUniversity(id: string, patch: Partial<University>): Promise<void> {
+  if (!isServerId(id)) return;
   const row: Partial<UniversityRow> = {};
   for (const [key, column] of Object.entries({
     name: "name",
@@ -442,6 +473,7 @@ export async function updateUniversity(id: string, patch: Partial<University>): 
 }
 
 export async function deleteUniversity(id: string): Promise<void> {
+  if (!isServerId(id)) return;
   const { error } = await client().from("universities").delete().eq("id", id);
   if (error) throw error;
 }
@@ -500,7 +532,7 @@ export async function createGoal(g: Omit<Goal, "id">): Promise<Goal | null> {
       priority: g.priority,
       status: g.status,
       progress: g.progress,
-      category_id: g.categoryId,
+      category_id: ref(g.categoryId),
       position: g.position,
     })
     .select()
@@ -513,6 +545,7 @@ export async function createGoal(g: Omit<Goal, "id">): Promise<Goal | null> {
 }
 
 export async function updateGoal(id: string, patch: Partial<Goal>): Promise<void> {
+  if (!isServerId(id)) return;
   const row: Partial<GoalRow> = {};
   if (patch.title !== undefined) row.title = patch.title;
   if (patch.note !== undefined) row.note = patch.note;
@@ -521,7 +554,7 @@ export async function updateGoal(id: string, patch: Partial<Goal>): Promise<void
   if (patch.priority !== undefined) row.priority = patch.priority;
   if (patch.status !== undefined) row.status = patch.status;
   if (patch.progress !== undefined) row.progress = patch.progress;
-  if (patch.categoryId !== undefined) row.category_id = patch.categoryId;
+  if (patch.categoryId !== undefined) row.category_id = ref(patch.categoryId);
   if (patch.position !== undefined) row.position = patch.position;
   if (patch.achievedAt !== undefined) row.achieved_at = patch.achievedAt;
   if (Object.keys(row).length === 0) return;
@@ -531,6 +564,7 @@ export async function updateGoal(id: string, patch: Partial<Goal>): Promise<void
 }
 
 export async function deleteGoal(id: string): Promise<void> {
+  if (!isServerId(id)) return;
   const { error } = await client().from("goals").delete().eq("id", id);
   if (error && !isMissingSchema(error)) throw error;
 }
@@ -562,6 +596,7 @@ export async function updateImportantDay(
   id: string,
   patch: Partial<ImportantDay>,
 ): Promise<void> {
+  if (!isServerId(id)) return;
   const row: Partial<ImportantDayRow> = {};
   if (patch.title !== undefined) row.title = patch.title;
   if (patch.date !== undefined) row.date = patch.date;
@@ -575,6 +610,7 @@ export async function updateImportantDay(
 }
 
 export async function deleteImportantDay(id: string): Promise<void> {
+  if (!isServerId(id)) return;
   const { error } = await client().from("important_days").delete().eq("id", id);
   if (error && !isMissingSchema(error)) throw error;
 }
@@ -588,8 +624,8 @@ export async function createPlanItem(p: Omit<PlanItem, "id">): Promise<PlanItem 
     start_time: p.start,
     minutes: p.minutes,
     done: p.done,
-    category_id: p.categoryId,
-    task_id: p.taskId,
+    category_id: ref(p.categoryId),
+    task_id: ref(p.taskId),
   };
 
   const insert = (body: Partial<PlanItemRow>) =>
@@ -612,6 +648,7 @@ export async function createPlanItem(p: Omit<PlanItem, "id">): Promise<PlanItem 
 }
 
 export async function updatePlanItem(id: string, patch: Partial<PlanItem>): Promise<void> {
+  if (!isServerId(id)) return;
   const row: Partial<PlanItemRow> = {};
   if (patch.title !== undefined) row.title = patch.title;
   if (patch.start !== undefined) row.start_time = patch.start;
@@ -619,8 +656,8 @@ export async function updatePlanItem(id: string, patch: Partial<PlanItem>): Prom
   if (patch.done !== undefined) row.done = patch.done;
   if (patch.priority !== undefined) row.priority = patch.priority;
   if (patch.date !== undefined) row.date = patch.date;
-  if (patch.categoryId !== undefined) row.category_id = patch.categoryId;
-  if (patch.taskId !== undefined) row.task_id = patch.taskId;
+  if (patch.categoryId !== undefined) row.category_id = ref(patch.categoryId);
+  if (patch.taskId !== undefined) row.task_id = ref(patch.taskId);
   if (Object.keys(row).length === 0) return;
 
   const { error } = await client().from("plan_items").update(row).eq("id", id);
@@ -628,6 +665,7 @@ export async function updatePlanItem(id: string, patch: Partial<PlanItem>): Prom
 }
 
 export async function deletePlanItem(id: string): Promise<void> {
+  if (!isServerId(id)) return;
   const { error } = await client().from("plan_items").delete().eq("id", id);
   if (error && !isMissingSchema(error)) throw error;
 }
@@ -635,7 +673,7 @@ export async function deletePlanItem(id: string): Promise<void> {
 export async function createHabit(h: Omit<Habit, "id">): Promise<Habit | null> {
   const { data, error } = await client()
     .from("habits")
-    .insert({ name: h.name, category_id: h.categoryId, weekdays: h.weekdays })
+    .insert({ name: h.name, category_id: ref(h.categoryId), weekdays: h.weekdays })
     .select()
     .single();
   if (error) {
@@ -646,9 +684,10 @@ export async function createHabit(h: Omit<Habit, "id">): Promise<Habit | null> {
 }
 
 export async function updateHabit(id: string, patch: Partial<Habit>): Promise<void> {
+  if (!isServerId(id)) return;
   const row: Partial<HabitRow> = {};
   if (patch.name !== undefined) row.name = patch.name;
-  if (patch.categoryId !== undefined) row.category_id = patch.categoryId;
+  if (patch.categoryId !== undefined) row.category_id = ref(patch.categoryId);
   if (patch.weekdays !== undefined) row.weekdays = patch.weekdays;
   if (patch.archivedAt !== undefined) row.archived_at = patch.archivedAt;
   if (Object.keys(row).length === 0) return;
@@ -673,6 +712,7 @@ export async function createCategory(c: Omit<Category, "id">): Promise<Category 
 }
 
 export async function updateCategory(id: string, patch: Partial<Category>): Promise<void> {
+  if (!isServerId(id)) return;
   const row: Partial<CategoryRow> = {};
   if (patch.name !== undefined) row.name = patch.name;
   if (patch.color !== undefined) row.color = patch.color;
@@ -683,6 +723,7 @@ export async function updateCategory(id: string, patch: Partial<Category>): Prom
 }
 
 export async function deleteCategory(id: string): Promise<void> {
+  if (!isServerId(id)) return;
   const { error } = await client().from("categories").delete().eq("id", id);
   if (error && !isMissingSchema(error)) throw error;
 }
@@ -710,6 +751,7 @@ export async function createMemory(m: Omit<MemoryNote, "id">): Promise<MemoryNot
 }
 
 export async function updateMemory(id: string, patch: Partial<MemoryNote>): Promise<void> {
+  if (!isServerId(id)) return;
   const row: Partial<MemoryNoteRow> = { updated_at: new Date().toISOString() };
   if (patch.topic !== undefined) row.topic = patch.topic;
   if (patch.note !== undefined) row.note = patch.note;
@@ -720,6 +762,7 @@ export async function updateMemory(id: string, patch: Partial<MemoryNote>): Prom
 }
 
 export async function deleteMemory(id: string): Promise<void> {
+  if (!isServerId(id)) return;
   const { error } = await client().from("memory_notes").delete().eq("id", id);
   if (error && !isMissingSchema(error)) throw error;
 }
@@ -751,6 +794,7 @@ export async function dismissInsight(id: string, at: string | null): Promise<voi
 }
 
 export async function deleteInsight(id: string): Promise<void> {
+  if (!isServerId(id)) return;
   const { error } = await client().from("insights").delete().eq("id", id);
   if (error && !isMissingSchema(error)) throw error;
 }
