@@ -16,6 +16,7 @@ import {
 import { UNI_PRIORITIES, UNI_PRIORITY_LABEL } from "@/lib/types";
 import { Panel, SectionTitle, EmptyState, Button, TrendLabel } from "@/components/ui";
 import { Insights } from "@/components/Insights";
+import { NextUp } from "@/components/NextUp";
 import { Productivity } from "@/components/Productivity";
 import { TaskList, sortTasks } from "@/components/TaskItem";
 import { AddTaskButton } from "@/components/TaskDialog";
@@ -70,7 +71,11 @@ export default function HomePage() {
         </p>
       </header>
 
-      {/* What the hub noticed on its own comes first — it is the part that
+      {/* Countdowns first. Whatever else is on this page, the thing a student
+          opens it to find out is how long they have. */}
+      <NextUp />
+
+      {/* What the hub noticed on its own comes next — it is the part that
           knows this particular student, where the rules below know anyone. */}
       <Insights limit={2} />
 
@@ -157,7 +162,10 @@ export default function HomePage() {
                       key={t.id}
                       className="flex items-baseline gap-3 border-b border-line px-3.5 py-2.5 last:border-b-0"
                     >
-                      <span className="w-24 shrink-0 text-xs font-medium text-ink-2">
+                      <span className="nums w-10 shrink-0 text-xs font-semibold text-ink-2">
+                        {daysUntil(t.dueDate as string)}d
+                      </span>
+                      <span className="hidden w-20 shrink-0 text-xs text-ink-3 sm:block">
                         {relativeLabel(t.dueDate as string)}
                       </span>
                       <span className="min-w-0 flex-1 truncate text-sm">{t.title}</span>

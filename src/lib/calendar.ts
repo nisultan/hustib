@@ -1,4 +1,4 @@
-import { AppData, ImportantKind, PlanItem, Priority } from "./types";
+import { AppData, ImportantKind, PlanItem, Priority, PRIORITY_RANK } from "./types";
 import { addDays, toISO, fromISO } from "./dates";
 
 /**
@@ -205,4 +205,125 @@ export function addMonths(iso: string, n: number): string {
   const lastDay = new Date(target.getFullYear(), target.getMonth() + 1, 0).getDate();
   target.setDate(Math.min(d.getDate(), lastDay));
   return toISO(target);
+}
+
+/**
+ * What is coming, soonest first, across everything that carries a date.
+ *
+ * The dashboard's question is "what is closest", and until now that could only
+ * be answered one collection at a time — the tasks list knew nothing about the
+ * SAT, and the calendar knew about it only if you were already looking at
+ * September. Merging them is the whole point: a deadline three days out
+ * matters the same amount whether it came from a task or a birthday.
+ */
+export interface Upcoming {
+  kind: MarkKind;
+  id: string;
+  label: string;
+  /** The resolved date — for a yearly day, its next occurrence. */
+  date: string;
+  daysLeft: number;
+  priority: Priority;
+  dayKind?: ImportantKind;
+  /** Which anniversary the next occurrence will be, when that is knowable. */
+  year?: number;
+}
+
+/**
+ * When a yearly day next comes round, counting today as still ahead.
+ *
+ * A birthday is not "passed" on the morning of, so today always resolves to
+ * today. February 29th only resolves in a leap year, which is the honest
+ * answer rather than quietly moving it.
+ */
+export function nextOccurrence(stored: string, from: string): string | null {
+  const [, month, day] = stored.split("-");
+  for (let year = Number(from.slice(0, 4)); year <= Number(from.slice(0, 4)) + 4; year += 1) {
+    const candidate = `${year}-${month}-${day}`;
+    // Rejects the 29th in a common year: the Date would roll into March.
+    const real = new Date(`${candidate}T12:00:00`);
+    if (toISO(real) !== candidate) continue;
+    if (candidate >= from) return candidate;
+  }
+  return null;
+}
+
+export function upcoming(
+  data: AppData,
+  from: string,
+  {
+    within = 120,
+    limit = 8,
+    layers = ALL_LAYERS,
+  }: { within?: number; limit?: number; layers?: Layer[] } = {},
+): Upcoming[] {
+  const showing = (layer: Layer) => layers.includes(layer);
+  const horizon = addDays(from, within);
+  const out: Upcoming[] = [];
+
+  const push = (entry: Omit<Upcoming, "daysLeft">) => {
+    if (entry.date < from || entry.date > horizon) return;
+    out.push({ ...entry, daysLeft: daysBetween(from, entry.date) });
+  };
+
+  if (showing("day")) {
+    for (const d of data.importantDays) {
+      const date = d.repeatsYearly ? nextOccurrence(d.date, from) : d.date;
+      if (!date) continue;
+      const year = Number(date.slice(0, 4)) - Number(d.date.slice(0, 4));
+      push({
+        kind: "day",
+        id: d.id,
+        label: d.title,
+        date,
+        priority: "high",
+        dayKind: d.kind,
+        year: d.repeatsYearly && year > 0 ? year : undefined,
+      });
+    }
+  }
+
+  if (showing("task")) {
+    for (const t of data.tasks) {
+      // Finished work is not coming up, however close its deadline was.
+      if (t.status === "completed" || t.dueDate == null) continue;
+      push({ kind: "task", id: t.id, label: t.title, date: t.dueDate, priority: t.priority });
+    }
+  }
+
+  if (showing("university")) {
+    for (const u of data.universities) {
+      if (u.deadline == null) continue;
+      if (u.status === "applied" || u.status === "accepted" || u.status === "rejected")
+        continue;
+      push({
+        kind: "university",
+        id: u.id,
+        label: `${u.name} — ${u.program || "application"}`,
+        date: u.deadline,
+        priority: "urgent",
+      });
+    }
+  }
+
+  if (showing("goal")) {
+    for (const g of data.goals) {
+      if (g.deadline == null || g.status !== "active") continue;
+      push({ kind: "goal", id: g.id, label: g.title, date: g.deadline, priority: g.priority });
+    }
+  }
+
+  return out
+    .sort(
+      (a, b) =>
+        a.date.localeCompare(b.date) || PRIORITY_RANK[b.priority] - PRIORITY_RANK[a.priority],
+    )
+    .slice(0, limit);
+}
+
+/** Whole days from one date to another, both as "YYYY-MM-DD". */
+function daysBetween(from: string, to: string): number {
+  return Math.round(
+    (Date.parse(`${to}T00:00:00`) - Date.parse(`${from}T00:00:00`)) / 86_400_000,
+  );
 }
