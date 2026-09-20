@@ -24,6 +24,7 @@ import {
   Insight,
   MemoryNote,
   Task,
+  UniColumn,
   University,
   Profile,
   ID,
@@ -142,6 +143,11 @@ export interface Store extends AppData {
   updateGrade(id: ID, patch: Partial<Grade>): void;
   deleteGrade(id: ID): void;
 
+  addUniColumn(c: Omit<UniColumn, "id">): void;
+  updateUniColumn(id: ID, patch: Partial<UniColumn>): void;
+  /** Removes the column and the values under it, everywhere. */
+  deleteUniColumn(id: ID): void;
+
   addUniversity(u: Omit<University, "id">): void;
   updateUniversity(id: ID, patch: Partial<University>): void;
   deleteUniversity(id: ID): void;
@@ -243,6 +249,7 @@ function emptyData(): AppData {
     tasks: [],
     grades: [],
     universities: [],
+    uniColumns: [],
     days: [],
     plan: [],
     habits: [],
@@ -284,6 +291,9 @@ function parseData(raw: string | null): AppData {
       plan: parsed.plan ?? [],
       habits: parsed.habits ?? [],
       goals: parsed.goals ?? [],
+      uniColumns: parsed.uniColumns ?? [],
+      // Saved before custom columns existed: the map is absent, not empty.
+      universities: (parsed.universities ?? []).map((u) => ({ ...u, fields: u.fields ?? {} })),
       importantDays: parsed.importantDays ?? [],
       // Saved before habits existed: the field is absent rather than empty.
       days: (parsed.days ?? []).map((d) => ({ ...d, habitsDone: d.habitsDone ?? [] })),
@@ -831,6 +841,40 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       deleteGrade: (id) => {
         mutate((d) => ({ ...d, grades: d.grades.filter((g) => g.id !== id) }));
         if (cloud) push(repo.deleteGrade(id));
+      },
+
+      addUniColumn: (c) => {
+        const created = { ...c, id: uid() };
+        mutate((d) => ({ ...d, uniColumns: [...d.uniColumns, created] }));
+        if (cloud) push(repo.createUniColumn(created));
+      },
+      updateUniColumn: (id, patch) => {
+        mutate((d) => ({ ...d, uniColumns: upsert(d.uniColumns, id, patch) }));
+        if (cloud) push(repo.updateUniColumn(id, patch));
+      },
+      deleteUniColumn: (id) => {
+        // The values go with it. Leaving orphaned entries in every row means a
+        // column deleted by mistake and re-added comes back full of old data.
+        mutate((d) => ({
+          ...d,
+          uniColumns: d.uniColumns.filter((c) => c.id !== id),
+          universities: d.universities.map((u) => {
+            if (!(id in u.fields)) return u;
+            const fields = { ...u.fields };
+            delete fields[id];
+            return { ...u, fields };
+          }),
+        }));
+        if (cloud) {
+          push(repo.deleteUniColumn(id));
+          for (const u of latest.current.universities) {
+            if (id in u.fields) {
+              const fields = { ...u.fields };
+              delete fields[id];
+              push(repo.updateUniversity(u.id, { fields }));
+            }
+          }
+        }
       },
 
       addUniversity: (u) => {

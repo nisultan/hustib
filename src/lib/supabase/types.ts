@@ -80,6 +80,8 @@ export type GradeRow = {
 };
 
 export type UniversityRow = {
+  /** Custom column values. Absent before the migration that adds them. */
+  fields?: Record<string, string> | null;
   id: string;
   user_id: string;
   name: string;
@@ -141,6 +143,16 @@ export type HabitRow = {
   weekdays: number[];
   created_at: string;
   archived_at: string | null;
+};
+
+export type UniColumnRow = {
+  id: string;
+  user_id: string;
+  label: string;
+  type: string;
+  options: string[];
+  position: number;
+  created_at: string;
 };
 
 export type GoalRow = {
@@ -242,6 +254,7 @@ export interface Database {
       plan_items: Table<PlanItemRow>;
       habits: Table<HabitRow>;
       goals: Table<GoalRow>;
+      uni_columns: Table<UniColumnRow>;
       important_days: Table<ImportantDayRow>;
       memory_notes: Table<MemoryNoteRow>;
       insights: Table<InsightRow>;

@@ -335,6 +335,7 @@ function runTool(call: ToolCall, store: Store, router: Router): ToolResult {
           priority: oneOf(a.priority, UNI_PRIORITIES, "target") as UniPriority,
           notes: str(a.notes) ?? "",
           website: "",
+          fields: {},
         });
         return ok(`Added ${name} to your university list`, "/universities");
       }

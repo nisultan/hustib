@@ -131,6 +131,37 @@ export const UNI_PRIORITY_LABEL: Record<UniPriority, string> = {
   safety: "Safety",
 };
 
+export type UniFieldType = "text" | "number" | "date" | "url" | "select";
+
+export const UNI_FIELD_TYPES: { id: UniFieldType; label: string }[] = [
+  { id: "text", label: "Text" },
+  { id: "number", label: "Number" },
+  { id: "date", label: "Date" },
+  { id: "url", label: "Link" },
+  { id: "select", label: "Choice" },
+];
+
+/**
+ * A column the student added to the university table.
+ *
+ * The built-in fields cover what every application has — a name, a deadline, a
+ * status. They cannot cover what this particular student is tracking, which
+ * might be tuition, or an IELTS minimum, or whether the portal is open yet.
+ * Rather than guess at ten more fields and be wrong for everyone, the table
+ * takes columns.
+ *
+ * Values live on the university as strings whatever the type. A column can be
+ * retyped after it holds data, and a number that briefly reads "tbc" is a
+ * smaller problem than a save that refuses the word.
+ */
+export interface UniColumn {
+  id: ID;
+  label: string;
+  type: UniFieldType;
+  /** Only for "select": the choices offered. */
+  options: string[];
+}
+
 export interface University {
   id: ID;
   name: string;
@@ -144,6 +175,8 @@ export interface University {
   priority: UniPriority;
   notes: string;
   website: string;
+  /** Values for the student's own columns, keyed by column id. */
+  fields: Record<string, string>;
 }
 
 /**
@@ -429,6 +462,7 @@ export interface AppData {
   tasks: Task[];
   grades: Grade[];
   universities: University[];
+  uniColumns: UniColumn[];
   days: Day[];
   plan: PlanItem[];
   habits: Habit[];

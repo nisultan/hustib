@@ -18,6 +18,7 @@ import {
   InsightKind,
   MemoryNote,
   Task,
+  UniColumn,
   University,
 } from "../types";
 import type { User } from "@supabase/supabase-js";
@@ -35,6 +36,7 @@ import {
   LessonRow,
   MemoryNoteRow,
   TaskRow,
+  UniColumnRow,
   UniversityRow,
 } from "./types";
 
@@ -201,6 +203,7 @@ export async function fetchAll(): Promise<AppData> {
     plan,
     habits,
     goals,
+    uniColumns,
     importantDays,
     memory,
     insights,
@@ -216,6 +219,7 @@ export async function fetchAll(): Promise<AppData> {
     supabase.from("plan_items").select("*").order("date", { ascending: false }),
     supabase.from("habits").select("*").order("created_at"),
     supabase.from("goals").select("*").order("position"),
+    supabase.from("uni_columns").select("*").order("position"),
     supabase.from("important_days").select("*").order("date"),
     supabase.from("memory_notes").select("*").order("created_at"),
     supabase.from("insights").select("*").order("created_at", { ascending: false }),
@@ -235,7 +239,16 @@ export async function fetchAll(): Promise<AppData> {
   // arrived after the rest of the schema, and a database still on the earlier
   // migration must load a student's courses and grades exactly as before
   // rather than failing the entire hub over a table it has never heard of.
-  for (const optional of [categories, plan, habits, goals, importantDays, memory, insights]) {
+  for (const optional of [
+    categories,
+    plan,
+    habits,
+    goals,
+    uniColumns,
+    importantDays,
+    memory,
+    insights,
+  ]) {
     if (optional.error && !isMissingSchema(optional.error)) throw optional.error;
   }
 
@@ -259,6 +272,7 @@ export async function fetchAll(): Promise<AppData> {
     plan: ((plan.data ?? []) as PlanItemRow[]).map(toPlanItem),
     habits: ((habits.data ?? []) as HabitRow[]).map(toHabit),
     goals: ((goals.data ?? []) as GoalRow[]).map(toGoal),
+    uniColumns: ((uniColumns.data ?? []) as UniColumnRow[]).map(toUniColumn),
     importantDays: ((importantDays.data ?? []) as ImportantDayRow[]).map(toImportantDay),
     memory: ((memory.data ?? []) as MemoryNoteRow[]).map(toMemory),
     insights: ((insights.data ?? []) as InsightRow[]).map(toInsight),
@@ -427,6 +441,31 @@ export async function deleteGrade(id: string): Promise<void> {
 /* Universities                                                               */
 /* -------------------------------------------------------------------------- */
 
+export async function createUniColumn(c: UniColumn): Promise<void> {
+  const { error } = await client()
+    .from("uni_columns")
+    .insert({ id: c.id, label: c.label, type: c.type, options: c.options });
+  if (error && !isMissingSchema(error)) throw error;
+}
+
+export async function updateUniColumn(id: string, patch: Partial<UniColumn>): Promise<void> {
+  if (!isServerId(id)) return;
+  const row: Partial<UniColumnRow> = {};
+  if (patch.label !== undefined) row.label = patch.label;
+  if (patch.type !== undefined) row.type = patch.type;
+  if (patch.options !== undefined) row.options = patch.options;
+  if (Object.keys(row).length === 0) return;
+
+  const { error } = await client().from("uni_columns").update(row).eq("id", id);
+  if (error && !isMissingSchema(error)) throw error;
+}
+
+export async function deleteUniColumn(id: string): Promise<void> {
+  if (!isServerId(id)) return;
+  const { error } = await client().from("uni_columns").delete().eq("id", id);
+  if (error && !isMissingSchema(error)) throw error;
+}
+
 export async function createUniversity(u: Omit<University, "id">): Promise<University> {
   const { data, error } = await client()
     .from("universities")
@@ -441,6 +480,7 @@ export async function createUniversity(u: Omit<University, "id">): Promise<Unive
       priority: u.priority,
       notes: u.notes,
       website: u.website,
+      fields: u.fields,
     })
     .select()
     .single();
@@ -462,6 +502,7 @@ export async function updateUniversity(id: string, patch: Partial<University>): 
     priority: "priority",
     notes: "notes",
     website: "website",
+    fields: "fields",
   })) {
     const value = (patch as Record<string, unknown>)[key];
     if (value !== undefined) (row as Record<string, unknown>)[column] = value;
@@ -945,6 +986,17 @@ function toHabit(row: HabitRow): Habit {
 
 const GOAL_STATUSES = ["active", "achieved", "paused"];
 
+const UNI_FIELD_TYPES = ["text", "number", "date", "url", "select"];
+
+function toUniColumn(row: UniColumnRow): UniColumn {
+  return {
+    id: row.id,
+    label: row.label,
+    type: (UNI_FIELD_TYPES.includes(row.type) ? row.type : "text") as UniColumn["type"],
+    options: Array.isArray(row.options) ? row.options : [],
+  };
+}
+
 function toGoal(row: GoalRow): Goal {
   return {
     id: row.id,
@@ -1045,5 +1097,8 @@ function toUniversity(row: UniversityRow): University {
     priority: row.priority,
     notes: row.notes,
     website: row.website,
+    // Null before the migration that adds the column, which reads as "this
+    // student has no custom columns yet" — true in that case either way.
+    fields: row.fields ?? {},
   };
 }

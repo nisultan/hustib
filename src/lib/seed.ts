@@ -295,6 +295,7 @@ export function seedData(): AppData {
       grade("g9", "c-eng", "Oral", "Test", 94, 25, addDays(t, -28)),
       grade("g10", "c-eng", "Written task 1", "Project", 92, 20, addDays(t, -10)),
     ],
+    uniColumns: [],
     universities: [
       uni(
         "u1",
@@ -450,7 +451,20 @@ function uni(
   notes: string,
   website: string,
 ) {
-  return { id, name, country, flag, city, program, deadline, status, priority, notes, website };
+  return {
+    id,
+    name,
+    country,
+    flag,
+    city,
+    program,
+    deadline,
+    status,
+    priority,
+    notes,
+    website,
+    fields: {},
+  };
 }
 
 /** The next January `day` that hasn't passed yet. */
