@@ -71,7 +71,7 @@ export function NextUp() {
             Closest deadlines
           </SectionTitle>
 
-          <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+          <div className="grid items-stretch gap-2.5 sm:grid-cols-2 xl:grid-cols-4">
             {deadlines.map((entry) => (
               <Card
                 key={`${entry.kind}-${entry.id}`}
@@ -98,7 +98,7 @@ export function NextUp() {
             Important days
           </SectionTitle>
 
-          <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+          <div className="grid items-stretch gap-2.5 sm:grid-cols-2 xl:grid-cols-4">
             {days.map((entry) => (
               <Card
                 key={entry.id}
@@ -195,9 +195,14 @@ function Overdue({ tasks, today }: { tasks: Task[]; today: string }) {
 /**
  * One countdown.
  *
- * The number leads, at a size you can read without stopping, because the count
- * is the reason the card exists — everything else on it is there to say what
- * the number is about.
+ * The count sits in a tinted badge rather than as loose text beside the title.
+ * Two reasons: it gives the number a fixed footprint, so a long title can no
+ * longer squeeze it, and the tint carries the urgency at a glance — a row of
+ * these should be readable as a shape before any of it is read as words.
+ *
+ * Titles clamp to two lines and the card stretches to its row, so a wrapped
+ * Kazakh title and a short English one still produce cards of equal height
+ * instead of a ragged row.
  */
 function Card({
   href,
@@ -215,53 +220,59 @@ function Card({
   glyph?: string;
 }) {
   const overdue = days < 0;
+  const today = days === 0;
 
   return (
     <Link
       href={href}
       title={`${label} — ${detail}`}
-      className="group flex items-center gap-3 rounded-xl border border-line bg-panel px-3.5 py-3 shadow-[var(--shadow),var(--edge)] transition-[transform,border-color,box-shadow] duration-200 hover:-translate-y-px hover:border-line-strong hover:shadow-[var(--shadow-md),var(--edge)]"
-      style={{ borderLeft: `3px solid ${tone}` }}
+      className="group flex h-full items-center gap-3 rounded-xl border border-line bg-panel p-3 shadow-[var(--shadow),var(--edge)] transition-[transform,border-color,box-shadow] duration-200 hover:-translate-y-0.5 hover:border-line-strong hover:shadow-[var(--shadow-md),var(--edge)]"
     >
-      <div className="min-w-[46px] shrink-0">
-        <p
-          className="nums text-xl font-semibold leading-none tracking-tight"
-          style={{ color: tone }}
-        >
-          {count(days)}
-        </p>
-        <p className="mt-0.5 text-[10px] uppercase tracking-wide text-ink-3">{unit(days)}</p>
-      </div>
+      <span
+        aria-hidden
+        className="grid size-[52px] shrink-0 place-content-center rounded-lg text-center transition-transform duration-200 group-hover:scale-105"
+        style={{
+          background: `color-mix(in srgb, ${tone} 14%, transparent)`,
+          color: tone,
+        }}
+      >
+        {today ? (
+          <span className="px-1 text-[13px] font-semibold leading-none">Today</span>
+        ) : (
+          <>
+            <span className="nums text-[21px] font-semibold leading-none tracking-tight">
+              {Math.abs(days)}
+            </span>
+            <span className="mt-1 text-[9px] font-medium uppercase leading-none tracking-wider">
+              {unit(days)}
+            </span>
+          </>
+        )}
+      </span>
 
-      <div className="min-w-0 flex-1">
-        <p className="truncate text-[13px] font-medium leading-snug">
+      <span className="flex min-w-0 flex-1 flex-col gap-1">
+        <span className="line-clamp-2 text-[13px] font-medium leading-snug">
           {glyph && (
             <span aria-hidden className="mr-1 text-ink-3">
               {glyph}
             </span>
           )}
           {label}
-        </p>
-        <p
+        </span>
+        <span
           className="truncate text-[11px] text-ink-3"
-          style={overdue ? { color: "var(--urgent)" } : undefined}
+          style={overdue ? { color: tone } : undefined}
         >
           {detail}
-        </p>
-      </div>
+        </span>
+      </span>
     </Link>
   );
 }
 
-/** Today reads as a word, not as a zero. */
-function count(days: number): string {
-  if (days === 0) return "Today";
-  return String(Math.abs(days));
-}
-
+/** Two lines of badge, so "days over" has to become one short word. */
 function unit(days: number): string {
-  if (days === 0) return "";
-  if (days < 0) return Math.abs(days) === 1 ? "day over" : "days over";
+  if (days < 0) return "late";
   return days === 1 ? "day" : "days";
 }
 
