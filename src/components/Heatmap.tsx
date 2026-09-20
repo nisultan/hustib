@@ -8,10 +8,15 @@ import { formatDate } from "@/lib/dates";
  * A year of days as a wall of squares.
  *
  * The chart everyone already knows how to read, which is most of why it is
- * worth having: nobody needs a legend explained to see that the left half is
- * dense and the right half is empty. What it adds over the month calendar is
- * span — a calendar shows you this month and cannot show you that you have
- * been fading since October.
+ * worth having: nobody needs a legend explained to see that half of it is
+ * dense and half is empty. What it adds over the month calendar is span — a
+ * calendar shows you this month and cannot show you that you have been fading
+ * since October.
+ *
+ * Time runs right to left here: the newest week is the leftmost column. That
+ * inverts every contribution graph ever drawn, and it is the ask — this one is
+ * read for "how am I doing lately", and the usual order buries that answer at
+ * the far end of a strip you have to scroll first.
  *
  * Shades come from the accent at rising opacity rather than from five hand
  * picked colours, so the whole thing re-themes for free and stays legible on
@@ -43,8 +48,8 @@ export function Heatmap({
         Scrolled rather than squeezed. Fifty-three columns will not fit a phone
         at a legible square size, and the alternative — shrinking the squares
         until they do — produces a grey smear that answers no question at all.
-        Starts at the right, because the recent weeks are the ones being asked
-        about.
+        The newest week is the first column now, so it starts where any strip
+        starts and the recent weeks are simply there.
       */}
       <div className="flex gap-2">
         {/* Outside the scroller on purpose. Inside it, the labels slide off the
@@ -66,11 +71,8 @@ export function Heatmap({
           ))}
         </div>
 
-        <div
-          dir="rtl"
-          className="min-w-0 flex-1 overflow-x-auto pb-1 [scrollbar-width:thin]"
-        >
-          <div dir="ltr" className="inline-block">
+        <div className="min-w-0 flex-1 overflow-x-auto pb-1 [scrollbar-width:thin]">
+          <div className="inline-block">
             <div className="relative mb-1 h-[14px]">
               {months.map((month) => (
                 <span
@@ -90,12 +92,7 @@ export function Heatmap({
                     day == null ? (
                       <span key={row} style={{ width: CELL, height: CELL }} />
                     ) : (
-                      <Square
-                        key={day.date}
-                        day={day}
-                        onHover={setHover}
-                        onPick={onPick}
-                      />
+                      <Square key={day.date} day={day} onHover={setHover} onPick={onPick} />
                     ),
                   )}
                 </div>
@@ -121,12 +118,12 @@ export function Heatmap({
                   : `${hover.total} ${hover.total === 1 ? "thing" : "things"}`}
               </span>{" "}
               on {formatDate(hover.date)}
-              {hover.total > 0 && (
-                <span className="text-ink-3"> · {breakdown(hover)}</span>
-              )}
+              {hover.total > 0 && <span className="text-ink-3"> · {breakdown(hover)}</span>}
             </>
           ) : (
-            <span className="text-ink-3">Hover a square for the day it stands for.</span>
+            <span className="text-ink-3">
+              Hover a square for the day it stands for. Newest week on the left.
+            </span>
           )}
         </p>
 

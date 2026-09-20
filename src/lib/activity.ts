@@ -149,22 +149,65 @@ const MONTH_SHORT = [
 ];
 
 /**
- * The last `weeks` weeks as a grid of squares, ending with the week today is in.
+ * Recent weeks as a grid of squares, newest column first.
  *
  * Padded to whole weeks at both ends so the columns line up, with the padding
  * left as `null` rather than as zero-activity days: a Thursday that has not
  * happened yet is not a day the student failed to show up for.
  */
+function firstRecorded(data: AppData): string | null {
+  const dates: string[] = [];
+
+  for (const t of data.tasks) if (t.completedAt) dates.push(t.completedAt);
+  for (const p of data.plan) dates.push(p.date);
+  for (const d of data.days) {
+    if (d.weight != null || d.habitsDone.length > 0 || d.reflection.some((b) => b.text.trim()))
+      dates.push(d.date);
+  }
+
+  return dates.length === 0 ? null : dates.reduce((a, b) => (a < b ? a : b));
+}
+
 export function wall(data: AppData, weeks = 53, today = todayISO()): Wall {
   const lastMonday = startOfWeek(today);
-  const firstMonday = addDays(lastMonday, -(weeks - 1) * 7);
+
+  /*
+    Never earlier than the first thing the student ever recorded.
+
+    Asking for a year when the hub is two months old drew ten months of empty
+    squares — a wall of grey that says nothing except that the app is older
+    than the record, which it is not. The window shrinks to the history that
+    exists and the chart fills the width it has.
+  */
+  const requested = addDays(lastMonday, -(weeks - 1) * 7);
+  const earliest = firstRecorded(data);
+  const firstMonday =
+    earliest != null && startOfWeek(earliest) > requested ? startOfWeek(earliest) : requested;
+
+  const span =
+    Math.round(
+      (Date.parse(`${lastMonday}T00:00:00`) - Date.parse(`${firstMonday}T00:00:00`)) /
+        604_800_000,
+    ) + 1;
+
   const days = activityRange(data, firstMonday, addDays(lastMonday, 6));
 
   const columns: (DayActivity | null)[][] = [];
-  for (let w = 0; w < weeks; w += 1) {
+  for (let w = 0; w < span; w += 1) {
     const column = days.slice(w * 7, w * 7 + 7);
     columns.push(column.map((d) => (d.date > today ? null : d)));
   }
+
+  /*
+    Newest week first, so the left edge is now.
+
+    Against the convention every contribution graph follows, and deliberately:
+    this one is read to answer "how am I doing lately", and putting the answer
+    at the far right of a scrolling strip means finding it before reading it.
+    The oldest week trails off to the right, where it can be scrolled to by
+    anyone who wants it.
+  */
+  columns.reverse();
 
   // A label goes above the column holding that month's first Monday, and only
   // when there is room for it — two labels in adjacent columns overlap into
