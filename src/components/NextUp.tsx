@@ -5,7 +5,7 @@ import { useMemo } from "react";
 import { useStore } from "@/lib/store";
 import { upcoming, Upcoming } from "@/lib/calendar";
 import { formatDate, todayISO } from "@/lib/dates";
-import { IMPORTANT_KIND_GLYPH, IMPORTANT_KIND_LABEL } from "@/lib/types";
+import { IMPORTANT_KIND_GLYPH, IMPORTANT_KIND_LABEL, Task } from "@/lib/types";
 import { SectionTitle } from "./ui";
 
 /**
@@ -38,9 +38,11 @@ export function NextUp() {
     [store, today],
   );
 
-  // Overdue work is not "upcoming", but it is the most urgent thing on the
-  // page, so it rides along at the front rather than being hidden by a filter
-  // that only looks forward.
+  // Overdue work gets its own block rather than a slot in the row beside
+  // things that are merely close. A deadline that has passed is a different
+  // problem — it is not "how long have I got", it is "this is already late" —
+  // and letting it take a countdown slot pushed real upcoming work off the
+  // end of the row.
   const overdue = useMemo(
     () =>
       store.tasks
@@ -55,7 +57,9 @@ export function NextUp() {
 
   return (
     <div className="mb-8 grid gap-6">
-      {(overdue.length > 0 || deadlines.length > 0) && (
+      {overdue.length > 0 && <Overdue tasks={overdue} today={today} />}
+
+      {deadlines.length > 0 && (
         <section>
           <SectionTitle
             right={
@@ -68,18 +72,7 @@ export function NextUp() {
           </SectionTitle>
 
           <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
-            {overdue.map((task) => (
-              <Card
-                key={task.id}
-                href="/tasks?view=all"
-                label={task.title}
-                detail={`Was due ${formatDate(task.dueDate as string)}`}
-                days={daysBetween(today, task.dueDate as string)}
-                tone="var(--urgent)"
-              />
-            ))}
-
-            {deadlines.slice(0, Math.max(0, MAX_PER_ROW - overdue.length)).map((entry) => (
+            {deadlines.map((entry) => (
               <Card
                 key={`${entry.kind}-${entry.id}`}
                 href={hrefFor(entry)}
@@ -127,6 +120,75 @@ export function NextUp() {
         </section>
       )}
     </div>
+  );
+}
+
+/**
+ * Work whose deadline has already gone.
+ *
+ * A list rather than countdown cards, because the number is no longer the
+ * useful part — how many days late something is changes nothing about what to
+ * do with it. What matters is the choice, so each row offers the two that
+ * exist: finish it, or let it go. Clearing one is not deleting it; the task
+ * keeps its place in the list, it just stops being late at you.
+ */
+function Overdue({ tasks, today }: { tasks: Task[]; today: string }) {
+  const store = useStore();
+
+  return (
+    <section>
+      <SectionTitle
+        right={
+          <Link href="/tasks?view=all" className="text-xs text-ink-3 hover:text-ink">
+            All
+          </Link>
+        }
+      >
+        <span style={{ color: "var(--urgent)" }}>Overdue · {tasks.length}</span>
+      </SectionTitle>
+
+      <div
+        className="overflow-hidden rounded-xl border bg-panel shadow-[var(--shadow),var(--edge)]"
+        style={{ borderColor: "color-mix(in srgb, var(--urgent) 35%, var(--border))" }}
+      >
+        {tasks.map((task) => (
+          <div
+            key={task.id}
+            className="flex items-center gap-3 border-b border-line px-3.5 py-2.5 last:border-b-0"
+          >
+            <span
+              className="nums w-16 shrink-0 text-xs font-semibold"
+              style={{ color: "var(--urgent)" }}
+            >
+              {Math.abs(daysBetween(today, task.dueDate as string))}d late
+            </span>
+
+            <span className="min-w-0 flex-1 truncate text-[13px]">{task.title}</span>
+
+            <button
+              onClick={() => store.toggleTask(task.id)}
+              className="shrink-0 rounded-md border border-line px-2 py-1 text-[11px] font-medium text-ink-2 transition-colors hover:border-line-strong hover:bg-panel-2 hover:text-ink"
+            >
+              Done
+            </button>
+            <button
+              onClick={() => store.updateTask(task.id, { dueDate: today })}
+              title="Move it to today and deal with it"
+              className="shrink-0 rounded-md border border-line px-2 py-1 text-[11px] font-medium text-ink-2 transition-colors hover:border-line-strong hover:bg-panel-2 hover:text-ink"
+            >
+              Today
+            </button>
+            <button
+              onClick={() => store.updateTask(task.id, { dueDate: null })}
+              title="Keep the task, drop the deadline"
+              className="shrink-0 rounded-md px-2 py-1 text-[11px] text-ink-3 transition-colors hover:text-ink"
+            >
+              Clear
+            </button>
+          </div>
+        ))}
+      </div>
+    </section>
   );
 }
 

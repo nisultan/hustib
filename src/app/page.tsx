@@ -9,15 +9,17 @@ import {
   countdownLabel,
   daysUntil,
   formatDate,
+  formatTime,
   greeting,
   relativeLabel,
   todayISO,
 } from "@/lib/dates";
 import { UNI_PRIORITIES, UNI_PRIORITY_LABEL } from "@/lib/types";
 import { Panel, SectionTitle, EmptyState, Button, TrendLabel } from "@/components/ui";
-import { Insights } from "@/components/Insights";
 import { NextUp } from "@/components/NextUp";
+import { TodayPanel } from "@/components/TodayPanel";
 import { Productivity } from "@/components/Productivity";
+import { productivity } from "@/lib/productivity";
 import { TaskList, sortTasks } from "@/components/TaskItem";
 import { AddTaskButton } from "@/components/TaskDialog";
 import { openTour } from "@/components/Tour";
@@ -31,12 +33,13 @@ export default function HomePage() {
     [store.tasks],
   );
 
-  // "Today" carries overdue work too — hiding it until the student visits the
-  // tasks page would defeat the point of the dashboard.
-  const todayTasks = useMemo(
-    () => open.filter((t) => t.dueDate != null && t.dueDate <= today),
-    [open, today],
-  );
+  /*
+    Strictly today. Overdue work used to be folded in here so it could not be
+    missed, but it now has its own block above with its own choices — leaving
+    it in both places listed the same task twice and made "3 due today" a
+    number that was not true.
+  */
+  const todayTasks = useMemo(() => open.filter((t) => t.dueDate === today), [open, today]);
 
   const upcoming = useMemo(
     () => sortTasks(open.filter((t) => t.dueDate != null && t.dueDate > today)).slice(0, 5),
@@ -54,9 +57,38 @@ export default function HomePage() {
 
   if (!store.ready) return <div className="h-64" aria-busy="true" />;
 
-  const overdueCount = todayTasks.filter(
-    (t) => t.dueDate != null && daysUntil(t.dueDate) < 0,
-  ).length;
+  const overdueCount = open.filter((t) => t.dueDate != null && daysUntil(t.dueDate) < 0).length;
+
+  /*
+    One line about right now, assembled in order of what would actually change
+    someone's next hour. The same greeting every day is furniture; this is the
+    only part of the header worth reading twice.
+  */
+  const streak = productivity(store).streak;
+  const dueToday = todayTasks.length;
+  const summary = (() => {
+    const bits: string[] = [];
+    if (overdueCount > 0) {
+      bits.push(`${overdueCount} overdue`);
+    } else if (dueToday > 0) {
+      bits.push(`${dueToday} due today`);
+    }
+
+    const next = store.plan
+      .filter((p) => p.date === today && !p.done && p.start != null)
+      .sort((a, b) => (a.start ?? "").localeCompare(b.start ?? ""))[0];
+    if (next) bits.push(`next up ${formatTime(next.start as string)} — ${next.title}`);
+
+    if (streak > 1) bits.push(`${streak}-day streak`);
+
+    if (bits.length === 0) {
+      return open.length === 0
+        ? "Nothing on your plate. Add what's coming up."
+        : "Nothing pressing today.";
+    }
+    // Sentence case, since the first fragment starts the sentence.
+    return bits.join(" · ").replace(/^./, (c) => c.toUpperCase());
+  })();
 
   return (
     <div className="page-in">
@@ -64,20 +96,16 @@ export default function HomePage() {
         <h1 className="text-2xl font-semibold tracking-tight">
           {greeting()}, {store.profile.name} <span aria-hidden>👋</span>
         </h1>
-        <p className="mt-1 text-sm text-ink-2">
-          {open.length === 0
-            ? "Nothing on your plate. Add what's coming up."
-            : "Here's what needs your attention."}
-        </p>
+        <p className="mt-1 text-sm text-ink-2">{summary}</p>
       </header>
 
       {/* Countdowns first. Whatever else is on this page, the thing a student
           opens it to find out is how long they have. */}
       <NextUp />
 
-      {/* What the hub noticed on its own comes next — it is the part that
-          knows this particular student, where the rules below know anyone. */}
-      <Insights limit={2} />
+      <div className="mb-8">
+        <TodayPanel />
+      </div>
 
       <Productivity compact />
 
@@ -115,17 +143,9 @@ export default function HomePage() {
         <div className="grid gap-8">
           <section>
             <SectionTitle
-              right={
-                overdueCount > 0 ? (
-                  <span className="text-xs font-medium text-[var(--urgent)]">
-                    {overdueCount} overdue
-                  </span>
-                ) : (
-                  <span className="text-xs text-ink-3">{todayTasks.length} due</span>
-                )
-              }
+              right={<span className="text-xs text-ink-3">{todayTasks.length} due</span>}
             >
-              Today
+              Due today
             </SectionTitle>
             <TaskList
               tasks={todayTasks}

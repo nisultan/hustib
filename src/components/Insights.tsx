@@ -7,13 +7,18 @@ import { Insight, INSIGHT_LABEL } from "@/lib/types";
 import { SectionTitle } from "./ui";
 
 /**
- * What the hub noticed without being asked.
+ * What the hub noticed, when asked to look.
  *
  * Distinct from the rule-based recommendations beside it, and marked as such:
  * a rule is a guarantee ("this is overdue"), while these are a reading of a
  * particular week and can be wrong. Each one shows what it was drawn from, so
  * the student can check the reasoning rather than take it on faith, and each
  * can be dismissed for good.
+ *
+ * Nothing here runs on its own. Reading a term of journal entries costs real
+ * money, and a paragraph the student did not ask for is not worth paying for
+ * on a timer — especially when the honest answer is often that nothing has
+ * changed. So the button is the feature: it is asked, it looks, it answers.
  */
 
 export function Insights({ limit }: { limit?: number }) {
@@ -22,35 +27,49 @@ export function Insights({ limit }: { limit?: number }) {
 
   const live = store.insights.filter((i) => i.dismissedAt == null);
   const shown = limit ? live.slice(0, limit) : live;
-
-  // On the dashboard an empty section is just clutter, so it stays out of the
-  // way. On the recommendations page — where the student came specifically to
-  // see this — silence reads as breakage, so it explains itself instead.
-  if (shown.length === 0 && !running && !ready && limit != null) return null;
+  const untouched = shown.length === 0 && !running && outcome == null && error == null;
 
   return (
     <section className="mb-8">
       <SectionTitle
         right={
-          <button
-            onClick={() => void reflect()}
-            disabled={running}
-            className="text-xs text-ink-3 transition-colors hover:text-ink disabled:opacity-50"
-          >
-            {running ? "Thinking…" : "Refresh"}
-          </button>
+          shown.length > 0 || outcome != null ? (
+            <button
+              onClick={() => void reflect()}
+              disabled={running}
+              className="text-xs text-ink-3 transition-colors hover:text-ink disabled:opacity-50"
+            >
+              {running ? "Thinking…" : "Look again"}
+            </button>
+          ) : undefined
         }
       >
         Noticed about you
       </SectionTitle>
 
-      {shown.length === 0 ? (
+      {untouched ? (
+        <div className="rounded-xl border border-dashed border-line px-4 py-7 text-center">
+          <p className="text-[13px] leading-relaxed text-ink-2">
+            {ready
+              ? "I can read back through your reflections, grades and habits and tell you what I see."
+              : "Not enough recorded yet. Add your courses and a few tasks, and this starts noticing things."}
+          </p>
+          <button
+            onClick={() => void reflect()}
+            disabled={!ready || running}
+            className="mt-3 rounded-lg bg-accent px-3.5 py-2 text-[13px] font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-40"
+          >
+            Tell me about me
+          </button>
+          <p className="mt-2 text-[11px] text-ink-3">
+            Only when you ask — it does not run on its own.
+          </p>
+        </div>
+      ) : shown.length === 0 ? (
         <p className="rounded-xl border border-dashed border-line px-3.5 py-6 text-center text-sm text-ink-3">
           {running
-            ? "Reading through your week…"
-            : ready
-              ? "Nothing worth flagging right now. Keep logging and this fills in."
-              : "Not enough recorded yet. Add your courses and a few tasks, and this starts noticing things."}
+            ? "Reading back through your week…"
+            : "Nothing new worth flagging since last time."}
         </p>
       ) : (
         <div className="grid gap-2">
