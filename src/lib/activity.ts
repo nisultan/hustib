@@ -148,52 +148,24 @@ const MONTH_SHORT = [
   "Dec",
 ];
 
-/**
- * Recent weeks as a grid of squares, newest column first.
- *
- * Padded to whole weeks at both ends so the columns line up, with the padding
- * left as `null` rather than as zero-activity days: a Thursday that has not
- * happened yet is not a day the student failed to show up for.
- */
-function firstRecorded(data: AppData): string | null {
-  const dates: string[] = [];
-
-  for (const t of data.tasks) if (t.completedAt) dates.push(t.completedAt);
-  for (const p of data.plan) dates.push(p.date);
-  for (const d of data.days) {
-    if (d.weight != null || d.habitsDone.length > 0 || d.reflection.some((b) => b.text.trim()))
-      dates.push(d.date);
-  }
-
-  return dates.length === 0 ? null : dates.reduce((a, b) => (a < b ? a : b));
-}
 
 export function wall(data: AppData, weeks = 53, today = todayISO()): Wall {
   const lastMonday = startOfWeek(today);
 
   /*
-    Never earlier than the first thing the student ever recorded.
+    The full window, always, even when the hub is younger than it.
 
-    Asking for a year when the hub is two months old drew ten months of empty
-    squares — a wall of grey that says nothing except that the app is older
-    than the record, which it is not. The window shrinks to the history that
-    exists and the chart fills the width it has.
+    Shrinking the grid to the history that exists was an attempt to avoid a
+    wall of grey, and it cost more than it saved: a two-week-old hub drew two
+    columns floating in white space, which reads as a broken chart rather than
+    as a new one. The empty squares are the point — they are the room the year
+    has left in it.
   */
-  const requested = addDays(lastMonday, -(weeks - 1) * 7);
-  const earliest = firstRecorded(data);
-  const firstMonday =
-    earliest != null && startOfWeek(earliest) > requested ? startOfWeek(earliest) : requested;
-
-  const span =
-    Math.round(
-      (Date.parse(`${lastMonday}T00:00:00`) - Date.parse(`${firstMonday}T00:00:00`)) /
-        604_800_000,
-    ) + 1;
-
+  const firstMonday = addDays(lastMonday, -(weeks - 1) * 7);
   const days = activityRange(data, firstMonday, addDays(lastMonday, 6));
 
   const columns: (DayActivity | null)[][] = [];
-  for (let w = 0; w < span; w += 1) {
+  for (let w = 0; w < weeks; w += 1) {
     const column = days.slice(w * 7, w * 7 + 7);
     columns.push(column.map((d) => (d.date > today ? null : d)));
   }

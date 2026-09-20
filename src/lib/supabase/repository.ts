@@ -484,7 +484,33 @@ export async function createUniversity(u: Omit<University, "id">): Promise<Unive
     })
     .select()
     .single();
-  if (error) throw error;
+  if (error) {
+    /*
+      A database that has not run migration 009 has no `fields` column, and
+      rejects the whole insert over it. Save the university without its custom
+      fields rather than refusing to save a university at all — the rest of
+      the sheet works fine, and the migration can be run later.
+    */
+    if (!isMissingSchema(error)) throw error;
+    const retry = await client()
+      .from("universities")
+      .insert({
+        name: u.name,
+        country: u.country,
+        flag: u.flag,
+        city: u.city,
+        program: u.program,
+        deadline: u.deadline,
+        status: u.status,
+        priority: u.priority,
+        notes: u.notes,
+        website: u.website,
+      })
+      .select()
+      .single();
+    if (retry.error) throw retry.error;
+    return toUniversity(retry.data as UniversityRow);
+  }
   return toUniversity(data as UniversityRow);
 }
 
@@ -510,7 +536,17 @@ export async function updateUniversity(id: string, patch: Partial<University>): 
   if (Object.keys(row).length === 0) return;
 
   const { error } = await client().from("universities").update(row).eq("id", id);
-  if (error) throw error;
+  if (!error) return;
+  if (!isMissingSchema(error)) throw error;
+
+  // Same as above: drop the column the database does not have and keep the
+  // edit to the ones it does. Silently dropping the whole write would lose a
+  // rename or a status change with no sign that anything went wrong.
+  if (row.fields === undefined) return;
+  delete row.fields;
+  if (Object.keys(row).length === 0) return;
+  const retry = await client().from("universities").update(row).eq("id", id);
+  if (retry.error && !isMissingSchema(retry.error)) throw retry.error;
 }
 
 export async function deleteUniversity(id: string): Promise<void> {

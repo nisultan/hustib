@@ -16,7 +16,7 @@ import { Source, SOURCES, WeekBar } from "@/lib/activity";
  */
 export function ActivityTrend({
   weeks,
-  height = 132,
+  height = 120,
 }: {
   weeks: WeekBar[];
   height?: number;
@@ -25,6 +25,12 @@ export function ActivityTrend({
 
   const peak = Math.max(1, ...weeks.map((w) => w.total));
   const shown = hover ?? weeks[weeks.length - 1];
+
+  // Newest on the left, to match the wall above it. Two charts of the same
+  // data running in opposite directions is worse than either order is wrong:
+  // it puts this week at the far right of one and the far left of the other,
+  // and the eye has to re-learn the axis halfway down the page.
+  const bars = [...weeks].reverse();
 
   return (
     <div>
@@ -45,12 +51,18 @@ export function ActivityTrend({
         <p className="nums text-[10px] text-ink-3">peak {peak}</p>
       </div>
 
+      {/*
+        Bars grow to fill the width, but only up to a point. Uncapped `flex-1`
+        meant a hub with three weeks of history drew three bars a third of the
+        screen wide each — a chart that looks like a stretched flag rather than
+        a trend. Capped, a short history reads as a short history.
+      */}
       <div
         className="flex items-end gap-[3px]"
         style={{ height }}
         onMouseLeave={() => setHover(null)}
       >
-        {weeks.map((week) => (
+        {bars.map((week) => (
           <button
             key={week.start}
             type="button"
@@ -58,7 +70,8 @@ export function ActivityTrend({
             aria-label={`Week of ${week.label}: ${week.total} logged`}
             onMouseEnter={() => setHover(week)}
             onFocus={() => setHover(week)}
-            className="group flex h-full flex-1 flex-col justify-end rounded-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
+            style={{ maxWidth: 22 }}
+            className="group flex h-full min-w-[4px] flex-1 flex-col justify-end rounded-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
           >
             {/*
               A floor of two pixels on any non-empty week. Rounding a quiet week

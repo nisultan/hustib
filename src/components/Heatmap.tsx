@@ -90,7 +90,16 @@ export function Heatmap({
                 <div key={w} className="flex flex-col" style={{ gap: GAP }}>
                   {column.map((day, row) =>
                     day == null ? (
-                      <span key={row} style={{ width: CELL, height: CELL }} />
+                      /* The rest of this week. Drawn as an outline rather than
+                         left blank so the leftmost column is a column and not
+                         a ragged edge — and so the days still to come read as
+                         waiting rather than as missing. */
+                      <span
+                        key={row}
+                        aria-hidden
+                        style={{ width: CELL, height: CELL }}
+                        className="rounded-[2px] border border-dashed border-line"
+                      />
                     ) : (
                       <Square key={day.date} day={day} onHover={setHover} onPick={onPick} />
                     ),
@@ -122,7 +131,7 @@ export function Heatmap({
             </>
           ) : (
             <span className="text-ink-3">
-              Hover a square for the day it stands for. Newest week on the left.
+              Hover a square for the day it stands for. Newest week on the left; dashed squares are still to come.
             </span>
           )}
         </p>
