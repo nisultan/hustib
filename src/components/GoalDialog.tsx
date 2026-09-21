@@ -12,6 +12,9 @@ import {
   PRIORITY_LABEL,
 } from "@/lib/types";
 import { prepareImage } from "@/lib/image";
+import { GoalTracker } from "@/lib/types";
+import { describe as describeTracker, sourceLabel } from "@/lib/goals/tracker";
+import { suggestTracker } from "@/lib/goals/suggest";
 import { COURSE_COLORS, courseColor } from "@/lib/appearance";
 import { Button, ConfirmDeleteButton, Field, Input, Modal, Select, Textarea } from "./ui";
 import { DateField } from "./DateField";
@@ -41,8 +44,19 @@ export function GoalDialog({
   const [priority, setPriority] = useState<Priority>("medium");
   const [status, setStatus] = useState<GoalStatus>("active");
   const [categoryId, setCategoryId] = useState("");
-  const [tracking, setTracking] = useState(false);
+  /*
+    Three ways a goal can carry a number, not two.
+
+    "off" is still the default — most goals are not the kind of thing you can
+    put a percentage on, and a bar sitting at 0% on one of those reads as
+    failure. The new one is "auto": the hub works the number out from what it
+    already records, which is the only version that stays true untouched.
+  */
+  const [mode, setMode] = useState<"off" | "manual" | "auto">("off");
   const [progress, setProgress] = useState(0);
+  const [tracker, setTracker] = useState<GoalTracker | null>(null);
+  const [linking, setLinking] = useState(false);
+  const [linkError, setLinkError] = useState<string | null>(null);
 
   /*
     Seeded when the dialog opens rather than in an effect, so the fields are
@@ -63,9 +77,45 @@ export function GoalDialog({
     setPriority(goal?.priority ?? "medium");
     setStatus(goal?.status ?? "active");
     setCategoryId(goal?.categoryId ?? "");
-    setTracking(goal?.progress != null);
+    setMode(goal?.tracker ? "auto" : goal?.progress != null ? "manual" : "off");
     setProgress(goal?.progress ?? 0);
+    setTracker(goal?.tracker ?? null);
+    setLinkError(null);
+    setLinking(false);
   }
+
+  /*
+    The one AI call a goal ever costs, and it is on a button.
+
+    Running it on save would spend tokens on every goal whether or not it can
+    be measured, including the ones typed and then deleted. Asking costs a tap
+    and makes the spend legible, which is the trade worth making.
+  */
+  const link = async () => {
+    const clean = title.trim();
+    if (clean === "") return;
+    setLinking(true);
+    setLinkError(null);
+    try {
+      const { tracker: found, declined } = await suggestTracker(
+        { title: clean, note, deadline: deadline || null },
+        store,
+      );
+      if (declined || found == null) {
+        setLinkError(
+          "Nothing in the hub measures this one honestly. Set the bar by hand, or leave it off.",
+        );
+        setMode("manual");
+        return;
+      }
+      setTracker(found);
+      setMode("auto");
+    } catch (e) {
+      setLinkError(e instanceof Error ? e.message : "Could not read that goal.");
+    } finally {
+      setLinking(false);
+    }
+  };
 
   const save = () => {
     const clean = title.trim();
@@ -78,7 +128,11 @@ export function GoalDialog({
       deadline: deadline || null,
       priority,
       status,
-      progress: tracking ? Math.min(100, Math.max(0, progress)) : null,
+      // A tracked goal keeps no hand-set number. Leaving one behind would sit
+      // in the data contradicting the computed bar, and whichever the next
+      // reader reached for would be wrong half the time.
+      progress: mode === "manual" ? Math.min(100, Math.max(0, progress)) : null,
+      tracker: mode === "auto" ? tracker : null,
       categoryId: categoryId || null,
     };
 
@@ -157,27 +211,41 @@ export function GoalDialog({
 
         <Field
           label="Progress"
-          hint="Off by default — plenty of goals are not the kind of thing you can put a number on."
+          hint="Plenty of goals cannot honestly be put on a scale. Off is a fine answer."
         >
-          <div className="flex items-center gap-3">
-            <button
-              type="button"
-              role="switch"
-              aria-checked={tracking}
-              onClick={() => setTracking((v) => !v)}
-              className={`relative h-5 w-9 shrink-0 rounded-full transition-colors ${
-                tracking ? "bg-accent" : "bg-[var(--border-strong)]"
-              }`}
-            >
-              <span
-                className={`absolute top-0.5 size-4 rounded-full bg-white transition-[left] ${
-                  tracking ? "left-[18px]" : "left-0.5"
-                }`}
-              />
-            </button>
+          <div className="grid gap-2.5">
+            <div className="flex gap-1">
+              {(
+                [
+                  ["off", "Off"],
+                  ["manual", "By hand"],
+                  ["auto", "From my data"],
+                ] as const
+              ).map(([value, label]) => (
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() => {
+                    setMode(value);
+                    setLinkError(null);
+                    // Choosing "from my data" with no spec yet is the whole
+                    // gesture; it should not then require a second button.
+                    if (value === "auto" && tracker == null && title.trim() !== "") void link();
+                  }}
+                  aria-pressed={mode === value}
+                  className={`flex-1 rounded-lg border px-2 py-1.5 text-[12px] font-medium transition-colors ${
+                    mode === value
+                      ? "border-accent bg-accent-soft text-accent-text"
+                      : "border-line text-ink-2 hover:border-line-strong hover:text-ink"
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
 
-            {tracking && (
-              <>
+            {mode === "manual" && (
+              <div className="flex items-center gap-3">
                 <input
                   type="range"
                   min={0}
@@ -190,7 +258,47 @@ export function GoalDialog({
                 <span className="nums w-9 shrink-0 text-right text-[13px] text-ink-2">
                   {progress}%
                 </span>
-              </>
+              </div>
+            )}
+
+            {mode === "auto" && (
+              <div className="rounded-lg border border-line bg-panel-2 p-2.5">
+                {linking ? (
+                  <p className="text-[12px] text-ink-2">Reading the goal…</p>
+                ) : tracker ? (
+                  <>
+                    <p className="text-[12px] leading-relaxed text-ink">
+                      {tracker.basis || `Counts ${sourceLabel(tracker.source)}.`}
+                    </p>
+                    <p className="mt-1 text-[11px] text-ink-3">
+                      {describeTracker(tracker, store)}
+                    </p>
+                    <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1">
+                      <Button size="sm" onClick={() => void link()}>
+                        Read it again
+                      </Button>
+                      <span className="text-[10px] text-ink-3">
+                        Counted from your own data after this — the AI does not run again.
+                      </span>
+                    </div>
+                  </>
+                ) : (
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Button size="sm" onClick={() => void link()} disabled={title.trim() === ""}>
+                      Work it out
+                    </Button>
+                    <span className="text-[11px] text-ink-3">
+                      {title.trim() === "" ? "Name the goal first." : "One read, then it is yours."}
+                    </span>
+                  </div>
+                )}
+
+                {linkError && (
+                  <p className="mt-2 text-[11px] leading-relaxed text-[var(--urgent)]">
+                    {linkError}
+                  </p>
+                )}
+              </div>
             )}
           </div>
         </Field>

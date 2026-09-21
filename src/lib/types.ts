@@ -257,6 +257,31 @@ export const GOAL_STATUS_LABEL: Record<GoalStatus, string> = {
  * The deadline is optional on purpose. Plenty of what matters has no date, and
  * inventing one to satisfy a form turns an ambition into an overdue item.
  */
+export type GoalSource = "habits" | "tasks" | "plan" | "journal" | "weight";
+
+export interface GoalTracker {
+  source: GoalSource;
+  /** Habits that count. Empty means every unarchived habit. */
+  habitIds: ID[];
+  /** Courses whose tasks count. Empty means any course. */
+  courseIds: ID[];
+  /** Categories that count, across tasks and plan blocks. Empty means any. */
+  categoryIds: ID[];
+  /**
+   * Title words that also let something count, as case-insensitive substrings.
+   * The escape hatch for work that was never filed under anything — "IA",
+   * "essay", "5km" — and the reason a goal can be measured on day one, before
+   * the student has made a category for it.
+   */
+  keywords: string[];
+  /** How many. For weight, the weight being aimed at. */
+  target: number;
+  /** Rolling window in days. 0 counts everything since the goal was set. */
+  windowDays: number;
+  /** The model's own sentence, shown under the bar so the number is never a mystery. */
+  basis: string;
+}
+
 export interface Goal {
   id: ID;
   title: string;
@@ -270,6 +295,13 @@ export interface Goal {
   status: GoalStatus;
   /** 0-100, set by hand. Null when the student is not tracking it that way. */
   progress: number | null;
+  /**
+   * How the hub measures this goal on its own, or null for a hand-set bar.
+   *
+   * Written once when the goal is created and evaluated locally from then on —
+   * see `lib/goals/tracker.ts`. When it is set, `progress` is ignored.
+   */
+  tracker: GoalTracker | null;
   categoryId: ID | null;
   createdAt: string;
   achievedAt: string | null;

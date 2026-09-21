@@ -5,6 +5,7 @@ import { useStore } from "@/lib/store";
 import { Goal, GOAL_STATUS_LABEL, GoalStatus, PRIORITY_LABEL } from "@/lib/types";
 import { countdownLabel, daysUntil, formatDate } from "@/lib/dates";
 import { courseColor } from "@/lib/appearance";
+import { progressOf, TrackedProgress } from "@/lib/goals/tracker";
 import { PageHeader, Panel, SectionTitle } from "@/components/ui";
 import { GoalDialog } from "@/components/GoalDialog";
 import { Celebration } from "@/components/Celebration";
@@ -152,6 +153,7 @@ function Card({
     };
   }, [armed]);
   const category = store.categories.find((c) => c.id === goal.categoryId);
+  const { value: progress, tracked } = progressOf(goal, store);
   const due = goal.deadline ? daysUntil(goal.deadline) : null;
   const overdue = due != null && due < 0 && goal.status === "active";
 
@@ -190,7 +192,7 @@ function Card({
             <p className="line-clamp-3 text-[13px] leading-relaxed text-ink-2">{goal.note}</p>
           )}
 
-          {goal.progress != null && <Progress value={goal.progress} />}
+          {progress != null && <Progress value={progress} tracked={tracked} />}
 
           <div className="mt-auto flex flex-wrap items-center gap-x-2.5 gap-y-1.5 pt-0.5">
             <span
@@ -290,17 +292,45 @@ function Card({
   );
 }
 
-/** A bar, and the number beside it. Neither alone is as quick to read. */
-function Progress({ value }: { value: number }) {
+/**
+ * A bar, the number beside it, and — when the hub worked the number out — what
+ * it counted to get there.
+ *
+ * A computed bar has to show its working or it is just a more confident version
+ * of the one someone dragged. The count under it is the difference between
+ * "62%" and "18 of 28 habit ticks, last 28 days", and only the second one tells
+ * you what to do this evening.
+ */
+function Progress({ value, tracked }: { value: number; tracked: TrackedProgress | null }) {
   return (
-    <div className="flex items-center gap-2.5">
-      <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-panel-2">
-        <div
-          className="h-full rounded-full bg-accent transition-[width] duration-500"
-          style={{ width: `${Math.min(100, Math.max(0, value))}%` }}
-        />
+    <div className="grid gap-1.5">
+      <div className="flex items-center gap-2.5">
+        <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-panel-2">
+          <div
+            className="h-full rounded-full bg-accent transition-[width] duration-500"
+            style={{ width: `${Math.min(100, Math.max(0, value))}%` }}
+          />
+        </div>
+        <span className="nums w-8 shrink-0 text-right text-[11px] text-ink-3">{value}%</span>
       </div>
-      <span className="nums w-8 shrink-0 text-right text-[11px] text-ink-3">{value}%</span>
+
+      {tracked && (
+        <p className="nums text-[10px] leading-relaxed text-ink-3">
+          {tracked.measured ? (
+            tracked.source === "weight" ? (
+              <>
+                {tracked.observed} kg → {tracked.target} kg · {tracked.window}
+              </>
+            ) : (
+              <>
+                {tracked.observed} of {tracked.target} {tracked.unit} · {tracked.window}
+              </>
+            )
+          ) : (
+            "Nothing recorded to measure this against yet."
+          )}
+        </p>
+      )}
     </div>
   );
 }

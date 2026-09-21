@@ -1,4 +1,5 @@
 import { AppData, Block, Day, PRIORITY_RANK, Task } from "@/lib/types";
+import { progressOf } from "@/lib/goals/tracker";
 import { courseAverage, overallAverage, trend } from "@/lib/grades";
 import { addDays, daysUntil, todayISO } from "@/lib/dates";
 import { productivity } from "@/lib/productivity";
@@ -184,7 +185,24 @@ function goals(data: AppData, today: string): string {
       if (g.status === "achieved")
         bits.push(`ACHIEVED${g.achievedAt ? ` ${g.achievedAt}` : ""}`);
       if (g.deadline) bits.push(`deadline ${g.deadline} (in ${daysUntil(g.deadline)}d)`);
-      if (g.progress != null) bits.push(`${g.progress}% done`);
+      /*
+        A tracked goal reports what it was counted from, not just the
+        percentage. "62% done" tells the assistant nothing it can act on;
+        "62% — 18 of 28 habit ticks in the last 28 days" lets it say which
+        evening is the one that moved the bar, which is the point of having
+        connected the two at all.
+      */
+      const { value, tracked } = progressOf(g, data, today);
+      if (value != null) {
+        bits.push(
+          tracked?.measured
+            ? tracked.source === "weight"
+              ? `${value}% (${tracked.observed}kg towards ${tracked.target}kg)`
+              : `${value}% (${tracked.observed}/${tracked.target} ${tracked.unit}, ${tracked.window})`
+            : `${value}% done`,
+        );
+      }
+      if (tracked && !tracked.measured) bits.push("tracked, but nothing recorded yet");
       const why = g.note.trim() ? ` — ${truncate(g.note, 200)}` : "";
       return `- "${g.title}" (id ${g.id}) · ${bits.join(" · ")}${why}`;
     })

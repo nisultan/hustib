@@ -166,6 +166,8 @@ export type GoalRow = {
   priority: TaskPriority;
   status: string;
   progress: number | null;
+  /** The measurement spec, as written by the goal-link pass. jsonb. */
+  tracker: unknown | null;
   category_id: string | null;
   position: number;
   created_at: string;

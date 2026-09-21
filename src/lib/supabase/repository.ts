@@ -8,6 +8,7 @@ import {
   Course,
   Day,
   Goal,
+  GoalTracker,
   GoalStatus,
   ImportantDay,
   ImportantKind,
@@ -609,14 +610,42 @@ export async function createGoal(g: Omit<Goal, "id">): Promise<Goal | null> {
       priority: g.priority,
       status: g.status,
       progress: g.progress,
+      tracker: g.tracker,
       category_id: ref(g.categoryId),
       position: g.position,
     })
     .select()
     .single();
   if (error) {
-    if (isMissingSchema(error)) return null;
-    throw error;
+    if (!isMissingSchema(error)) throw error;
+
+    /*
+      A database without migration 010 has no `tracker` column and refuses the
+      whole insert over it. The goal itself matters more than the measurement
+      spec, so it goes in without one and falls back to the hand-set bar. The
+      goals table itself may also be missing, in which case the retry fails the
+      same way and the caller gets null.
+    */
+    const retry = await client()
+      .from("goals")
+      .insert({
+        title: g.title,
+        note: g.note,
+        image: g.image,
+        deadline: g.deadline,
+        priority: g.priority,
+        status: g.status,
+        progress: g.progress,
+        category_id: ref(g.categoryId),
+        position: g.position,
+      })
+      .select()
+      .single();
+    if (retry.error) {
+      if (isMissingSchema(retry.error)) return null;
+      throw retry.error;
+    }
+    return toGoal(retry.data as GoalRow);
   }
   return toGoal(data as GoalRow);
 }
@@ -631,13 +660,23 @@ export async function updateGoal(id: string, patch: Partial<Goal>): Promise<void
   if (patch.priority !== undefined) row.priority = patch.priority;
   if (patch.status !== undefined) row.status = patch.status;
   if (patch.progress !== undefined) row.progress = patch.progress;
+  if (patch.tracker !== undefined) row.tracker = patch.tracker;
   if (patch.categoryId !== undefined) row.category_id = ref(patch.categoryId);
   if (patch.position !== undefined) row.position = patch.position;
   if (patch.achievedAt !== undefined) row.achieved_at = patch.achievedAt;
   if (Object.keys(row).length === 0) return;
 
   const { error } = await client().from("goals").update(row).eq("id", id);
-  if (error && !isMissingSchema(error)) throw error;
+  if (!error) return;
+  if (!isMissingSchema(error)) throw error;
+
+  // Same as the insert: drop the column this database has not got and save the
+  // rest, rather than losing a rename because the spec had nowhere to go.
+  if (row.tracker === undefined) return;
+  delete row.tracker;
+  if (Object.keys(row).length === 0) return;
+  const retry = await client().from("goals").update(row).eq("id", id);
+  if (retry.error && !isMissingSchema(retry.error)) throw retry.error;
 }
 
 export async function deleteGoal(id: string): Promise<void> {
@@ -1043,10 +1082,42 @@ function toGoal(row: GoalRow): Goal {
     priority: row.priority ?? "medium",
     status: (GOAL_STATUSES.includes(row.status) ? row.status : "active") as GoalStatus,
     progress: row.progress,
+    tracker: toTracker(row.tracker),
     categoryId: row.category_id,
     createdAt: row.created_at.slice(0, 10),
     achievedAt: row.achieved_at ? row.achieved_at.slice(0, 10) : null,
     position: Number(row.position) || 0,
+  };
+}
+
+const GOAL_SOURCES = ["habits", "tasks", "plan", "journal", "weight"];
+
+/**
+ * The measurement spec, checked on the way in.
+ *
+ * jsonb holds whatever was put in it, and this column is written by a model.
+ * A spec with a missing array or a string where a number belongs would throw
+ * inside the progress bar on every render of the goals page — so anything that
+ * does not typecheck comes back as null, and the goal falls back to its slider.
+ */
+function toTracker(raw: unknown): GoalTracker | null {
+  if (raw == null || typeof raw !== "object") return null;
+  const t = raw as Record<string, unknown>;
+  if (typeof t.source !== "string" || !GOAL_SOURCES.includes(t.source)) return null;
+  if (typeof t.target !== "number" || !Number.isFinite(t.target)) return null;
+
+  const list = (v: unknown): string[] =>
+    Array.isArray(v) ? v.filter((x): x is string => typeof x === "string") : [];
+
+  return {
+    source: t.source as GoalTracker["source"],
+    habitIds: list(t.habitIds),
+    courseIds: list(t.courseIds),
+    categoryIds: list(t.categoryIds),
+    keywords: list(t.keywords),
+    target: t.target,
+    windowDays: typeof t.windowDays === "number" && Number.isFinite(t.windowDays) ? t.windowDays : 0,
+    basis: typeof t.basis === "string" ? t.basis : "",
   };
 }
 
