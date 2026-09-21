@@ -274,6 +274,39 @@ summary {
 }
 
 /*
+ * Inputs whose focus ring is drawn by the row around them instead.
+ *
+ * A bare input stretched across a panel drew the ring as a full-width
+ * rectangle floating inside the panel, attached to nothing the eye reads as a
+ * field. Tailwind's `outline-none` cannot turn it off: utilities live in a
+ * layer and unlayered rules beat layered ones regardless of specificity, so
+ * the override has to be unlayered too. The container takes over with
+ * `focus-within`, so focus stays visible.
+ */
+.bare:focus,
+.bare:focus-visible {
+  outline: none;
+}
+
+/*
+ * The row that owns that ring.
+ *
+ * Written here rather than as `focus-within:shadow-[...]` because Tailwind
+ * silently drops an arbitrary value containing commas — the class lands in the
+ * markup, `:focus-within` matches, and no rule exists to apply. Nothing warns
+ * you; the field simply never lights up.
+ */
+.add-row {
+  transition:
+    border-color 150ms var(--ease-out),
+    box-shadow 150ms var(--ease-out);
+}
+.add-row:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent);
+}
+
+/*
  * In @layer, because Tailwind v4 puts its utilities in one. Unlayered rules
  * beat layered ones whatever their specificity, so leaving this bare meant
  * `color: inherit` quietly won over every `text-*` utility — which is how
@@ -509,6 +542,30 @@ summary {
 .pop {
   animation: pop 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
   animation-delay: var(--d, 0ms);
+}
+
+/*
+ * Confetti, for exactly one event: a goal marked achieved.
+ *
+ * Each piece carries its own direction in --dx/--dy and its own spin, so one
+ * keyframe serves the whole burst and the randomness lives in the markup
+ * rather than in sixty generated rules. The extra 45vh on the way out is
+ * gravity: paper that flies out in a perfect ring and stops looks like a
+ * loading spinner, and paper that falls looks like paper.
+ */
+@keyframes confetti-burst {
+  0% {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) rotate(0deg) scale(0.5);
+  }
+  55% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translate3d(var(--dx, 0), calc(var(--dy, 0) + 45vh), 0)
+      rotate(var(--spin, 360deg)) scale(1);
+  }
 }
 
 /* Line chart drawing itself left to right. Pair with pathLength="1". */

@@ -1,12 +1,13 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useStore } from "@/lib/store";
 import { Goal, GOAL_STATUS_LABEL, GoalStatus, PRIORITY_LABEL } from "@/lib/types";
 import { countdownLabel, daysUntil, formatDate } from "@/lib/dates";
 import { courseColor } from "@/lib/appearance";
 import { PageHeader, Panel, SectionTitle } from "@/components/ui";
 import { GoalDialog } from "@/components/GoalDialog";
+import { Celebration } from "@/components/Celebration";
 
 /**
  * What the student is actually aiming at.
@@ -23,6 +24,7 @@ import { GoalDialog } from "@/components/GoalDialog";
 export default function GoalsPage() {
   const store = useStore();
   const [editing, setEditing] = useState<Goal | "new" | null>(null);
+  const [celebrating, setCelebrating] = useState<string | null>(null);
 
   const { active, achieved, paused } = useMemo(() => {
     const sorted = [...store.goals].sort((a, b) => a.position - b.position);
@@ -54,12 +56,12 @@ export default function GoalsPage() {
         <Empty onAdd={() => setEditing("new")} />
       ) : (
         <>
-          <Grid goals={active} onOpen={setEditing} />
+          <Grid goals={active} onOpen={setEditing} onAchieved={setCelebrating} />
 
           {paused.length > 0 && (
             <section className="mt-10">
               <SectionTitle>On hold</SectionTitle>
-              <Grid goals={paused} onOpen={setEditing} muted />
+              <Grid goals={paused} onOpen={setEditing} onAchieved={setCelebrating} muted />
             </section>
           )}
 
@@ -70,7 +72,7 @@ export default function GoalsPage() {
               >
                 Achieved
               </SectionTitle>
-              <Grid goals={achieved} onOpen={setEditing} muted />
+              <Grid goals={achieved} onOpen={setEditing} onAchieved={setCelebrating} muted />
             </section>
           )}
         </>
@@ -81,6 +83,10 @@ export default function GoalsPage() {
         goal={editing === "new" ? undefined : (editing ?? undefined)}
         onClose={() => setEditing(null)}
       />
+
+      {celebrating != null && (
+        <Celebration title={celebrating} onDone={() => setCelebrating(null)} />
+      )}
     </div>
   );
 }
@@ -88,10 +94,12 @@ export default function GoalsPage() {
 function Grid({
   goals,
   onOpen,
+  onAchieved,
   muted = false,
 }: {
   goals: Goal[];
   onOpen: (goal: Goal) => void;
+  onAchieved: (title: string) => void;
   muted?: boolean;
 }) {
   if (goals.length === 0) return null;
@@ -99,14 +107,50 @@ function Grid({
   return (
     <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
       {goals.map((goal) => (
-        <Card key={goal.id} goal={goal} onOpen={() => onOpen(goal)} muted={muted} />
+        <Card
+          key={goal.id}
+          goal={goal}
+          onOpen={() => onOpen(goal)}
+          onAchieved={onAchieved}
+          muted={muted}
+        />
       ))}
     </div>
   );
 }
 
-function Card({ goal, onOpen, muted }: { goal: Goal; onOpen: () => void; muted: boolean }) {
+function Card({
+  goal,
+  onOpen,
+  onAchieved,
+  muted,
+}: {
+  goal: Goal;
+  onOpen: () => void;
+  onAchieved: (title: string) => void;
+  muted: boolean;
+}) {
   const store = useStore();
+
+  /*
+    Marking something achieved asks once first.
+
+    The three status buttons sit a few pixels apart on a card you also click to
+    open, and "achieved" is the one of the three that is a claim about the
+    world rather than a filing decision. It is undoable — but undoing it after
+    a mis-tap means watching a celebration for something you have not done,
+    which is worse than the extra click.
+  */
+  const [armed, setArmed] = useState(false);
+  const disarm = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    if (!armed) return;
+    disarm.current = setTimeout(() => setArmed(false), 4000);
+    return () => {
+      if (disarm.current) clearTimeout(disarm.current);
+    };
+  }, [armed]);
   const category = store.categories.find((c) => c.id === goal.categoryId);
   const due = goal.deadline ? daysUntil(goal.deadline) : null;
   const overdue = due != null && due < 0 && goal.status === "active";
@@ -195,20 +239,52 @@ function Card({ goal, onOpen, muted }: { goal: Goal; onOpen: () => void; muted: 
           one thing you come to this page to do and it should not need a
           dialog. */}
       <div className="flex items-center gap-1 border-t border-line px-2 py-1.5">
-        {(["active", "achieved", "paused"] as GoalStatus[]).map((status) => (
-          <button
-            key={status}
-            onClick={() => store.setGoalStatus(goal.id, status)}
-            aria-pressed={goal.status === status}
-            className={`rounded-md px-2 py-1 text-[11px] font-medium transition-colors ${
-              goal.status === status
-                ? "bg-accent-soft text-accent-text"
-                : "text-ink-3 hover:bg-panel-2 hover:text-ink"
-            }`}
-          >
-            {GOAL_STATUS_LABEL[status]}
-          </button>
-        ))}
+        {armed ? (
+          <>
+            <span className="px-1 text-[11px] text-ink-2">Really done?</span>
+            <button
+              onClick={() => {
+                setArmed(false);
+                store.setGoalStatus(goal.id, "achieved");
+                onAchieved(goal.title);
+              }}
+              autoFocus
+              className="ml-auto rounded-md px-2 py-1 text-[11px] font-medium text-white"
+              style={{ background: "var(--up)" }}
+            >
+              Yes, achieved
+            </button>
+            <button
+              onClick={() => setArmed(false)}
+              className="rounded-md px-2 py-1 text-[11px] font-medium text-ink-3 hover:bg-panel-2 hover:text-ink"
+            >
+              Not yet
+            </button>
+          </>
+        ) : (
+          (["active", "achieved", "paused"] as GoalStatus[]).map((status) => (
+            <button
+              key={status}
+              onClick={() => {
+                // Already achieved: the button is just the current state, and
+                // re-confirming it would replay the confetti for nothing.
+                if (status === "achieved" && goal.status !== "achieved") {
+                  setArmed(true);
+                  return;
+                }
+                store.setGoalStatus(goal.id, status);
+              }}
+              aria-pressed={goal.status === status}
+              className={`rounded-md px-2 py-1 text-[11px] font-medium transition-colors ${
+                goal.status === status
+                  ? "bg-accent-soft text-accent-text"
+                  : "text-ink-3 hover:bg-panel-2 hover:text-ink"
+              }`}
+            >
+              {GOAL_STATUS_LABEL[status]}
+            </button>
+          ))
+        )}
       </div>
     </article>
   );

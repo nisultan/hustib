@@ -807,6 +807,7 @@ function Loose({ date, items }: { date: string; items: PlanItem[] }) {
   const [draft, setDraft] = useState("");
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
+  const [priority, setPriority] = useState<Priority>("medium");
   const [over, setOver] = useState(false);
 
   const add = () => {
@@ -825,18 +826,31 @@ function Loose({ date, items }: { date: string; items: PlanItem[] }) {
       start,
       minutes: span && span > 0 ? span : start ? 45 : 30,
       done: false,
-      priority: "medium",
+      priority,
       categoryId: null,
       taskId: null,
     });
     setDraft("");
     setFrom("");
     setTo("");
+    setPriority("medium");
   };
+
+  const left = items.filter((i) => !i.done).length;
 
   return (
     <section>
-      <SectionTitle>Also today</SectionTitle>
+      <SectionTitle
+        right={
+          items.length > 0 ? (
+            <span className="nums text-xs text-ink-3">
+              {left === 0 ? "all done" : `${left} left`}
+            </span>
+          ) : undefined
+        }
+      >
+        Also today
+      </SectionTitle>
       <div
         onDragOver={(e: React.DragEvent) => {
           e.preventDefault();
@@ -872,21 +886,46 @@ function Loose({ date, items }: { date: string; items: PlanItem[] }) {
           over ? "border-accent/50 bg-accent-soft/40" : "border-line"
         }`}
       >
-        {items.map((item) => (
-          <div key={item.id} className="px-2 py-1.5">
-            <Item item={item} />
-          </div>
-        ))}
-        <div className="flex flex-col gap-2 px-3.5 py-2.5">
-          <div className="flex items-center gap-2">
+        {items.length === 0 ? (
+          /* Not a blank panel. An empty box with a text field in it does not
+             say what the box is for, and this one is for the half of a day
+             that has no hour — errands, calls, the thing you keep forgetting. */
+          <p className="px-3.5 pb-1 pt-3 text-[12px] leading-relaxed text-ink-3">
+            Anything meant for today that has no particular hour. Drag a block
+            here to strip its time.
+          </p>
+        ) : (
+          items.map((item) => (
+            <div key={item.id} className="px-2 py-1.5">
+              <Item item={item} />
+            </div>
+          ))
+        )}
+
+        {/*
+          The row lights up as a whole rather than the input alone. The global
+          focus ring is unlayered and beats Tailwind's `outline-none`, so a
+          bare input drew a full-width accent rectangle across the inside of
+          the panel — the ring belongs on the thing that looks like a field.
+        */}
+        <div className="flex flex-col gap-2 px-2 py-2">
+          <div className="add-row flex items-center gap-1.5 rounded-lg border border-line bg-panel-2 px-2 py-1 hover:border-line-strong">
+            <span aria-hidden className="shrink-0 text-[15px] leading-none text-ink-3">
+              +
+            </span>
             <input
               value={draft}
               onChange={(e) => setDraft(e.target.value)}
               onKeyDown={(e) => {
                 if (e.key === "Enter") add();
+                if (e.key === "Escape") {
+                  setDraft("");
+                  setFrom("");
+                  setTo("");
+                }
               }}
               placeholder="Add something for today…"
-              className="min-w-0 flex-1 border-0 bg-transparent text-[13px] outline-none placeholder:text-ink-3"
+              className="bare min-w-0 flex-1 border-0 bg-transparent py-1 text-[13px] placeholder:text-ink-3"
             />
             <Button size="sm" onClick={add} disabled={draft.trim() === ""}>
               Add
@@ -896,7 +935,7 @@ function Loose({ date, items }: { date: string; items: PlanItem[] }) {
           {/* Only once there is something to add: two empty time fields above
               an empty box is a form, and this should feel like typing a line. */}
           {draft.trim() !== "" && (
-            <div className="flex items-center gap-1.5">
+            <div className="flex flex-wrap items-center gap-1.5 px-0.5">
               <div className="w-[86px]">
                 <TimeField value={from} onChange={setFrom} />
               </div>
@@ -906,7 +945,28 @@ function Loose({ date, items }: { date: string; items: PlanItem[] }) {
               <div className="w-[86px]">
                 <TimeField value={to} onChange={setTo} />
               </div>
-              <span className="text-[10px] text-ink-3">both optional</span>
+
+              {/* Everything typed here used to land on medium, so the one
+                  urgent thing in the list looked exactly like the shopping. */}
+              <div className="ml-1 flex items-center gap-0.5">
+                {PRIORITIES.map((p) => (
+                  <button
+                    key={p}
+                    type="button"
+                    onClick={() => setPriority(p)}
+                    aria-pressed={priority === p}
+                    title={PRIORITY_LABEL[p]}
+                    aria-label={PRIORITY_LABEL[p]}
+                    className={`rounded-md p-1 transition-colors ${
+                      priority === p ? "bg-panel-2 ring-1 ring-line-strong" : "opacity-45 hover:opacity-100"
+                    }`}
+                  >
+                    <PriorityDot priority={p} />
+                  </button>
+                ))}
+              </div>
+
+              <span className="text-[10px] text-ink-3">times optional · Enter to add</span>
             </div>
           )}
         </div>

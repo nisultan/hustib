@@ -170,17 +170,6 @@ export function wall(data: AppData, weeks = 53, today = todayISO()): Wall {
     columns.push(column.map((d) => (d.date > today ? null : d)));
   }
 
-  /*
-    Newest week first, so the left edge is now.
-
-    Against the convention every contribution graph follows, and deliberately:
-    this one is read to answer "how am I doing lately", and putting the answer
-    at the far right of a scrolling strip means finding it before reading it.
-    The oldest week trails off to the right, where it can be scrolled to by
-    anyone who wants it.
-  */
-  columns.reverse();
-
   // A label goes above the column holding that month's first Monday, and only
   // when there is room for it — two labels in adjacent columns overlap into
   // something unreadable.

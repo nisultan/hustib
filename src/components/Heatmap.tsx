@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { DayActivity, SOURCES } from "@/lib/activity";
 import { formatDate } from "@/lib/dates";
 
@@ -13,10 +13,14 @@ import { formatDate } from "@/lib/dates";
  * calendar shows you this month and cannot show you that you have been fading
  * since October.
  *
- * Time runs right to left here: the newest week is the leftmost column. That
- * inverts every contribution graph ever drawn, and it is the ask — this one is
- * read for "how am I doing lately", and the usual order buries that answer at
- * the far end of a strip you have to scroll first.
+ * Time runs left to right, oldest to newest, the way every contribution graph
+ * does. It was briefly reversed to put this week at the near edge; reading it
+ * that way turns out to cost more than the scroll it saves, because every
+ * instinct about a timeline says later is rightwards.
+ *
+ * The rest of the year is drawn rather than left off — dashed outlines for the
+ * days that have not happened, filling in as they do. An empty grid that grows
+ * a square a day is a different object from one that starts full of grey.
  *
  * Shades come from the accent at rising opacity rather than from five hand
  * picked colours, so the whole thing re-themes for free and stays legible on
@@ -42,14 +46,29 @@ export function Heatmap({
 }) {
   const [hover, setHover] = useState<DayActivity | null>(null);
 
+  /*
+    Opens at the far end, where today is.
+
+    A year of squares is wider than any phone and most sidebars, so the default
+    scroll position decides what the chart is about. Left means last October,
+    which nobody opened this page to see. Re-run when the number of columns
+    changes — switching the range from a year to three months rebuilds the grid
+    and would otherwise leave the scroll pinned wherever it was.
+  */
+  const strip = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = strip.current;
+    if (el) el.scrollLeft = el.scrollWidth;
+  }, [weeks.length]);
+
   return (
     <div>
       {/*
         Scrolled rather than squeezed. Fifty-three columns will not fit a phone
         at a legible square size, and the alternative — shrinking the squares
         until they do — produces a grey smear that answers no question at all.
-        The newest week is the first column now, so it starts where any strip
-        starts and the recent weeks are simply there.
+        It opens scrolled to the right, because the end of the strip is the
+        part anyone is here to read.
       */}
       <div className="flex gap-2">
         {/* Outside the scroller on purpose. Inside it, the labels slide off the
@@ -71,7 +90,7 @@ export function Heatmap({
           ))}
         </div>
 
-        <div className="min-w-0 flex-1 overflow-x-auto pb-1 [scrollbar-width:thin]">
+        <div ref={strip} className="min-w-0 flex-1 overflow-x-auto pb-1 [scrollbar-width:thin]">
           <div className="inline-block">
             <div className="relative mb-1 h-[14px]">
               {months.map((month) => (
@@ -90,9 +109,8 @@ export function Heatmap({
                 <div key={w} className="flex flex-col" style={{ gap: GAP }}>
                   {column.map((day, row) =>
                     day == null ? (
-                      /* The rest of this week. Drawn as an outline rather than
-                         left blank so the leftmost column is a column and not
-                         a ragged edge — and so the days still to come read as
+                      /* A day still ahead. An outline rather than a gap, so
+                         the grid keeps its shape and the days to come read as
                          waiting rather than as missing. */
                       <span
                         key={row}
@@ -131,7 +149,7 @@ export function Heatmap({
             </>
           ) : (
             <span className="text-ink-3">
-              Hover a square for the day it stands for. Newest week on the left; dashed squares are still to come.
+              Hover a square for the day it stands for. Dashed squares have not happened yet.
             </span>
           )}
         </p>

@@ -26,11 +26,6 @@ export function ActivityTrend({
   const peak = Math.max(1, ...weeks.map((w) => w.total));
   const shown = hover ?? weeks[weeks.length - 1];
 
-  // Newest on the left, to match the wall above it. Two charts of the same
-  // data running in opposite directions is worse than either order is wrong:
-  // it puts this week at the far right of one and the far left of the other,
-  // and the eye has to re-learn the axis halfway down the page.
-  const bars = [...weeks].reverse();
 
   return (
     <div>
@@ -62,7 +57,7 @@ export function ActivityTrend({
         style={{ height }}
         onMouseLeave={() => setHover(null)}
       >
-        {bars.map((week) => (
+        {weeks.map((week) => (
           <button
             key={week.start}
             type="button"

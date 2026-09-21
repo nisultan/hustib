@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useStore } from "@/lib/store";
 import {
   Goal,
@@ -12,6 +12,7 @@ import {
   PRIORITY_LABEL,
 } from "@/lib/types";
 import { prepareImage } from "@/lib/image";
+import { COURSE_COLORS, courseColor } from "@/lib/appearance";
 import { Button, ConfirmDeleteButton, Field, Input, Modal, Select, Textarea } from "./ui";
 import { DateField } from "./DateField";
 
@@ -150,14 +151,7 @@ export function GoalDialog({
           </Field>
 
           <Field label="Category" hint="Optional.">
-            <Select value={categoryId} onChange={(e) => setCategoryId(e.target.value)}>
-              <option value="">None</option>
-              {store.categories.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                </option>
-              ))}
-            </Select>
+            <CategoryChoice value={categoryId} onChange={setCategoryId} />
           </Field>
         </div>
 
@@ -221,6 +215,156 @@ export function GoalDialog({
         </div>
       </div>
     </Modal>
+  );
+}
+
+
+/**
+ * Pick a category, or make one without leaving the form.
+ *
+ * Categories were reachable only from Settings, which meant that deciding a
+ * goal belongs to "Applications" mid-form cost a trip to another page and the
+ * half-filled form along with it. The categories themselves are shared with
+ * tasks and plan blocks — this creates a real one, not a goals-only label.
+ */
+function CategoryChoice({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (id: string) => void;
+}) {
+  const store = useStore();
+  const [creating, setCreating] = useState(false);
+  const [name, setName] = useState("");
+  const [pending, setPending] = useState<string | null>(null);
+
+  // The first colour nothing else is using, so two categories made a minute
+  // apart do not come out the same shade.
+  const free =
+    COURSE_COLORS.find((c) => !store.categories.some((x) => x.color === c.id)) ??
+    COURSE_COLORS[0];
+  const [color, setColor] = useState<string>(free.id);
+
+  const taken = store.categories.some(
+    (c) => c.name.toLowerCase() === name.trim().toLowerCase(),
+  );
+
+  /*
+    Select the new category once it exists.
+
+    addCategory returns nothing, and in cloud mode the id is minted by the
+    database a round trip later, so there is no id to select at the moment of
+    creating it. Watching for the name to appear works for both backends.
+  */
+  useEffect(() => {
+    if (pending == null) return;
+    const made = store.categories.find(
+      (c) => c.name.toLowerCase() === pending.toLowerCase(),
+    );
+    if (made) {
+      onChange(made.id);
+      setPending(null);
+    }
+  }, [pending, store.categories, onChange]);
+
+  const create = () => {
+    const clean = name.trim();
+    if (clean === "" || taken) return;
+    store.addCategory({ name: clean, color });
+    setPending(clean);
+    setName("");
+    setCreating(false);
+  };
+
+  if (creating) {
+    return (
+      <div className="grid gap-2 rounded-lg border border-line bg-panel-2 p-2.5">
+        <Input
+          autoFocus
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              create();
+            }
+            // Escape backs out of the sub-form without closing the dialog
+            // behind it, which is what the modal would otherwise do with it.
+            if (e.key === "Escape") {
+              e.preventDefault();
+              e.stopPropagation();
+              setCreating(false);
+            }
+          }}
+          placeholder="Applications, training, family…"
+        />
+
+        <div className="flex items-center gap-1.5">
+          {COURSE_COLORS.map((c) => (
+            <button
+              key={c.id}
+              type="button"
+              onClick={() => setColor(c.id)}
+              aria-label={c.label}
+              aria-pressed={color === c.id}
+              className={`size-4 rounded-full transition-transform hover:scale-110 ${
+                color === c.id ? "ring-2 ring-offset-2 ring-offset-[var(--panel-2)]" : ""
+              }`}
+              style={{ background: c.value, boxShadow: color === c.id ? `0 0 0 2px ${c.value}` : undefined }}
+            />
+          ))}
+        </div>
+
+        {taken && name.trim() !== "" && (
+          <p className="text-[11px] text-[var(--urgent)]">You already have that one.</p>
+        )}
+
+        <div className="flex gap-1.5">
+          <Button variant="primary" onClick={create} disabled={name.trim() === "" || taken}>
+            Add
+          </Button>
+          <Button onClick={() => setCreating(false)}>Cancel</Button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex items-center gap-1.5">
+      <div className="min-w-0 flex-1">
+        <Select value={value} onChange={(e) => onChange(e.target.value)}>
+          <option value="">None</option>
+          {store.categories.map((c) => (
+            <option key={c.id} value={c.id}>
+              {c.name}
+            </option>
+          ))}
+        </Select>
+      </div>
+
+      {value !== "" && (
+        <span
+          aria-hidden
+          className="size-2.5 shrink-0 rounded-full"
+          style={{
+            background: courseColor(
+              store.categories.find((c) => c.id === value)?.color ?? "",
+            ),
+          }}
+        />
+      )}
+
+      <button
+        type="button"
+        onClick={() => setCreating(true)}
+        title="New category"
+        aria-label="New category"
+        className="shrink-0 rounded-lg border border-line px-2 py-1.5 text-[13px] leading-none text-ink-2 transition-colors hover:border-line-strong hover:text-ink"
+      >
+        +
+      </button>
+    </div>
   );
 }
 
