@@ -227,6 +227,16 @@ export interface Upcoming {
   dayKind?: ImportantKind;
   /** Which anniversary the next occurrence will be, when that is knowable. */
   year?: number;
+  /**
+   * How much of the run-up has gone, 0 to 1, or undefined when there is no
+   * honest start to measure from.
+   *
+   * "35 days" says little on its own — 35 days into a six-week goal is a very
+   * different situation from 35 days left of a year. This is the share of the
+   * original stretch already spent, counted from the day the thing was written
+   * down, or for a birthday from last year's.
+   */
+  elapsed?: number;
 }
 
 /**
@@ -261,9 +271,14 @@ export function upcoming(
   const horizon = addDays(from, within);
   const out: Upcoming[] = [];
 
-  const push = (entry: Omit<Upcoming, "daysLeft">) => {
+  const push = (entry: Omit<Upcoming, "daysLeft" | "elapsed"> & { since?: string }) => {
     if (entry.date < from || entry.date > horizon) return;
-    out.push({ ...entry, daysLeft: daysBetween(from, entry.date) });
+    const { since, ...rest } = entry;
+    out.push({
+      ...rest,
+      daysLeft: daysBetween(from, entry.date),
+      elapsed: share(since, from, entry.date),
+    });
   };
 
   if (showing("day")) {
@@ -279,6 +294,9 @@ export function upcoming(
         priority: "high",
         dayKind: d.kind,
         year: d.repeatsYearly && year > 0 ? year : undefined,
+        // A birthday's run-up is the year since the last one; a one-off's is
+        // however long it has been sitting on the calendar.
+        since: d.repeatsYearly ? addDays(date, -365) : d.createdAt,
       });
     }
   }
@@ -287,7 +305,14 @@ export function upcoming(
     for (const t of data.tasks) {
       // Finished work is not coming up, however close its deadline was.
       if (t.status === "completed" || t.dueDate == null) continue;
-      push({ kind: "task", id: t.id, label: t.title, date: t.dueDate, priority: t.priority });
+      push({
+        kind: "task",
+        id: t.id,
+        label: t.title,
+        date: t.dueDate,
+        priority: t.priority,
+        since: t.createdAt.slice(0, 10),
+      });
     }
   }
 
@@ -309,7 +334,14 @@ export function upcoming(
   if (showing("goal")) {
     for (const g of data.goals) {
       if (g.deadline == null || g.status !== "active") continue;
-      push({ kind: "goal", id: g.id, label: g.title, date: g.deadline, priority: g.priority });
+      push({
+        kind: "goal",
+        id: g.id,
+        label: g.title,
+        date: g.deadline,
+        priority: g.priority,
+        since: g.createdAt.slice(0, 10),
+      });
     }
   }
 
@@ -319,6 +351,20 @@ export function upcoming(
         a.date.localeCompare(b.date) || PRIORITY_RANK[b.priority] - PRIORITY_RANK[a.priority],
     )
     .slice(0, limit);
+}
+
+/**
+ * The share of a run-up already spent.
+ *
+ * Undefined when there is nothing to measure against, rather than 0 — a ring
+ * drawn empty is a claim that none of the time has gone, and that is a worse
+ * answer than drawing no ring at all.
+ */
+function share(since: string | undefined, today: string, due: string): number | undefined {
+  if (!since) return undefined;
+  const total = daysBetween(since, due);
+  if (total <= 0) return undefined;
+  return Math.min(1, Math.max(0, daysBetween(since, today) / total));
 }
 
 /** Whole days from one date to another, both as "YYYY-MM-DD". */

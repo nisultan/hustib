@@ -5,8 +5,8 @@ import { useMemo } from "react";
 import { useStore } from "@/lib/store";
 import { upcoming, Upcoming } from "@/lib/calendar";
 import { formatDate, todayISO } from "@/lib/dates";
-import { IMPORTANT_KIND_GLYPH, IMPORTANT_KIND_LABEL, Task } from "@/lib/types";
-import { SectionTitle } from "./ui";
+import { IMPORTANT_KIND_GLYPH, IMPORTANT_KIND_LABEL, Priority, Task } from "@/lib/types";
+import { PriorityDot, SectionTitle } from "./ui";
 
 /**
  * What is closest, at the top of the dashboard.
@@ -106,7 +106,8 @@ export function NextUp() {
                 label={entry.label}
                 detail={`${kindLabel(entry)} · ${formatDate(entry.date)}`}
                 days={entry.daysLeft}
-                tone={`var(--${entry.priority})`}
+                elapsed={entry.elapsed}
+                priority={entry.priority}
               />
             ))}
           </div>
@@ -139,7 +140,7 @@ export function NextUp() {
                   .filter(Boolean)
                   .join(" · ")}
                 days={entry.daysLeft}
-                tone="var(--accent)"
+                elapsed={entry.elapsed}
                 glyph={IMPORTANT_KIND_GLYPH[entry.dayKind ?? "other"]}
               />
             ))}
@@ -223,30 +224,38 @@ function Overdue({ tasks, today }: { tasks: Task[]; today: string }) {
 /**
  * One countdown.
  *
- * The count sits in a tinted badge rather than as loose text beside the title.
- * Two reasons: it gives the number a fixed footprint, so a long title can no
- * longer squeeze it, and the tint carries the urgency at a glance — a row of
- * these should be readable as a shape before any of it is read as words.
+ * The number is drawn inside a ring, and the ring is the point. "35 days" on
+ * its own is a fact with no scale attached: thirty-five days into a six-week
+ * goal is nearly out of time, and thirty-five days of a year is barely
+ * started. The ring fills with the share of the run-up already spent, so the
+ * card answers "how am I doing against this" and not merely "when is it".
  *
- * Titles clamp to two lines and the card stretches to its row, so a wrapped
- * Kazakh title and a short English one still produce cards of equal height
- * instead of a ragged row.
+ * Colour runs off urgency rather than priority. A row of these should be
+ * legible as a shape before any of it is read as words, and the shape worth
+ * seeing is which things are close — a low-priority thing due tomorrow still
+ * needs doing tomorrow. Priority has not been dropped; it moved to the dot
+ * beside the title, where it is information rather than the loudest signal.
  */
 function Card({
   href,
   label,
   detail,
   days,
-  tone,
+  elapsed,
+  priority,
   glyph,
 }: {
   href: string;
   label: string;
   detail: string;
   days: number;
-  tone: string;
+  /** 0-1, or undefined when there is no start date to measure from. */
+  elapsed?: number;
+  /** Omitted for important days, which are not work and have no priority. */
+  priority?: Priority;
   glyph?: string;
 }) {
+  const tone = heat(days);
   const overdue = days < 0;
   const today = days === 0;
 
@@ -254,38 +263,34 @@ function Card({
     <Link
       href={href}
       title={`${label} — ${detail}`}
-      className="group flex h-full items-center gap-3 rounded-xl border border-line bg-panel p-3 shadow-[var(--shadow),var(--edge)] transition-[transform,border-color,box-shadow] duration-200 hover:-translate-y-0.5 hover:border-line-strong hover:shadow-[var(--shadow-md),var(--edge)]"
+      className="group relative flex h-full items-center gap-3.5 overflow-hidden rounded-xl border border-line bg-panel p-3.5 shadow-[var(--shadow),var(--edge)] transition-[transform,border-color,box-shadow] duration-200 hover:-translate-y-0.5 hover:border-line-strong hover:shadow-[var(--shadow-md),var(--edge)]"
     >
+      {/* A wash bleeding in from the dial, so the card itself carries some of
+          the urgency instead of leaving it all to a badge in the corner. It
+          is barely there on a distant date and unmistakable on a late one. */}
       <span
         aria-hidden
-        className="grid size-[52px] shrink-0 place-content-center rounded-lg text-center transition-transform duration-200 group-hover:scale-105"
+        className="pointer-events-none absolute inset-0 opacity-75 transition-opacity duration-300 group-hover:opacity-100"
         style={{
-          background: `color-mix(in srgb, ${tone} 14%, transparent)`,
-          color: tone,
+          background: `radial-gradient(120px 80px at 0% 50%, color-mix(in srgb, ${tone} ${
+            overdue || today ? 16 : 9
+          }%, transparent), transparent 70%)`,
         }}
-      >
-        {today ? (
-          <span className="px-1 text-[13px] font-semibold leading-none">Today</span>
-        ) : (
-          <>
-            <span className="nums text-[21px] font-semibold leading-none tracking-tight">
-              {Math.abs(days)}
-            </span>
-            <span className="mt-1 text-[9px] font-medium uppercase leading-none tracking-wider">
-              {unit(days)}
-            </span>
-          </>
-        )}
-      </span>
+      />
 
-      <span className="flex min-w-0 flex-1 flex-col gap-1">
-        <span className="line-clamp-2 text-[13px] font-medium leading-snug">
-          {glyph && (
-            <span aria-hidden className="mr-1 text-ink-3">
-              {glyph}
-            </span>
-          )}
-          {label}
+      <Dial days={days} elapsed={elapsed} tone={tone} />
+
+      <span className="relative flex min-w-0 flex-1 flex-col gap-1">
+        <span className="flex items-center gap-1.5">
+          {priority && <PriorityDot priority={priority} />}
+          <span className="line-clamp-2 text-[13px] font-medium leading-snug">
+            {glyph && (
+              <span aria-hidden className="mr-1 text-ink-3">
+                {glyph}
+              </span>
+            )}
+            {label}
+          </span>
         </span>
         <span
           className="truncate text-[11px] text-ink-3"
@@ -296,6 +301,79 @@ function Card({
       </span>
     </Link>
   );
+}
+
+/** Ring geometry, in the SVG's own units. */
+const R = 20;
+const C = 2 * Math.PI * R;
+
+/**
+ * The number, and the ring around it.
+ *
+ * Drawn as an arc rather than a bar because it has to sit around the figure it
+ * belongs to — a bar underneath would be a second thing to read, and the whole
+ * point is that one glance gets both. The track stays visible under the arc so
+ * a nearly-empty ring still reads as a ring rather than as a stray mark.
+ */
+function Dial({ days, elapsed, tone }: { days: number; elapsed?: number; tone: string }) {
+  const today = days === 0;
+  const spent = elapsed ?? 0;
+
+  return (
+    <span aria-hidden className="relative grid size-[54px] shrink-0 place-items-center">
+      <svg viewBox="0 0 48 48" className="absolute inset-0 size-full -rotate-90">
+        <circle cx="24" cy="24" r={R} fill="none" stroke={tone} strokeWidth="3" opacity="0.14" />
+        {elapsed != null && (
+          <circle
+            cx="24"
+            cy="24"
+            r={R}
+            fill="none"
+            stroke={tone}
+            strokeWidth="3"
+            strokeLinecap="round"
+            strokeDasharray={C}
+            strokeDashoffset={C * (1 - spent)}
+            className="transition-[stroke-dashoffset] duration-700 ease-out"
+          />
+        )}
+      </svg>
+
+      <span
+        className="relative grid place-items-center text-center leading-none"
+        style={{ color: tone }}
+      >
+        {today ? (
+          <span className="text-[11px] font-semibold uppercase tracking-wide">Today</span>
+        ) : (
+          <>
+            <span className="nums text-[19px] font-semibold tracking-tight">
+              {Math.abs(days)}
+            </span>
+            <span className="mt-0.5 text-[8px] font-medium uppercase tracking-wider opacity-70">
+              {unit(days)}
+            </span>
+          </>
+        )}
+      </span>
+    </span>
+  );
+}
+
+/**
+ * Colour by how close it is, not by how important someone said it was.
+ *
+ * The thresholds are deliberately uneven. The difference between tomorrow and
+ * next week is enormous; the difference between seven weeks and eight is not,
+ * and giving those the same spread would make everything beyond a fortnight
+ * look identically urgent.
+ */
+function heat(days: number): string {
+  if (days < 0) return "var(--urgent)";
+  if (days <= 2) return "var(--urgent)";
+  if (days <= 7) return "var(--high)";
+  if (days <= 21) return "var(--medium)";
+  return "var(--accent)";
 }
 
 /** Two lines of badge, so "days over" has to become one short word. */
