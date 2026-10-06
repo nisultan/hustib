@@ -79,13 +79,13 @@ function Dot({ tone }: { tone: string }) {
 export function ArtWelcome() {
   const areas = [
     { label: "Tasks", tone: "high" },
-    { label: "Grades", tone: "medium" },
+    { label: "Plan", tone: "medium" },
     { label: "Courses", tone: "up" },
-    { label: "Universities", tone: "accent" },
+    { label: "Goals", tone: "accent" },
   ];
 
   return (
-    <Frame label="Four areas — tasks, grades, courses and universities — feeding one hub">
+    <Frame label="Four areas — tasks, plan, courses and goals — feeding one hub">
       <div className="flex h-full flex-col items-center justify-center gap-3">
         <div
           className="pop grid size-12 place-items-center rounded-xl bg-accent text-white shadow-[var(--shadow),inset_0_1px_0_rgba(255,255,255,0.22)]"
@@ -343,172 +343,7 @@ export function ArtQuickAdd() {
 /* -------------------------------------------------------------------------- */
 /* 5. Grades                                                                  */
 /* -------------------------------------------------------------------------- */
-
-export function ArtGrades() {
-  return (
-    <Frame label="A grade chart drawing itself, with weighted averages and a what-if projection">
-      <div className="flex h-full flex-col gap-2">
-        <div className="grid grid-cols-3 gap-1.5">
-          {[
-            { k: "Average", v: "87.9%" },
-            { k: "Trend", v: "↑ 2.4%" },
-            { k: "Predicted", v: "89.2%" },
-          ].map((s, i) => (
-            <Card key={s.k} delay={80 + i * 110} className="px-1.5 py-1.5">
-              <div className="text-[7px] uppercase tracking-wider text-ink-3">{s.k}</div>
-              <div
-                className="nums mt-0.5 text-[11px] font-semibold"
-                style={i === 1 ? { color: "var(--up)" } : undefined}
-              >
-                {s.v}
-              </div>
-            </Card>
-          ))}
-        </div>
-
-        <Card delay={340} className="relative min-h-0 flex-1 px-2 py-2">
-          <svg
-            viewBox="0 0 200 64"
-            className="h-full w-full"
-            preserveAspectRatio="none"
-            aria-hidden
-          >
-            <defs>
-              <linearGradient id="tour-grade-fill" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="var(--accent)" stopOpacity="0.2" />
-                <stop offset="100%" stopColor="var(--accent)" stopOpacity="0" />
-              </linearGradient>
-            </defs>
-
-            {[14, 32, 50].map((y) => (
-              <line
-                key={y}
-                x1="0"
-                x2="200"
-                y1={y}
-                y2={y}
-                stroke="var(--border)"
-                strokeWidth="0.6"
-              />
-            ))}
-
-            <g className="reveal-up" style={{ "--d": "620ms" } as React.CSSProperties}>
-              <path
-                d="M4 52 L52 44 L100 30 L148 22 L196 12 L196 62 L4 62 Z"
-                fill="url(#tour-grade-fill)"
-              />
-            </g>
-
-            <path
-              d="M4 52 L52 44 L100 30 L148 22 L196 12"
-              fill="none"
-              stroke="var(--accent)"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              pathLength={1}
-              className="draw"
-              style={{ "--d": "520ms" } as React.CSSProperties}
-            />
-
-            {[
-              [4, 52],
-              [52, 44],
-              [100, 30],
-              [148, 22],
-              [196, 12],
-            ].map(([cx, cy], i) => (
-              <circle
-                key={cx}
-                cx={cx}
-                cy={cy}
-                r="2.6"
-                fill="var(--panel)"
-                stroke="var(--accent)"
-                strokeWidth="1.6"
-                className="pop"
-                style={{ "--d": `${700 + i * 150}ms` } as React.CSSProperties}
-              />
-            ))}
-          </svg>
-        </Card>
-
-        <Card delay={1500} className="flex items-center gap-2 px-2 py-1.5">
-          <span className="text-[7px] font-semibold uppercase tracking-wider text-ink-3">
-            What if?
-          </span>
-          <span className="nums text-[8px] text-ink-2">Score 95%</span>
-          <span className="text-[8px] text-ink-3" aria-hidden>
-            →
-          </span>
-          <span className="nums text-[9px] font-semibold text-accent-text">89.1%</span>
-        </Card>
-      </div>
-    </Frame>
-  );
-}
-
-/* -------------------------------------------------------------------------- */
 /* 6. Universities                                                            */
-/* -------------------------------------------------------------------------- */
-
-export function ArtUniversities() {
-  const unis = [
-    { name: "NYU Abu Dhabi", flag: "🇦🇪", tag: "Dream", status: "Preparing", tone: "high" },
-    { name: "Toronto", flag: "🇨🇦", tag: "Target", status: "Researching", tone: "medium" },
-    { name: "TU Delft", flag: "🇳🇱", tag: "Target", status: "Interested", tone: "low" },
-    { name: "Nazarbayev", flag: "🇰🇿", tag: "Safety", status: "Applied", tone: "accent" },
-  ];
-
-  return (
-    <Frame label="University list grouped by dream, target and safety, with the next deadline">
-      <div className="flex h-full flex-col gap-2">
-        <div className="grid grid-cols-3 gap-1.5">
-          {[
-            { k: "Dream", v: 3 },
-            { k: "Target", v: 5 },
-            { k: "Safety", v: 2 },
-          ].map((c, i) => (
-            <Card
-              key={c.k}
-              delay={80 + i * 110}
-              anim="pop"
-              className="px-1.5 py-1.5 text-center"
-            >
-              <div className="nums text-[13px] font-semibold leading-none">{c.v}</div>
-              <div className="mt-0.5 text-[7px] text-ink-3">{c.k}</div>
-            </Card>
-          ))}
-        </div>
-
-        <div className="grid min-h-0 flex-1 grid-cols-2 gap-1.5">
-          {unis.map((u, i) => (
-            <Card key={u.name} delay={420 + i * 110} className="flex flex-col px-2 py-1.5">
-              <div className="flex items-start justify-between gap-1">
-                <span className="truncate text-[8px] font-semibold">
-                  {u.flag} {u.name}
-                </span>
-                <span className="shrink-0 rounded px-1 py-px text-[6px] font-medium text-accent-text bg-accent-soft">
-                  {u.tag}
-                </span>
-              </div>
-              <span className="mt-auto flex items-center gap-1 pt-1.5 text-[7px] text-ink-3">
-                <Dot tone={u.tone} />
-                {u.status}
-              </span>
-            </Card>
-          ))}
-        </div>
-
-        <Card delay={900} className="flex items-center justify-between px-2 py-1.5">
-          <span className="text-[7px] uppercase tracking-wider text-ink-3">Next deadline</span>
-          <span className="nums text-[8px] font-medium">NYU Abu Dhabi · Jan 5</span>
-        </Card>
-      </div>
-    </Frame>
-  );
-}
-
 /* -------------------------------------------------------------------------- */
 /* 7. Recommendations — three signals combining into one instruction          */
 /* -------------------------------------------------------------------------- */

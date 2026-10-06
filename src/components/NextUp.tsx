@@ -23,6 +23,20 @@ import { SectionTitle } from "./ui";
 
 const MAX_PER_ROW = 4;
 
+/**
+ * How to lay a row of countdowns out, given how many there are.
+ *
+ * A fixed four columns was the whole problem: one deadline drew a card in a
+ * quarter of the row and three quarters of nothing. Few cards go wide, many
+ * cards share — so the row is full either way, and a lonely card reads as the
+ * only thing coming up rather than as a layout that gave up.
+ */
+function rowGrid(count: number, paired: boolean): string {
+  const base = "grid items-stretch gap-2.5";
+  if (paired) return count > 2 ? `${base} sm:grid-cols-2` : base;
+  return count > 2 ? `${base} sm:grid-cols-2 xl:grid-cols-4` : `${base} sm:grid-cols-2`;
+}
+
 export function NextUp() {
   const store = useStore();
   const today = todayISO();
@@ -55,10 +69,23 @@ export function NextUp() {
   if (!store.ready) return null;
   if (deadlines.length === 0 && days.length === 0 && overdue.length === 0) return null;
 
+  /*
+    Side by side when there is something in both.
+
+    Full-width rows of four columns each were right for a student mid-term with
+    a dozen deadlines, and wrong for everyone else: one goal and two birthdays
+    drew two headings stacked down the page, each with a card or two adrift in
+    three quarters of empty row, and the "All" link stranded a screen away from
+    the thing it belonged to. Paired, the same three cards fill the width and
+    each heading sits over its own column.
+  */
+  const paired = deadlines.length > 0 && days.length > 0;
+
   return (
     <div className="mb-8 grid gap-6">
       {overdue.length > 0 && <Overdue tasks={overdue} today={today} />}
 
+      <div className={`grid gap-6 ${paired ? "lg:grid-cols-2" : ""}`}>
       {deadlines.length > 0 && (
         <section>
           <SectionTitle
@@ -71,7 +98,7 @@ export function NextUp() {
             Closest deadlines
           </SectionTitle>
 
-          <div className="grid items-stretch gap-2.5 sm:grid-cols-2 xl:grid-cols-4">
+          <div className={rowGrid(deadlines.length, paired)}>
             {deadlines.map((entry) => (
               <Card
                 key={`${entry.kind}-${entry.id}`}
@@ -98,7 +125,7 @@ export function NextUp() {
             Important days
           </SectionTitle>
 
-          <div className="grid items-stretch gap-2.5 sm:grid-cols-2 xl:grid-cols-4">
+          <div className={rowGrid(days.length, paired)}>
             {days.map((entry) => (
               <Card
                 key={entry.id}
@@ -119,6 +146,7 @@ export function NextUp() {
           </div>
         </section>
       )}
+      </div>
     </div>
   );
 }

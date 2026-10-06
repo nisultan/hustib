@@ -60,7 +60,13 @@ export function TodayPanel() {
         Today&rsquo;s plan
       </SectionTitle>
 
-      <div className="grid gap-3 sm:grid-cols-2">
+      {/*
+        Two columns only when there are two things to put in them. A day with
+        habits and no timetable left the habits in the left half and nothing in
+        the right, which reads as a column that failed to load rather than as a
+        day with no blocks in it.
+      */}
+      <div className={`grid gap-3 ${blocks.length > 0 && habits.length > 0 ? "sm:grid-cols-2" : ""}`}>
         {blocks.length > 0 && (
           <div className="overflow-hidden rounded-xl border border-line bg-panel shadow-[var(--shadow),var(--edge)]">
             {blocks.map((block) => {
@@ -102,7 +108,13 @@ export function TodayPanel() {
         )}
 
         {habits.length > 0 && (
-          <div className="overflow-hidden rounded-xl border border-line bg-panel shadow-[var(--shadow),var(--edge)]">
+          <div
+            className={`overflow-hidden rounded-xl border border-line bg-panel shadow-[var(--shadow),var(--edge)] ${
+              blocks.length === 0 && habits.length > 3
+                ? "sm:grid sm:grid-cols-2 sm:[&>*:nth-child(odd)]:border-r"
+                : ""
+            }`}
+          >
             {habits.map((habit) => {
               const ticked = done.includes(habit.id);
               const streak = streakOf(

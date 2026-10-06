@@ -935,38 +935,63 @@ function Loose({ date, items }: { date: string; items: PlanItem[] }) {
           {/* Only once there is something to add: two empty time fields above
               an empty box is a form, and this should feel like typing a line. */}
           {draft.trim() !== "" && (
-            <div className="flex flex-wrap items-center gap-1.5 px-0.5">
-              <div className="w-[86px]">
-                <TimeField value={from} onChange={setFrom} />
+            <div className="grid gap-2 px-0.5 pt-0.5">
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+                {/*
+                  Labelled, and wide enough for the time it holds.
+
+                  These were unlabelled 86px boxes running the full TimeField,
+                  which reserves 64px for its clear and clock buttons — leaving
+                  about ten pixels of text, so "11:30" rendered as "11:3". The
+                  compact variant drops those buttons, and the boxes are sized
+                  for "23:59" with room to spare.
+                */}
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[10px] uppercase tracking-wide text-ink-3">From</span>
+                  <div className="w-[76px]">
+                    <TimeField value={from} onChange={setFrom} compact />
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[10px] uppercase tracking-wide text-ink-3">To</span>
+                  <div className="w-[76px]">
+                    <TimeField value={to} onChange={setTo} compact />
+                  </div>
+                </div>
+
+                {/*
+                  Four bare dots said nothing. A colour is only a priority once
+                  you already know the code, and nobody learns a code from a row
+                  of dots with no word anywhere near them — so the chosen one
+                  now says its name, and the rest are a dot plus a label too.
+                */}
+                <div className="flex items-center gap-1">
+                  <span className="text-[10px] uppercase tracking-wide text-ink-3">Priority</span>
+                  <div className="flex items-center gap-0.5 rounded-lg bg-panel-2 p-0.5">
+                    {PRIORITIES.map((p) => (
+                      <button
+                        key={p}
+                        type="button"
+                        onClick={() => setPriority(p)}
+                        aria-pressed={priority === p}
+                        className={`flex items-center gap-1 rounded-md px-1.5 py-1 text-[11px] font-medium transition-colors ${
+                          priority === p
+                            ? "bg-panel text-ink shadow-[var(--shadow)]"
+                            : "text-ink-3 hover:text-ink"
+                        }`}
+                      >
+                        <PriorityDot priority={p} />
+                        {PRIORITY_LABEL[p]}
+                      </button>
+                    ))}
+                  </div>
+                </div>
               </div>
-              <span aria-hidden className="text-[11px] text-ink-3">
-                –
+
+              <span className="text-[10px] text-ink-3">
+                Both times are optional. Enter adds it.
               </span>
-              <div className="w-[86px]">
-                <TimeField value={to} onChange={setTo} />
-              </div>
-
-              {/* Everything typed here used to land on medium, so the one
-                  urgent thing in the list looked exactly like the shopping. */}
-              <div className="ml-1 flex items-center gap-0.5">
-                {PRIORITIES.map((p) => (
-                  <button
-                    key={p}
-                    type="button"
-                    onClick={() => setPriority(p)}
-                    aria-pressed={priority === p}
-                    title={PRIORITY_LABEL[p]}
-                    aria-label={PRIORITY_LABEL[p]}
-                    className={`rounded-md p-1 transition-colors ${
-                      priority === p ? "bg-panel-2 ring-1 ring-line-strong" : "opacity-45 hover:opacity-100"
-                    }`}
-                  >
-                    <PriorityDot priority={p} />
-                  </button>
-                ))}
-              </div>
-
-              <span className="text-[10px] text-ink-3">times optional · Enter to add</span>
             </div>
           )}
         </div>

@@ -9,11 +9,9 @@ import { Button } from "./ui";
 import {
   ArtDashboard,
   ArtGetStarted,
-  ArtGrades,
   ArtQuickAdd,
   ArtRecommendations,
   ArtTasks,
-  ArtUniversities,
   ArtWelcome,
 } from "./TourArt";
 import { Logo } from "./Logo";
@@ -34,7 +32,7 @@ const STEPS: Step[] = [
     id: "welcome",
     eyebrow: "Welcome",
     title: "One place for your whole academic life",
-    body: "Tasks, notes, grades and university applications live together — so instead of checking four apps, you open one and know where you stand.",
+    body: "Tasks, your plan for the day, habits, goals and the journal live together — so instead of checking four apps, you open one and know where you stand.",
     points: [
       "No more notes in one app and deadlines in another",
       "Everything stays on your device",
@@ -45,11 +43,11 @@ const STEPS: Step[] = [
     id: "home",
     eyebrow: "Home",
     title: "Answers five questions in ten seconds",
-    body: "The dashboard opens with what needs your attention today, what is coming, how your grades are moving, and what to do next.",
+    body: "The dashboard opens with what needs your attention today, what is coming, how steadily you have been showing up, and what to do next.",
     points: [
       "Today's work, overdue items included",
       "Your next deadlines at a glance",
-      "Course averages with trend arrows",
+      "Your habits for today, tickable without leaving the page",
     ],
     art: <ArtDashboard />,
   },
@@ -76,29 +74,6 @@ const STEPS: Step[] = [
     art: <ArtQuickAdd />,
   },
   {
-    id: "grades",
-    eyebrow: "Grades",
-    title: "Averages worked out, not guessed",
-    body: "Record each assessment with its weight and the maths is done for you — per course, overall, and where you are heading. It always tells you how it got the number.",
-    points: [
-      "Weighted averages, or plain means when you have no weights",
-      "What if? — see where one future score would put you",
-      "Charts that show improving, declining or stable",
-    ],
-    art: <ArtGrades />,
-  },
-  {
-    id: "universities",
-    eyebrow: "Universities",
-    title: "Applications, with the deadlines that matter",
-    body: "Track every university from first interest through to a decision, sorted into dream, target and safety, with a notes field for scholarships, essays and requirements.",
-    points: [
-      "Seven application statuses, from Interested to Accepted",
-      "Your next deadline is surfaced on the dashboard",
-    ],
-    art: <ArtUniversities />,
-  },
-  {
     id: "recommendations",
     eyebrow: "Recommendations",
     title: "Signals combined, not just listed",
@@ -110,7 +85,7 @@ const STEPS: Step[] = [
     id: "start",
     eyebrow: "Get started",
     title: "Your hub is empty — let's fill it",
-    body: "Add your courses first; tasks and grades attach to them. You can do the rest in any order, and the dashboard gets more useful with each piece.",
+    body: "Add your courses first; tasks attach to them. You can do the rest in any order, and the dashboard gets more useful with each piece.",
     art: <ArtGetStarted />,
   },
 ];

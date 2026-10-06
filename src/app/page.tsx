@@ -20,6 +20,7 @@ import { NextUp } from "@/components/NextUp";
 import { TodayPanel } from "@/components/TodayPanel";
 import { Productivity } from "@/components/Productivity";
 import { productivity } from "@/lib/productivity";
+import { appliesOn } from "@/lib/habits";
 import { TaskList, sortTasks } from "@/components/TaskItem";
 import { AddTaskButton } from "@/components/TaskDialog";
 import { openTour } from "@/components/Tour";
@@ -82,6 +83,15 @@ export default function HomePage() {
     if (streak > 1) bits.push(`${streak}-day streak`);
 
     if (bits.length === 0) {
+      /*
+        Habits count as something on your plate.
+
+        "Nothing on your plate" was printed over a list of six unticked habits,
+        because the line only ever looked at tasks. A dashboard that contradicts
+        the thing directly beneath it is worse than one that says nothing.
+      */
+      const left = habitsLeft(store, today);
+      if (left > 0) return `${left} habit${left === 1 ? "" : "s"} left today.`;
       return open.length === 0
         ? "Nothing on your plate. Add what's coming up."
         : "Nothing pressing today.";
@@ -284,4 +294,12 @@ export default function HomePage() {
       )}
     </div>
   );
+}
+
+/** Habits that apply today and have not been ticked yet. */
+function habitsLeft(store: ReturnType<typeof useStore>, today: string): number {
+  const done = store.days.find((d) => d.date === today)?.habitsDone ?? [];
+  return store.habits.filter(
+    (h) => h.archivedAt == null && appliesOn(h, today) && !done.includes(h.id),
+  ).length;
 }
