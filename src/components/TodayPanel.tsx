@@ -7,6 +7,7 @@ import { appliesOn, streakOf } from "@/lib/habits";
 import { formatTime, todayISO } from "@/lib/dates";
 import { courseColor } from "@/lib/appearance";
 import { SectionTitle } from "./ui";
+import { Flame } from "./Flame";
 
 /**
  * Today, as it will actually happen.
@@ -141,8 +142,9 @@ export function TodayPanel() {
                   {/* The run is the reason to tick it tonight rather than
                       tomorrow, so it belongs on the row you tick. */}
                   {streak > 0 && (
-                    <span className="nums shrink-0 text-[11px] text-accent-text">
-                      {streak}🔥
+                    <span className="nums flex shrink-0 items-center gap-0.5 text-[11px] text-ink-2">
+                      {streak}
+                      <Flame streak={streak} />
                     </span>
                   )}
                 </label>

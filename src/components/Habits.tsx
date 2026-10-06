@@ -6,6 +6,7 @@ import { Habit, WEEKDAY_LABEL } from "@/lib/types";
 import { addDays, formatDate } from "@/lib/dates";
 import { appliesOn, keptRate, streakOf } from "@/lib/habits";
 import { Panel, SectionTitle } from "./ui";
+import { Flame } from "./Flame";
 
 /**
  * Habits, as a tracker rather than a list.
@@ -173,7 +174,14 @@ function Row({
         }`}
         title={streak > 0 ? `${streak} in a row` : "No run yet"}
       >
-        {streak > 0 ? `${streak}🔥` : "—"}
+        {streak > 0 ? (
+          <span className="inline-flex items-center gap-0.5">
+            {streak}
+            <Flame streak={streak} />
+          </span>
+        ) : (
+          "—"
+        )}
       </span>
     </div>
   );

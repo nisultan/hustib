@@ -7,6 +7,7 @@ import { habitRows } from "@/lib/activity";
 import { streakOf } from "@/lib/habits";
 import { addDays, todayISO } from "@/lib/dates";
 import { SectionTitle } from "./ui";
+import { Flame } from "./Flame";
 
 /**
  * The last fortnight of each habit, as a row of marks.
@@ -75,8 +76,13 @@ export function HabitStreaks() {
 
               {/* The run, where it is a run. Zero is not shown: a habit nobody
                   has started yet does not need a 0 beside it saying so. */}
-              <span className="nums w-9 shrink-0 text-right text-[11px] text-ink-3">
-                {row.streak > 0 ? `${row.streak}🔥` : ""}
+              <span className="nums flex w-11 shrink-0 items-center justify-end gap-0.5 text-[11px] text-ink-3">
+                {row.streak > 0 && (
+                  <>
+                    {row.streak}
+                    <Flame streak={row.streak} />
+                  </>
+                )}
               </span>
             </div>
           ))}

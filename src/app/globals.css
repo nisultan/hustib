@@ -545,6 +545,38 @@ summary {
 }
 
 /*
+ * The streak flame, in two parts that never agree.
+ *
+ * The body leans and stretches; the core breathes on a longer cycle. Running
+ * them at different durations means the pair never repeats the same shape,
+ * which is the whole difference between a flame and a blinking light. Both are
+ * tiny movements — a few percent — because this appears a dozen times down a
+ * list and anything larger turns the page into a fairground.
+ */
+@keyframes flame-body {
+  0%,
+  100% {
+    transform: scaleY(1) scaleX(1) rotate(0deg);
+  }
+  30% {
+    transform: scaleY(1.07) scaleX(0.96) rotate(-1.5deg);
+  }
+  65% {
+    transform: scaleY(0.96) scaleX(1.03) rotate(1.5deg);
+  }
+}
+
+@keyframes flame-core {
+  0%,
+  100% {
+    transform: scaleY(0.92) translateY(0.4px);
+  }
+  45% {
+    transform: scaleY(1.12) translateY(-0.3px);
+  }
+}
+
+/*
  * Confetti, for exactly one event: a goal marked achieved.
  *
  * Each piece carries its own direction in --dx/--dy and its own spin, so one
