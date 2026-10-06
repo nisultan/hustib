@@ -3,8 +3,7 @@
 import Link from "next/link";
 import { useMemo } from "react";
 import { useStore } from "@/lib/store";
-import { courseAverage, overallAverage, trend } from "@/lib/grades";
-import { recommend, nextUniDeadline } from "@/lib/recommendations";
+import { recommend } from "@/lib/recommendations";
 import {
   countdownLabel,
   daysUntil,
@@ -14,10 +13,12 @@ import {
   relativeLabel,
   todayISO,
 } from "@/lib/dates";
-import { UNI_PRIORITIES, UNI_PRIORITY_LABEL } from "@/lib/types";
-import { Panel, SectionTitle, EmptyState, Button, TrendLabel } from "@/components/ui";
+import { Panel, SectionTitle, EmptyState, Button } from "@/components/ui";
 import { NextUp } from "@/components/NextUp";
 import { TodayPanel } from "@/components/TodayPanel";
+import { GoalsStrip } from "@/components/GoalsStrip";
+import { HabitStreaks } from "@/components/HabitStreaks";
+import { Spark } from "@/components/Spark";
 import { Productivity } from "@/components/Productivity";
 import { productivity } from "@/lib/productivity";
 import { appliesOn } from "@/lib/habits";
@@ -48,13 +49,6 @@ export default function HomePage() {
   );
 
   const recs = useMemo(() => recommend(store, 3), [store]);
-  const overall = overallAverage(store.grades, store.courses);
-  const uni = nextUniDeadline(store);
-
-  const uniCounts = UNI_PRIORITIES.map((p) => ({
-    priority: p,
-    count: store.universities.filter((u) => u.priority === p).length,
-  }));
 
   if (!store.ready) return <div className="h-64" aria-busy="true" />;
 
@@ -107,50 +101,26 @@ export default function HomePage() {
           {greeting()}, {store.profile.name} <span aria-hidden>👋</span>
         </h1>
         <p className="mt-1 text-sm text-ink-2">{summary}</p>
+        <Spark />
       </header>
 
-      {/* Countdowns first. Whatever else is on this page, the thing a student
-          opens it to find out is how long they have. */}
-      <NextUp />
+      {/*
+        Two columns, and which side a thing goes on is the whole argument.
 
-      <div className="mb-8">
-        <TodayPanel />
-      </div>
+        The left is today: what is late, what is close, what is planned, what
+        is left to tick. The right is the longer run — goals, how steadily the
+        last fortnight went, what the hub makes of it all. Someone opening this
+        between lessons reads the left column and closes it; someone opening it
+        on a Sunday reads the right.
 
-      <Productivity compact />
+        Stacked on narrow screens in that same order, so the phone gets the
+        urgent half first.
+      */}
+      <div className="grid gap-x-8 gap-y-8 xl:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)] xl:items-start">
+        <div className="grid min-w-0 gap-8">
+          <NextUp />
+          <TodayPanel />
 
-      {/* Recommendations sit above the fold: the dashboard should answer
-          "what should I focus on" before it shows a list to scan. */}
-      {recs.length > 0 && (
-        <section className="mb-8">
-          <SectionTitle
-            right={
-              <Link href="/recommendations" className="text-xs text-ink-3 hover:text-ink">
-                All
-              </Link>
-            }
-          >
-            Recommended for you
-          </SectionTitle>
-          <div className="grid gap-2">
-            {recs.map((r) => (
-              <Link
-                key={r.id}
-                href={r.href}
-                className="flex items-start gap-2.5 rounded-xl border border-line bg-panel px-3.5 py-3 text-sm shadow-[var(--shadow)] transition-colors hover:border-line-strong"
-              >
-                <span aria-hidden className="mt-px">
-                  💡
-                </span>
-                <span className="text-ink-2">{r.text}</span>
-              </Link>
-            ))}
-          </div>
-        </section>
-      )}
-
-      <div className="grid gap-8 lg:grid-cols-[1.35fr_1fr]">
-        <div className="grid gap-8">
           <section>
             <SectionTitle
               right={<span className="text-xs text-ink-3">{todayTasks.length} due</span>}
@@ -212,65 +182,38 @@ export default function HomePage() {
           </section>
         </div>
 
-        <div className="grid gap-8">
-          <section>
-            <SectionTitle
-              right={
-                <Link href="/courses" className="text-xs text-ink-3 hover:text-ink">
-                  Details
-                </Link>
-              }
-            >
-              Academic overview
-            </SectionTitle>
-            <Panel className="px-4 py-4">
-              {overall.value == null ? (
-                <p className="py-3 text-center text-sm text-ink-3">
-                  Add grades to see your average.
-                </p>
-              ) : (
-                <>
-                  <div className="mb-4 flex items-baseline gap-2">
-                    <span className="nums text-3xl font-semibold tracking-tight">
-                      {overall.value}%
-                    </span>
-                    <span className="text-xs text-ink-3">current average</span>
-                  </div>
-                  <div className="grid gap-2.5">
-                    {store.courses.map((c) => {
-                      const avg = courseAverage(store.grades, c.id);
-                      if (avg.value == null) return null;
-                      const t = trend(store.grades.filter((g) => g.courseId === c.id));
-                      return (
-                        <Link
-                          key={c.id}
-                          href={`/courses/${c.id}`}
-                          className="group flex items-center gap-3"
-                        >
-                          <span className="w-28 shrink-0 truncate text-sm text-ink-2 group-hover:text-ink">
-                            {c.name}
-                          </span>
-                          <span className="h-1.5 flex-1 overflow-hidden rounded-full bg-panel-2">
-                            <span
-                              className="block h-full rounded-full bg-accent"
-                              style={{ width: `${avg.value}%` }}
-                            />
-                          </span>
-                          <span className="nums w-10 shrink-0 text-right text-sm font-medium">
-                            {avg.value}%
-                          </span>
-                          <span className="w-12 shrink-0 text-right">
-                            {t && <TrendLabel direction={t.direction} delta={t.delta} />}
-                          </span>
-                        </Link>
-                      );
-                    })}
-                  </div>
-                </>
-              )}
-            </Panel>
-          </section>
+        <div className="grid min-w-0 gap-8">
+          <GoalsStrip />
+          <Productivity compact />
+          <HabitStreaks />
 
+          {recs.length > 0 && (
+            <section>
+              <SectionTitle
+                right={
+                  <Link href="/recommendations" className="text-xs text-ink-3 hover:text-ink">
+                    All
+                  </Link>
+                }
+              >
+                Recommended for you
+              </SectionTitle>
+              <div className="grid gap-2">
+                {recs.map((r) => (
+                  <Link
+                    key={r.id}
+                    href={r.href}
+                    className="flex items-start gap-2.5 rounded-xl border border-line bg-panel px-3.5 py-3 text-sm shadow-[var(--shadow)] transition-colors hover:border-line-strong"
+                  >
+                    <span aria-hidden className="mt-px">
+                      💡
+                    </span>
+                    <span className="text-ink-2">{r.text}</span>
+                  </Link>
+                ))}
+              </div>
+            </section>
+          )}
         </div>
       </div>
 

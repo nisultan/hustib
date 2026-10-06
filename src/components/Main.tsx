@@ -7,16 +7,24 @@ import { ReactNode } from "react";
  * The page column.
  *
  * Most pages are reading width — a task list or a form gets harder to scan as
- * it gets wider, so they stay near 64rem. The planner is the exception: it is
- * a calendar next to a sidebar, and on a wide screen the grid was squeezed
- * into half of an already-narrow column while the rest of the monitor sat
- * empty.
+ * it gets wider, so they stay near 64rem. Two are not: the planner is a
+ * calendar beside a sidebar, and the dashboard is a board of cards. Both were
+ * squeezed into half an already-narrow column with the rest of the monitor
+ * sitting empty, which is a different failure from a paragraph being too long.
+ *
+ * The dashboard earns it only because nothing on it is prose. Its own layout
+ * splits into columns at that width, so no line of text actually runs the full
+ * 1680px.
  */
-const WIDE = ["/plan"];
+const WIDE = ["/plan", "/"];
 
 export function Main({ children }: { children: ReactNode }) {
   const pathname = usePathname();
-  const wide = WIDE.some((p) => pathname === p || pathname.startsWith(`${p}/`));
+  const wide = WIDE.some(
+    // `startsWith` on "/" would match every page in the app, so the root is
+    // only ever an exact match.
+    (p) => pathname === p || (p !== "/" && pathname.startsWith(`${p}/`)),
+  );
 
   // Reading pages keep a generous gutter; the planner gives that space to the
   // calendar instead, where 32px of margin is a visible amount of a day.
