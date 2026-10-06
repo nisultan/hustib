@@ -125,19 +125,6 @@ export function recommend(data: AppData, limit = 4): Recommendation[] {
 
   // 5. University deadline approaching.
   const uni = nextUniDeadline(data);
-  if (uni) {
-    const days = daysUntil(uni.deadline as string);
-    if (days >= 0 && days <= 30) {
-      recs.push({
-        id: `uni-${uni.id}`,
-        kind: "university",
-        weight: days <= 14 ? 85 : 50,
-        href: "/universities",
-        text: `${uni.name} closes ${days === 0 ? "today" : days === 1 ? "tomorrow" : `in ${days} days`} (${formatDate(uni.deadline as string)}) and is still marked "${uni.status}". Move it forward this week.`,
-      });
-    }
-  }
-
   // 6. A light day ahead is an opening to get ahead.
   const tomorrowLoad = open.filter((t) => t.dueDate && daysUntil(t.dueDate) === 1).length;
   if (tomorrowLoad <= 1 && overdue.length === 0 && open.length > 0) {
@@ -194,7 +181,7 @@ export function recommend(data: AppData, limit = 4): Recommendation[] {
       id: `untested-${untested.id}`,
       kind: "untested",
       weight: 32,
-      href: "/school",
+      href: "/courses",
       text: `${untested.name} has no grades recorded, so it is missing from your average and from every suggestion here. Add one when a mark comes back.`,
     });
   }

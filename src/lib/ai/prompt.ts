@@ -266,8 +266,9 @@ names, never "your grades" where "Physics SL, 77.7%" would do.
 basis: one short clause naming what you drew it from, e.g. "three reflections
 mentioning fatigue, and a 6-point drop in Physics". This is shown to the student
 so they can check your reasoning — never invent a basis.
-href: the page to act on it, one of /tasks, /courses, /grades, /universities,
-/weight, /reflection, or null when there is nothing to open.
+href: the page to act on it, one of /tasks, /plan, /courses, /goals, /weight,
+/reflection, or null when there is nothing to open. Those are all of them —
+a link to a page that does not exist is worse than no link.
 
 Never congratulate for its own sake. If the honest reading of the week is that
 they are doing fine, one takeaway saying so — specifically — is worth more than

@@ -181,8 +181,8 @@ const PAGES = [
   "/plan",
   "/tasks",
   "/courses",
-  "/school",
-  "/universities",
+  "/goals",
+  "/progress",
   "/weight",
   "/reflection",
   "/recommendations",
@@ -318,7 +318,7 @@ function runTool(call: ToolCall, store: Store, router: Router): ToolResult {
           weight: num(a.weight),
           date: date(a.date) ?? todayISO(),
         });
-        return ok(`Recorded ${assessment} — ${score}% in ${course.name}`, "/school");
+        return ok(`Recorded ${assessment} — ${score}% in ${course.name}`, `/courses/${course.id}`);
       }
 
       case "add_university": {
@@ -337,7 +337,8 @@ function runTool(call: ToolCall, store: Store, router: Router): ToolResult {
           website: "",
           fields: {},
         });
-        return ok(`Added ${name} to your university list`, "/universities");
+        // No page to send them to any more; the row is still kept.
+        return ok(`Added ${name} to your university list`);
       }
 
       case "log_weight": {

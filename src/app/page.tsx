@@ -206,7 +206,7 @@ export default function HomePage() {
           <section>
             <SectionTitle
               right={
-                <Link href="/school" className="text-xs text-ink-3 hover:text-ink">
+                <Link href="/courses" className="text-xs text-ink-3 hover:text-ink">
                   Details
                 </Link>
               }
@@ -261,55 +261,6 @@ export default function HomePage() {
             </Panel>
           </section>
 
-          <section>
-            <SectionTitle
-              right={
-                <Link href="/universities" className="text-xs text-ink-3 hover:text-ink">
-                  All
-                </Link>
-              }
-            >
-              Universities
-            </SectionTitle>
-            <Panel className="px-4 py-4">
-              {store.universities.length === 0 ? (
-                <p className="py-2 text-center text-sm text-ink-3">
-                  No universities on your list yet.
-                </p>
-              ) : (
-                <>
-                  <div className="grid grid-cols-3 gap-2 text-center">
-                    {uniCounts.map(({ priority, count }) => (
-                      <div key={priority} className="rounded-lg bg-panel-2 py-2.5">
-                        <div className="nums text-xl font-semibold">{count}</div>
-                        <div className="text-[11px] text-ink-3">
-                          {UNI_PRIORITY_LABEL[priority]}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                  {uni && (
-                    <div className="mt-3 border-t border-line pt-3">
-                      <p className="text-[11px] uppercase tracking-wider text-ink-3">
-                        Next deadline
-                      </p>
-                      <p className="mt-1 flex items-baseline justify-between gap-2 text-sm">
-                        <span className="truncate font-medium">
-                          {uni.flag} {uni.name}
-                        </span>
-                        <span className="nums shrink-0 text-ink-2">
-                          {formatDate(uni.deadline as string)}
-                        </span>
-                      </p>
-                      <p className="mt-0.5 text-xs text-ink-3">
-                        Closes {countdownLabel(uni.deadline as string)}
-                      </p>
-                    </div>
-                  )}
-                </>
-              )}
-            </Panel>
-          </section>
         </div>
       </div>
 

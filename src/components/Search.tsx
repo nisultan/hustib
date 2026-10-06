@@ -43,12 +43,6 @@ const PAGES: { title: string; detail: string; href: string; icon: string }[] = [
     icon: "M3.5 5h13v11h-13zM3.5 8.5h13M7 3v3M13 3v3",
   },
   {
-    title: "School",
-    detail: "Grades and averages",
-    href: "/school",
-    icon: "M3 16V9M8 16V4M13 16v-5M17 16H2",
-  },
-  {
     title: "Tasks",
     detail: "Everything you have to do",
     href: "/tasks",
@@ -59,12 +53,6 @@ const PAGES: { title: string; detail: string; href: string; icon: string }[] = [
     detail: "Subjects and topics",
     href: "/courses",
     icon: "M4 4h5a2 2 0 0 1 2 2v10a1.5 1.5 0 0 0-1.5-1.5H4zM16 4h-5a2 2 0 0 0-2 2v10",
-  },
-  {
-    title: "Universities",
-    detail: "Applications and deadlines",
-    href: "/universities",
-    icon: "M10 3.5 18 7l-8 3.5L2 7zM5.5 8.8V13c0 1.4 2 2.5 4.5 2.5s4.5-1.1 4.5-2.5V8.8",
   },
   {
     title: "Reflection",
@@ -141,34 +129,6 @@ function search(query: string, data: ReturnType<typeof useStore>): Result[] {
     }
   }
 
-  for (const g of data.grades) {
-    if (hit(q, g.assessment, g.type)) {
-      out.push({
-        group: "Grades",
-        title: `${g.assessment} — ${g.score}%`,
-        detail: `${courseName(g.courseId)} · ${formatDate(g.date)}`,
-        href: `/school?q=${encodeURIComponent(g.assessment)}`,
-      });
-    }
-  }
-
-  for (const u of data.universities) {
-    if (hit(q, u.name, u.country, u.city, u.program)) {
-      out.push({
-        group: "Universities",
-        title: u.name,
-        detail: `${u.city}, ${u.country} · ${u.program}`,
-        href: `/universities?q=${encodeURIComponent(u.name)}`,
-      });
-    } else if (hit(q, u.notes)) {
-      out.push({
-        group: "Notes",
-        title: `${u.name} notes`,
-        detail: excerpt(u.notes, q),
-        href: `/universities?q=${encodeURIComponent(u.name)}`,
-      });
-    }
-  }
 
   const order = ["Pages", "Universities", "Tasks", "Notes", "Courses", "Grades"];
   return out.sort((a, b) => order.indexOf(a.group) - order.indexOf(b.group)).slice(0, 12);

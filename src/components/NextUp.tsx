@@ -29,7 +29,7 @@ export function NextUp() {
 
   const deadlines = useMemo(
     () =>
-      upcoming(store, today, { layers: ["task", "university", "goal"], limit: MAX_PER_ROW }),
+      upcoming(store, today, { layers: ["task", "goal"], limit: MAX_PER_ROW }),
     [store, today],
   );
 
@@ -277,13 +277,11 @@ function unit(days: number): string {
 }
 
 function kindLabel(entry: Upcoming): string {
-  if (entry.kind === "university") return "Application";
   if (entry.kind === "goal") return "Goal";
   return "Task";
 }
 
 function hrefFor(entry: Upcoming): string {
-  if (entry.kind === "university") return "/universities";
   if (entry.kind === "goal") return "/goals";
   return "/tasks?view=upcoming";
 }

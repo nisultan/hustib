@@ -55,16 +55,6 @@ const PRIMARY: NavItem[] = [
     ),
   },
   {
-    href: "/school",
-    label: "School",
-    icon: (
-      <Icon>
-        <path d="M10 3.5 18 7l-8 3.5L2 7z" {...stroke} />
-        <path d="M5.5 8.8V13c0 1.4 2 2.5 4.5 2.5s4.5-1.1 4.5-2.5V8.8" {...stroke} />
-      </Icon>
-    ),
-  },
-  {
     href: "/tasks",
     label: "Tasks",
     icon: (
@@ -92,16 +82,6 @@ const PRIMARY: NavItem[] = [
         <circle cx="10" cy="10" r="7" {...stroke} />
         <circle cx="10" cy="10" r="3.4" {...stroke} />
         <circle cx="10" cy="10" r="0.9" fill="currentColor" stroke="none" />
-      </Icon>
-    ),
-  },
-  {
-    href: "/universities",
-    label: "Universities",
-    icon: (
-      <Icon>
-        <path d="M10 3.5 18 7l-8 3.5L2 7z" {...stroke} />
-        <path d="M5.5 8.8V13c0 1.4 2 2.5 4.5 2.5s4.5-1.1 4.5-2.5V8.8" {...stroke} />
       </Icon>
     ),
   },
@@ -230,17 +210,11 @@ export function Sidebar() {
             layoutId="sidebar-active"
             transition={springNav}
             aria-hidden
+            // The pill alone marks the page now. The accent rail down its
+            // left edge was a second marker saying the same thing, and at
+            // three pixels it read as a stray line rather than as emphasis.
             className="absolute inset-0 -z-10 rounded-lg bg-accent-soft"
-          >
-            {/* The rail is inside the pill, so it travels with it instead of
-                being redrawn at the destination. It grows out of nothing on
-                arrival, which is what gives the move a direction. */}
-            <motion.span
-              layoutId="sidebar-rail"
-              transition={springNav}
-              className="absolute inset-y-1.5 left-0 w-[3px] rounded-full bg-accent"
-            />
-          </motion.span>
+          />
         )}
 
         {/* The icon leads: it lifts a little when the pill arrives under it,
@@ -361,7 +335,7 @@ export function NavToggle() {
  * during a day rather than during a planning session — the rest stay one tap
  * away in the header.
  */
-const MOBILE_PRIMARY = ["/", "/plan", "/school", "/tasks", "/reflection"];
+const MOBILE_PRIMARY = ["/", "/plan", "/tasks", "/goals", "/reflection"];
 
 export function MobileNav() {
   const pathname = usePathname();
