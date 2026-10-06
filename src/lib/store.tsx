@@ -29,6 +29,7 @@ import {
   Profile,
   ID,
 } from "./types";
+import { coherent, patchFor } from "./tasks/coherent";
 import { seedData } from "./seed";
 import { todayISO } from "./dates";
 import { isSupabaseConfigured } from "./supabase/client";
@@ -584,7 +585,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         await repo.signOut();
       },
 
-      addTask: (t) => {
+      addTask: (raw) => {
+        const t = coherent(raw);
         if (cloud) {
           // The id is assigned by Postgres, so the row is appended once it
           // comes back rather than invented here and reconciled later.
@@ -599,13 +601,28 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           ...d,
           tasks: [
             ...d.tasks,
-            { ...t, id: uid(), createdAt: new Date().toISOString(), completedAt: null },
+            {
+              ...t,
+              id: uid(),
+              createdAt: new Date().toISOString(),
+              // A task created already ticked keeps the day it was ticked, the
+              // same as one created open and finished later. Hardcoding null
+              // here left the activity wall blind to it.
+              completedAt:
+                t.status === "completed" ? new Date().toISOString().slice(0, 10) : null,
+            },
           ],
         }));
       },
       updateTask: (id, patch) => {
-        mutate((d) => ({ ...d, tasks: upsert(d.tasks, id, patch) }));
-        if (cloud) push(repo.updateTask(id, patch));
+        // Against the row as it will be, not the patch alone, and read from
+        // `latest` rather than `data` so two edits in one frame compose.
+        const clean = patchFor(
+          latest.current.tasks.find((t) => t.id === id),
+          patch,
+        );
+        mutate((d) => ({ ...d, tasks: upsert(d.tasks, id, clean) }));
+        if (cloud) push(repo.updateTask(id, clean));
       },
       deleteTask: (id) => {
         mutate((d) => ({ ...d, tasks: d.tasks.filter((t) => t.id !== id) }));
@@ -623,7 +640,21 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         if (cloud) push(repo.updateTask(id, patch));
       },
 
-      addPlanItem: (item) => {
+      addPlanItem: (raw) => {
+        /*
+          A block has to be called something.
+
+          `title_is_not_empty` holds in the schema, and double-clicking an
+          empty slot in the day grid — the calendar gesture for "something
+          goes here" — sent an empty one. The database refused it, the block
+          appeared on screen anyway, and it was gone on the next reload.
+
+          Named here rather than at the double-click, because the next thing
+          that creates a block from a gesture will forget in the same way.
+        */
+        const item =
+          raw.title.trim() === "" ? { ...raw, title: "New block" } : { ...raw, title: raw.title };
+
         // On cloud the id is Postgres's to assign. Inventing one here and
         // inserting anyway leaves the screen holding an id the database has
         // never seen, and the next edit to that row fails as a malformed uuid.
