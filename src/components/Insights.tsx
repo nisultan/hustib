@@ -39,20 +39,20 @@ export function Insights({ limit }: { limit?: number }) {
               disabled={running}
               className="text-xs text-ink-3 transition-colors hover:text-ink disabled:opacity-50"
             >
-              {running ? "Thinking…" : "Look again"}
+              {running ? "Reading…" : "Look again"}
             </button>
           ) : undefined
         }
       >
-        Noticed about you
+        What I noticed
       </SectionTitle>
 
       {untouched ? (
         <div className="rounded-xl border border-dashed border-line px-4 py-7 text-center">
           <p className="text-[13px] leading-relaxed text-ink-2">
             {ready
-              ? "I can read back through your reflections, grades and habits and tell you what I see."
-              : "Not enough recorded yet. Add your courses and a few tasks, and this starts noticing things."}
+              ? "Want me to read back through your journal, your habits and how the term is actually going, and tell you what I see?"
+              : "Not much here yet. Write a few days and tick some habits, and there will be something to read."}
           </p>
           <button
             onClick={() => void reflect()}
@@ -62,14 +62,12 @@ export function Insights({ limit }: { limit?: number }) {
             Tell me about me
           </button>
           <p className="mt-2 text-[11px] text-ink-3">
-            Only when you ask — it does not run on its own.
+            Only when you ask. It never runs on its own.
           </p>
         </div>
       ) : shown.length === 0 ? (
         <p className="rounded-xl border border-dashed border-line px-3.5 py-6 text-center text-sm text-ink-3">
-          {running
-            ? "Reading back through your week…"
-            : "Nothing new worth flagging since last time."}
+          {running ? "Reading back through your week…" : "Nothing new since last time."}
         </p>
       ) : (
         <div className="grid gap-2">
@@ -91,36 +89,66 @@ export function Insights({ limit }: { limit?: number }) {
       {!error && outcome && outcome.insightsAdded === 0 && (
         <p className="mt-2 text-xs text-ink-3">
           {outcome.memoryChanged
-            ? "Read through your week — nothing new worth flagging, but I updated what I know about you."
-            : "Read through your week. Nothing new worth flagging since last time."}
+            ? "Read your week. Nothing new worth saying, but I know you a bit better now."
+            : "Read your week. Nothing new since last time."}
         </p>
       )}
     </section>
   );
 }
 
+/**
+ * One thing it noticed.
+ *
+ * The kind is carried by a tinted edge down the left rather than by a shouted
+ * uppercase chip. Three cards in a row each opening with a loud PATTERN label
+ * made the labels the loudest thing on the page, when the only reason the kind
+ * is shown at all is to say how much to trust it — a pattern is a reading, a
+ * suggestion is a thing to do.
+ *
+ * The basis sits under a rule, quieter than the body. It is there to be checked
+ * when something sounds wrong, not read every time.
+ */
 function Card({ insight, onDismiss }: { insight: Insight; onDismiss: () => void }) {
+  const tone = TONE[insight.kind];
+
   const body = (
     <>
-      <div className="flex items-center gap-2">
-        <Kind kind={insight.kind} />
-        <h3 className="text-[13px] font-semibold tracking-tight">{insight.title}</h3>
+      <div className="flex items-baseline gap-2">
+        <span
+          className="shrink-0 text-[10px] font-semibold uppercase tracking-[0.09em]"
+          style={{ color: tone }}
+        >
+          {INSIGHT_LABEL[insight.kind]}
+        </span>
+        <h3 className="text-[14px] font-semibold leading-snug tracking-tight text-balance">
+          {insight.title}
+        </h3>
       </div>
-      <p className="mt-1.5 text-sm leading-relaxed text-ink-2">{insight.body}</p>
+
+      <p className="mt-2 text-[13.5px] leading-[1.65] text-ink-2">{insight.body}</p>
+
       {insight.basis && (
-        <p className="mt-2 text-[11px] leading-snug text-ink-3">Based on {insight.basis}</p>
+        <p className="mt-3 border-t border-line pt-2 text-[11px] leading-snug text-ink-3">
+          {/* The lead-in stays. Without it the clause reads as a fragment
+              someone forgot to finish rather than as the evidence. */}
+          Going off {insight.basis}
+        </p>
       )}
     </>
   );
 
   return (
-    <div className="group relative rounded-xl border border-line bg-panel px-3.5 py-3 shadow-[var(--shadow)] transition-colors hover:border-line-strong">
+    <div
+      className="group relative overflow-hidden rounded-xl border border-line bg-panel shadow-[var(--shadow),var(--edge)] transition-[border-color,box-shadow] hover:border-line-strong hover:shadow-[var(--shadow-md),var(--edge)]"
+      style={{ borderLeft: `3px solid ${tone}` }}
+    >
       {insight.href ? (
-        <Link href={insight.href} className="block pr-6">
+        <Link href={insight.href} className="block px-4 py-3.5 pr-9">
           {body}
         </Link>
       ) : (
-        <div className="pr-6">{body}</div>
+        <div className="px-4 py-3.5 pr-9">{body}</div>
       )}
 
       <button
@@ -144,19 +172,9 @@ function Card({ insight, onDismiss }: { insight: Insight; onDismiss: () => void 
   );
 }
 
-function Kind({ kind }: { kind: Insight["kind"] }) {
-  const tone =
-    kind === "recommendation"
-      ? "border-accent/30 bg-accent-soft text-accent-text"
-      : kind === "pattern"
-        ? "border-[var(--medium)]/30 bg-[var(--medium)]/10 text-[var(--medium)]"
-        : "border-line bg-panel-2 text-ink-3";
-
-  return (
-    <span
-      className={`rounded border px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide ${tone}`}
-    >
-      {INSIGHT_LABEL[kind]}
-    </span>
-  );
-}
+/** A suggestion is the one you can act on, so it gets the accent. */
+const TONE: Record<Insight["kind"], string> = {
+  recommendation: "var(--accent)",
+  pattern: "var(--medium)",
+  takeaway: "var(--text-3)",
+};
