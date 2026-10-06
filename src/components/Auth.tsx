@@ -202,6 +202,22 @@ export function AuthScreen() {
  */
 function readable(err: unknown): string {
   const raw = err instanceof Error ? err.message : String(err);
+
+  /*
+    The request never left the browser.
+
+    supabase-js reports this as the bare string "Failed to fetch", which was
+    passing straight through to the student as "Failed to fetch" — true, and
+    useless, because it names the symptom and none of the three things that
+    actually cause it. A free Supabase project pauses itself after a week
+    without traffic, and a paused project is exactly this error.
+  */
+  if (/failed to fetch|networkerror|load failed|fetch failed/i.test(raw)) {
+    return "Could not reach the server. Check your connection — and if the hub has been quiet for a week, the database may have paused itself and needs resuming from the Supabase dashboard.";
+  }
+  if (/not configured/i.test(raw)) {
+    return "This build has no database configured, so there is nothing to sign in to. Your data is being kept on this device.";
+  }
   if (/invalid login credentials/i.test(raw)) {
     return "That email and password do not match an account.";
   }
