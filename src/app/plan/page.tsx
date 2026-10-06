@@ -47,7 +47,7 @@ import {
  * new block. Encoding both in one string keeps every drop target to a single
  * handler rather than one per source.
  */
-const DRAG_TYPE = "application/x-lifeos-plan";
+const DRAG_TYPE = "application/x-lockedin-plan";
 
 /** Where the day/sidebar split is remembered. */
 const SPLIT_KEY = "iblearner.planSplit";

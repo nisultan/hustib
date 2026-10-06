@@ -258,7 +258,7 @@ export function Sidebar() {
             collapsed ? "max-w-0 opacity-0 duration-150" : "max-w-[140px] opacity-100"
           }`}
         >
-          LifeOS
+          Locked In
         </span>
       </Link>
 

@@ -16,9 +16,9 @@ import { Logo } from "@/components/Logo";
 import { MotionProvider } from "@/lib/motion";
 
 export const metadata: Metadata = {
-  title: "LifeOS",
+  title: "Locked In",
   description:
-    "One place for tasks, grades, university applications, daily weight and reflection — and a clear answer to what to work on next.",
+    "One place for your tasks, your plan for the day, your habits and your goals — and a clear answer to what to work on next.",
 };
 
 export const viewport: Viewport = {

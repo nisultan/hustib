@@ -41,7 +41,7 @@ export function MemorySection() {
     <section>
       <div className="mb-3 flex items-end justify-between gap-3">
         <div>
-          <h2 className="text-sm font-semibold tracking-tight">What LifeOS knows about you</h2>
+          <h2 className="text-sm font-semibold tracking-tight">What Locked In knows about you</h2>
           <p className="mt-0.5 text-xs leading-relaxed text-ink-2">
             Built up from your tasks, grades and reflections over time, and used to tailor what
             it suggests. Correct anything that is wrong — it shapes real advice.

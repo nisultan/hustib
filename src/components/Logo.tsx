@@ -3,20 +3,21 @@ import { CSSProperties } from "react";
 /**
  * The mark.
  *
- * Still the thing the hub does — a line showing where a student stands and
- * which way it is going — but drawn as a measurement rather than as a
- * flourish. The earlier version filled the area under the curve and capped it
- * with a large dot, which read as friendly and slightly soft; this one keeps
- * the same gesture and takes the decoration out.
+ * Four brackets closing on a point: a focus lock, the thing a camera or a
+ * sight does when it has found what it is looking for. With the name it is
+ * almost literal — locked in is what the corners have just done — and it says
+ * the thing the app is actually for, which is not storing your week but
+ * narrowing it down to the one thing in front of you.
  *
- * The axis is what does most of the work. A line on its own is a squiggle; a
- * line against a corner is a reading against a scale, and that is the whole
- * difference between a mark that looks like an app icon and one that looks
- * like an instrument. It also fixes the silhouette — the corner anchors the
- * bottom-left, so the composition stays put at any size instead of drifting.
+ * Two earlier attempts were a chart line, filled and then bare against an
+ * axis. Both described what the hub contains. This describes what it is for,
+ * which turns out to be the more interesting half, and it has the silhouette
+ * neither of them had: a shape with a centre reads instantly at any size,
+ * where a diagonal line is just a diagonal line once it gets small enough.
  *
- * Square caps and mitred joins throughout. Round ones soften every corner, and
- * softness is precisely what was being asked to go.
+ * The brackets are open, deliberately. A closed square is a box and boxes are
+ * where things get put away; the gaps are what make it read as something being
+ * held in view.
  */
 export function LogoMark({
   className = "",
@@ -27,28 +28,22 @@ export function LogoMark({
 }) {
   return (
     <svg viewBox="0 0 24 24" fill="none" aria-hidden className={className} style={style}>
-      {/* The scale. Held back in weight and opacity so it reads as the ground
-          the line is measured against, not as part of the line. */}
-      <path
-        d="M5.2 4.5 V18.8 H19.4"
+      <g
         stroke="currentColor"
-        strokeWidth="1.7"
-        strokeLinecap="square"
-        strokeLinejoin="miter"
-        opacity="0.5"
-      />
+        strokeWidth="2.1"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        <path d="M4.9 9V6.7A1.8 1.8 0 0 1 6.7 4.9H9" />
+        <path d="M15 4.9h2.3A1.8 1.8 0 0 1 19.1 6.7V9" />
+        <path d="M19.1 15v2.3a1.8 1.8 0 0 1-1.8 1.8H15" />
+        <path d="M9 19.1H6.7a1.8 1.8 0 0 1-1.8-1.8V15" />
+      </g>
 
-      {/* Three segments, rising. Two would be a corner and four is a scribble
-          at sixteen pixels; three is the fewest that reads as a trend with a
-          setback in it, which is the honest shape of a term. */}
-      <path
-        d="M8 14.6 L11.9 10.3 L14.9 12.4 L19.6 6.4"
-        stroke="currentColor"
-        strokeWidth="2.2"
-        strokeLinecap="square"
-        strokeLinejoin="miter"
-        strokeMiterlimit="3"
-      />
+      {/* The thing being held. Solid, and the only filled shape in the mark —
+          at a favicon's size the brackets become texture and this stays the
+          part you actually see. */}
+      <circle cx="12" cy="12" r="2.7" fill="currentColor" />
     </svg>
   );
 }
@@ -66,7 +61,7 @@ const TILE_SIZE: Record<Size, string> = {
 };
 
 const MARK_SIZE: Record<Size, string> = {
-  sm: "size-4",
+  sm: "size-[15px]",
   md: "size-[18px]",
   lg: "size-7",
 };
@@ -76,10 +71,8 @@ type Size = "sm" | "md" | "lg";
 /**
  * The mark on its accent tile, which is how it appears everywhere in the app.
  *
- * No inner highlight any more. The gloss belonged to the button family and
- * made the logo look like something to press; a mark should sit flat and let
- * the controls be the things that catch the light. The corners are tighter for
- * the same reason — a softer radius reads as a toy at this size.
+ * Flat, with no inner highlight: the gloss belonged to the button family and
+ * made the logo look like something to press.
  */
 export function Logo({ size = "md", className = "" }: { size?: Size; className?: string }) {
   return (
