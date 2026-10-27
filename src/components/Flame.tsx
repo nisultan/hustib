@@ -29,7 +29,10 @@ export function Flame({ streak, className = "" }: { streak: number; className?: 
   // A young flame is amber and still; an established one burns toward white
   // at the core and moves a little faster.
   const body = heat < 0.5 ? "var(--high)" : "var(--urgent)";
-  const core = heat < 0.5 ? "var(--medium)" : "var(--high)";
+  // Not --medium, which is the blue of the "medium" priority: it put a blue
+  // core inside an amber flame. A pale amber reads as the hottest part.
+  const core =
+    heat < 0.5 ? "color-mix(in srgb, var(--high) 45%, #fff6d6)" : "var(--high)";
   const duration = 2.6 - heat * 0.9;
 
   return (

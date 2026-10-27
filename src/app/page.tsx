@@ -19,6 +19,7 @@ import { TodayPanel } from "@/components/TodayPanel";
 import { GoalsStrip } from "@/components/GoalsStrip";
 import { HabitStreaks } from "@/components/HabitStreaks";
 import { Spark } from "@/components/Spark";
+import { CheckIn } from "@/components/CheckIn";
 import { Productivity } from "@/components/Productivity";
 import { productivity } from "@/lib/productivity";
 import { appliesOn } from "@/lib/habits";
@@ -103,6 +104,8 @@ export default function HomePage() {
         <p className="mt-1 text-sm text-ink-2">{summary}</p>
         <Spark />
       </header>
+
+      <CheckIn />
 
       {/*
         Two columns, and which side a thing goes on is the whole argument.

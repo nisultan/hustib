@@ -16,7 +16,7 @@ import { ReactNode } from "react";
  * splits into columns at that width, so no line of text actually runs the full
  * 1680px.
  */
-const WIDE = ["/plan", "/"];
+const WIDE = ["/plan", "/", "/recommendations"];
 
 export function Main({ children }: { children: ReactNode }) {
   const pathname = usePathname();

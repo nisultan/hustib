@@ -1,9 +1,9 @@
-import { AppData, Block, Day, PRIORITY_RANK, Task } from "@/lib/types";
+import { AppData, Block, PRIORITY_RANK, Task } from "@/lib/types";
 import { progressOf } from "@/lib/goals/tracker";
+import { habitPatterns, pct, planPatterns, weekdayNames } from "@/lib/consistency";
 import { courseAverage, overallAverage, trend } from "@/lib/grades";
-import { addDays, daysUntil, todayISO } from "@/lib/dates";
+import { daysUntil, todayISO } from "@/lib/dates";
 import { productivity } from "@/lib/productivity";
-import { appliesOn, keptRate, streakOf } from "@/lib/habits";
 
 /**
  * The student's whole hub, flattened into something a model can read.
@@ -55,6 +55,7 @@ export function buildContext(data: AppData): string {
   out.push(section("UNIVERSITIES", universities(data)));
   out.push(section("TODAY'S PLAN", plan(data, today)));
   out.push(section("HABITS", habits(data, today)));
+  out.push(section("PLAN FOLLOW-THROUGH", planFollowThrough(data, today)));
   out.push(section("CONSISTENCY", consistency(data, today)));
   out.push(section("JOURNAL", journal(data)));
   out.push(section("WHAT YOU HAVE LEARNED ABOUT THEM", memory(data)));
@@ -234,63 +235,70 @@ function plan(data: AppData, today: string): string {
 }
 
 function habits(data: AppData, today: string): string {
-  const live = data.habits.filter((h) => h.archivedAt == null);
-  if (live.length === 0) return "";
+  const patterns = habitPatterns(data, today);
+  if (patterns.length === 0) return "";
 
-  const byDate = new Map(data.days.map((d) => [d.date, d]));
+  const live = new Map(data.habits.map((h) => [h.id, h]));
 
   /*
-    Shaped around the three things worth saying about a habit: whether a run is
-    riding on today, whether it has quietly stopped, and how it has gone lately.
-    A bare keep-rate supports none of those — "kept 9 of 14" cannot tell you
-    that a six-day streak is about to break this evening.
-  */
-  return live
-    .map((h) => {
-      const days =
-        h.weekdays.length === 0
-          ? "every day"
-          : h.weekdays
-              .map((d) => ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][d])
-              .join("/");
+    One line per habit, carrying the four things worth saying about it: is a
+    run riding on today, has it quietly stopped, is it getting better or worse,
+    and which day does it die on. Totals alone support none of those — "kept 9
+    of 14" cannot tell you that the 9 were all in the first week.
 
-      const streak = streakOf(h, byDate, today);
-      const { kept, due } = keptRate(h, byDate, today);
-      const dueToday = appliesOn(h, today);
-      const doneToday = byDate.get(today)?.habitsDone.includes(h.id) ?? false;
+    Spelled out in words rather than numbers where it matters, because the
+    model is better at noticing "slipping" than at subtracting two fractions.
+  */
+  return patterns
+    .map((p) => {
+      const h = live.get(p.id);
+      const schedule =
+        !h || h.weekdays.length === 0 ? "every day" : weekdayNames(h.weekdays);
 
       const bits: string[] = [];
-      bits.push(streak > 0 ? `${streak}-day run` : "no run going");
+      bits.push(p.streak > 0 ? `${p.streak}-day run` : "no run going");
+      bits.push(
+        p.dueToday ? (p.doneToday ? "done today" : "DUE TODAY, not yet done") : "not due today",
+      );
 
-      if (dueToday) {
-        bits.push(doneToday ? "done today" : "DUE TODAY, not yet done");
-      } else {
-        bits.push("not due today");
+      if (p.lastKept == null) bits.push("never kept");
+      else if (p.lastKept > 2) bits.push(`last kept ${p.lastKept} days ago`);
+
+      if (p.due > 0) bits.push(`${p.kept}/${p.due} kept over 4 weeks`);
+
+      if (p.trend === "up") {
+        bits.push(`IMPROVING: ${pct(p.recent)} last fortnight vs ${pct(p.before)} before`);
+      } else if (p.trend === "down") {
+        bits.push(`SLIPPING: ${pct(p.recent)} last fortnight vs ${pct(p.before)} before`);
       }
 
-      const last = lastKept(h, byDate, today);
-      if (last == null) bits.push("never kept");
-      else if (last > 2) bits.push(`last kept ${last} days ago`);
+      if (p.weakDays.length > 0) bits.push(`usually missed on ${weekdayNames(p.weakDays)}`);
 
-      if (due > 0) bits.push(`${kept}/${due} over the last month`);
-
-      return `- ${h.name} (${days}) — ${bits.join(" · ")}`;
+      return `- ${p.name} (${schedule}) — ${bits.join(" · ")}`;
     })
     .join("\n");
 }
 
-/** How many days since it was last kept, or null if it never has been. */
-function lastKept(
-  habit: Parameters<typeof streakOf>[0],
-  byDate: Map<string, Day>,
-  today: string,
-): number | null {
-  for (let i = 0; i < 400; i += 1) {
-    const date = addDays(today, -i);
-    if (date < habit.createdAt.slice(0, 10)) return null;
-    if (byDate.get(date)?.habitsDone.includes(habit.id)) return i;
-  }
-  return null;
+/**
+ * Whether the planned day tends to happen, over the last fortnight.
+ *
+ * Split by time of day and by category, because that is where a plan breaks
+ * and where the advice has to land — "your evening blocks almost never happen"
+ * is something to act on; "64% completion" is something to feel bad about.
+ */
+function planFollowThrough(data: AppData, today: string): string {
+  const p = planPatterns(data, today);
+  if (p.planned < 4) return "";
+
+  const slice = (s: { label: string; planned: number; done: number }) =>
+    `${s.label} ${s.done}/${s.planned}`;
+
+  const lines = [
+    `Planned ${p.planned} blocks over the last 14 days, did ${p.done} (${pct(p.done / p.planned)}).`,
+  ];
+  if (p.byPart.length > 1) lines.push(`By time of day: ${p.byPart.map(slice).join(", ")}.`);
+  if (p.byCategory.length > 1) lines.push(`By category: ${p.byCategory.map(slice).join(", ")}.`);
+  return lines.join("\n");
 }
 
 function consistency(data: AppData, today: string): string {
