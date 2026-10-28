@@ -1,9 +1,10 @@
 "use client";
 
 import Link from "next/link";
+import { useState } from "react";
 import { useStore } from "@/lib/store";
 import { useReflection } from "@/lib/ai/useReflection";
-import { Insight, INSIGHT_LABEL } from "@/lib/types";
+import { Insight } from "@/lib/types";
 import { SectionTitle } from "./ui";
 
 /**
@@ -100,63 +101,92 @@ export function Insights({ limit }: { limit?: number }) {
 /**
  * One thing it noticed.
  *
- * The kind is carried by a tinted edge down the left rather than by a shouted
- * uppercase chip. Three cards in a row each opening with a loud PATTERN label
- * made the labels the loudest thing on the page, when the only reason the kind
- * is shown at all is to say how much to trust it — a pattern is a reading, a
- * suggestion is a thing to do.
+ * Built to read like a note from someone rather than an output from something.
+ * The earlier card had every tell: a shouted SUGGESTION label, a coloured rail
+ * down the side, a wall of three sentences, and a "Going off…" citation line
+ * under each — four cards of that and the page looked like a model's
+ * scratchpad.
  *
- * The basis sits under a rule, quieter than the body. It is there to be checked
- * when something sounds wrong, not read every time.
+ * So the title does the talking, large, the way you would say the point
+ * first. The body is held to two lines until it is asked for; most of the
+ * time the title was the message. The evidence is still one tap away under
+ * "why?", because being able to check the reasoning matters — it just does not
+ * need to be on screen every time. The kind survives as a small mark rather
+ * than a label: it says how much to trust the card, and that is a glance, not
+ * a heading.
  */
 function Card({ insight, onDismiss }: { insight: Insight; onDismiss: () => void }) {
-  const tone = TONE[insight.kind];
-
-  const body = (
-    <>
-      <div className="flex items-baseline gap-2">
-        <span
-          className="shrink-0 text-[10px] font-semibold uppercase tracking-[0.09em]"
-          style={{ color: tone }}
-        >
-          {INSIGHT_LABEL[insight.kind]}
-        </span>
-        <h3 className="text-[14px] font-semibold leading-snug tracking-tight text-balance">
-          {insight.title}
-        </h3>
-      </div>
-
-      <p className="mt-2 text-[13.5px] leading-[1.65] text-ink-2">{insight.body}</p>
-
-      {insight.basis && (
-        <p className="mt-3 border-t border-line pt-2 text-[11px] leading-snug text-ink-3">
-          {/* The lead-in stays. Without it the clause reads as a fragment
-              someone forgot to finish rather than as the evidence. */}
-          Going off {insight.basis}
-        </p>
-      )}
-    </>
-  );
+  const [open, setOpen] = useState(false);
+  const [why, setWhy] = useState(false);
+  const k = KIND[insight.kind];
 
   return (
-    <div
-      className="group relative overflow-hidden rounded-xl border border-line bg-panel shadow-[var(--shadow),var(--edge)] transition-[border-color,box-shadow] hover:border-line-strong hover:shadow-[var(--shadow-md),var(--edge)]"
-      style={{ borderLeft: `3px solid ${tone}` }}
-    >
-      {insight.href ? (
-        <Link href={insight.href} className="block px-4 py-3.5 pr-9">
-          {body}
-        </Link>
-      ) : (
-        <div className="px-4 py-3.5 pr-9">{body}</div>
-      )}
+    <article className="group relative rounded-2xl border border-line bg-panel p-4 shadow-[var(--shadow),var(--edge)] transition-[border-color,box-shadow] hover:border-line-strong">
+      <div className="flex items-start gap-3 pr-7">
+        <span
+          aria-hidden
+          title={k.label}
+          className="mt-0.5 grid size-8 shrink-0 place-items-center rounded-full text-[15px]"
+          style={{ background: `color-mix(in srgb, ${k.tone} 13%, transparent)`, color: k.tone }}
+        >
+          {k.glyph}
+        </span>
+
+        <div className="min-w-0 flex-1">
+          <h3 className="text-[15.5px] font-semibold leading-snug tracking-tight text-balance">
+            {insight.title}
+          </h3>
+
+          <p
+            className={`mt-1.5 text-[13.5px] leading-relaxed text-ink-2 ${open ? "" : "line-clamp-2"}`}
+          >
+            {insight.body}
+          </p>
+
+          {why && insight.basis && (
+            <p className="mt-2 rounded-lg bg-panel-2 px-2.5 py-1.5 text-[11.5px] leading-snug text-ink-3">
+              {insight.basis}
+            </p>
+          )}
+
+          <div className="mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px]">
+            {insight.body.length > 140 && (
+              <button
+                type="button"
+                onClick={() => setOpen((v) => !v)}
+                className="text-ink-3 transition-colors hover:text-ink"
+              >
+                {open ? "Less" : "More"}
+              </button>
+            )}
+            {insight.basis && (
+              <button
+                type="button"
+                onClick={() => setWhy((v) => !v)}
+                className="text-ink-3 transition-colors hover:text-ink"
+              >
+                {why ? "Hide why" : "Why?"}
+              </button>
+            )}
+            {insight.href && (
+              <Link
+                href={insight.href}
+                className="ml-auto font-medium transition-opacity hover:opacity-80"
+                style={{ color: k.tone }}
+              >
+                Go there →
+              </Link>
+            )}
+          </div>
+        </div>
+      </div>
 
       <button
         onClick={onDismiss}
         aria-label={`Dismiss "${insight.title}"`}
         title="Dismiss"
         // Always reachable by keyboard and on touch, where there is no hover.
-        className="absolute right-2 top-2.5 grid size-6 place-items-center rounded-md text-ink-3 opacity-0 transition-opacity hover:bg-panel-2 hover:text-ink focus-visible:opacity-100 group-hover:opacity-100 max-md:opacity-60"
+        className="absolute right-2.5 top-2.5 grid size-7 place-items-center rounded-md text-ink-3 opacity-0 transition-opacity hover:bg-panel-2 hover:text-ink focus-visible:opacity-100 group-hover:opacity-100 max-md:opacity-60"
       >
         <svg viewBox="0 0 16 16" aria-hidden className="size-3.5">
           <path
@@ -168,13 +198,17 @@ function Card({ insight, onDismiss }: { insight: Insight; onDismiss: () => void 
           />
         </svg>
       </button>
-    </div>
+    </article>
   );
 }
 
-/** A suggestion is the one you can act on, so it gets the accent. */
-const TONE: Record<Insight["kind"], string> = {
-  recommendation: "var(--accent)",
-  pattern: "var(--medium)",
-  takeaway: "var(--text-3)",
+/**
+ * A mark per kind. A pattern is a reading of weeks and can be wrong; a
+ * suggestion is a thing to do today; a takeaway is a fact restated. The mark
+ * carries that difference without a word in capitals.
+ */
+const KIND: Record<Insight["kind"], { label: string; glyph: string; tone: string }> = {
+  pattern: { label: "Pattern", glyph: "∿", tone: "var(--accent)" },
+  recommendation: { label: "Suggestion", glyph: "→", tone: "var(--up)" },
+  takeaway: { label: "Takeaway", glyph: "•", tone: "var(--text-3)" },
 };
