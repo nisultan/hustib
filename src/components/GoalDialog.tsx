@@ -278,7 +278,9 @@ export function GoalDialog({
                         Read it again
                       </Button>
                       <span className="text-[10px] text-ink-3">
-                        Counted from your own data after this — the AI does not run again.
+                        {tracker.source === "reflection"
+                          ? "Lifee re-reads your journal every few days to move this bar."
+                          : "Counted from your own data after this — the AI does not run again."}
                       </span>
                     </div>
                   </>

@@ -257,7 +257,20 @@ export const GOAL_STATUS_LABEL: Record<GoalStatus, string> = {
  * The deadline is optional on purpose. Plenty of what matters has no date, and
  * inventing one to satisfy a form turns an ambition into an overdue item.
  */
-export type GoalSource = "habits" | "tasks" | "plan" | "journal" | "weight";
+export type GoalSource = "habits" | "tasks" | "plan" | "journal" | "weight" | "reflection";
+
+/**
+ * A goal's progress as read from the journal by the model.
+ *
+ * For goals nothing countable measures — "stop procrastinating", "get into
+ * NYU", "be calmer before exams". Re-read every few days, not continuously;
+ * `at` is when, so the card can say how fresh the reading is.
+ */
+export interface GoalJudgement {
+  value: number;
+  why: string;
+  at: string;
+}
 
 export interface GoalTracker {
   source: GoalSource;
@@ -280,6 +293,15 @@ export interface GoalTracker {
   windowDays: number;
   /** The model's own sentence, shown under the bar so the number is never a mystery. */
   basis: string;
+  /**
+   * For habits and plan blocks: count them, or measure how reliably they are
+   * done. "Finish 40 blocks" is a count; "follow my plan" is a rate, and a
+   * count would reward planning more rather than doing what was planned. When
+   * a rate, `target` is the percentage that counts as success.
+   */
+  measure?: "count" | "rate";
+  /** The latest reading, for source "reflection". */
+  judged?: GoalJudgement | null;
 }
 
 export interface Goal {

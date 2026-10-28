@@ -195,13 +195,7 @@ function goals(data: AppData, today: string): string {
       */
       const { value, tracked } = progressOf(g, data, today);
       if (value != null) {
-        bits.push(
-          tracked?.measured
-            ? tracked.source === "weight"
-              ? `${value}% (${tracked.observed}kg towards ${tracked.target}kg)`
-              : `${value}% (${tracked.observed}/${tracked.target} ${tracked.unit}, ${tracked.window})`
-            : `${value}% done`,
-        );
+        bits.push(tracked?.measured ? `${value}% (${tracked.summary})` : `${value}% done`);
       }
       if (tracked && !tracked.measured) bits.push("tracked, but nothing recorded yet");
       const why = g.note.trim() ? ` — ${truncate(g.note, 200)}` : "";

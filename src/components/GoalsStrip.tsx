@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useMemo } from "react";
 import { useStore } from "@/lib/store";
 import { progressOf } from "@/lib/goals/tracker";
+import { useGoalReadings } from "@/lib/goals/judge";
 import { countdownLabel, daysUntil } from "@/lib/dates";
 import { SectionTitle } from "./ui";
 
@@ -23,6 +24,8 @@ const MAX = 4;
 
 export function GoalsStrip() {
   const store = useStore();
+  // Keeps journal-read goals fresh from the dashboard too; a no-op when they are.
+  useGoalReadings();
 
   const goals = useMemo(
     () =>
@@ -112,11 +115,9 @@ export function GoalsStrip() {
 
                 {/* What the bar counted. A number with no working shown is the
                     thing the hand-set slider already was. */}
-                {tracked?.measured && (
-                  <span className="nums truncate text-[10px] text-ink-3">
-                    {tracked.source === "weight"
-                      ? `${tracked.observed} kg → ${tracked.target} kg`
-                      : `${tracked.observed} of ${tracked.target} ${tracked.unit} · ${tracked.window}`}
+                {tracked && (
+                  <span className="line-clamp-2 text-[10.5px] leading-snug text-ink-3">
+                    {tracked.summary}
                   </span>
                 )}
               </span>

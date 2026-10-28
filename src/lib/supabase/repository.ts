@@ -1090,7 +1090,7 @@ function toGoal(row: GoalRow): Goal {
   };
 }
 
-const GOAL_SOURCES = ["habits", "tasks", "plan", "journal", "weight"];
+const GOAL_SOURCES = ["habits", "tasks", "plan", "journal", "weight", "reflection"];
 
 /**
  * The measurement spec, checked on the way in.
@@ -1118,7 +1118,18 @@ function toTracker(raw: unknown): GoalTracker | null {
     target: t.target,
     windowDays: typeof t.windowDays === "number" && Number.isFinite(t.windowDays) ? t.windowDays : 0,
     basis: typeof t.basis === "string" ? t.basis : "",
+    measure: t.measure === "rate" ? "rate" : "count",
+    judged: toJudgement(t.judged),
   };
+}
+
+/** The last journal reading of a goal, or null when absent or malformed. */
+function toJudgement(raw: unknown): GoalTracker["judged"] {
+  if (raw == null || typeof raw !== "object") return null;
+  const j = raw as Record<string, unknown>;
+  if (typeof j.value !== "number" || !Number.isFinite(j.value)) return null;
+  if (typeof j.at !== "string") return null;
+  return { value: j.value, why: typeof j.why === "string" ? j.why : "", at: j.at };
 }
 
 const IMPORTANT_KINDS = ["exam", "birthday", "holiday", "trip", "other"];

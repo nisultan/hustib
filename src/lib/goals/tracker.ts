@@ -1,5 +1,6 @@
 import { AppData, Goal, GoalSource, GoalTracker, ID } from "@/lib/types";
 import { addDays, todayISO, formatDate } from "@/lib/dates";
+import { appliesOn } from "@/lib/habits";
 
 // Re-exported so callers can take the spec and the arithmetic from one place.
 export type { GoalSource, GoalTracker };
@@ -39,6 +40,12 @@ export interface TrackedProgress {
   source: GoalSource;
   /** False when the spec points at something with no data behind it yet. */
   measured: boolean;
+  /**
+   * The line under the bar, written once here. Three places used to format it
+   * for themselves, and each new kind of goal would have meant teaching all
+   * three — and getting one of them wrong.
+   */
+  summary: string;
 }
 
 const SOURCE_LABEL: Record<GoalSource, string> = {
@@ -47,6 +54,7 @@ const SOURCE_LABEL: Record<GoalSource, string> = {
   plan: "planned blocks",
   journal: "days written",
   weight: "weight",
+  reflection: "journal reading",
 };
 
 export function sourceLabel(source: GoalSource): string {
@@ -99,6 +107,10 @@ export function evaluate(
     typeof date === "string" && date.slice(0, 10) >= from && date.slice(0, 10) <= today;
 
   if (tracker.source === "weight") return weight(goal, tracker, data);
+  if (tracker.source === "reflection") return reading(tracker, today);
+  if (tracker.measure === "rate" && (tracker.source === "habits" || tracker.source === "plan")) {
+    return rate(tracker, data, today, from, window);
+  }
 
   const target = Math.max(tracker.target, 0);
   let observed = 0;
@@ -139,6 +151,108 @@ export function evaluate(
     window,
     source: tracker.source,
     measured: true,
+    summary: `${observed} of ${target} ${SOURCE_LABEL[tracker.source]} · ${window}`,
+  };
+}
+
+/**
+ * How reliably something is done, rather than how much of it.
+ *
+ * "Follow my plan" measured as a count rewards planning more; measured as a
+ * rate it rewards doing what was planned, which is the goal. Same for habits:
+ * keeping a habit five days in seven is the thing, however many habits there
+ * are. The target is the percentage that counts as success, so 80% of planned
+ * blocks done against a target of 80 is a full bar.
+ */
+function rate(
+  tracker: GoalTracker,
+  data: AppData,
+  today: string,
+  from: string,
+  window: string,
+): TrackedProgress {
+  // Today is still being lived; a block not yet ticked at breakfast is not a
+  // block missed.
+  const last = addDays(today, -1);
+  let done = 0;
+  let due = 0;
+
+  if (tracker.source === "plan") {
+    for (const p of data.plan) {
+      if (p.date < from || p.date > last || !matches(p, tracker)) continue;
+      due += 1;
+      if (p.done) done += 1;
+    }
+  } else {
+    const habits = data.habits.filter(
+      (h) =>
+        h.archivedAt == null && (tracker.habitIds.length === 0 || tracker.habitIds.includes(h.id)),
+    );
+    const byDate = new Map(data.days.map((d) => [d.date, d]));
+    for (let date = from; date <= last; date = addDays(date, 1)) {
+      for (const h of habits) {
+        if (!appliesOn(h, date)) continue;
+        due += 1;
+        if (byDate.get(date)?.habitsDone.includes(h.id)) done += 1;
+      }
+    }
+  }
+
+  const target = Math.min(100, Math.max(tracker.target, 1));
+  const pct = due === 0 ? 0 : Math.round((done / due) * 100);
+  const what = tracker.source === "plan" ? "planned blocks done" : "habit days kept";
+
+  return {
+    value: due === 0 ? 0 : clamp(Math.round((pct / target) * 100)),
+    observed: pct,
+    target,
+    unit: "%",
+    basis: tracker.basis,
+    window,
+    source: tracker.source,
+    measured: due > 0,
+    summary:
+      due === 0
+        ? `Nothing ${tracker.source === "plan" ? "planned" : "due"} yet · ${window}`
+        : `${pct}% of ${what} (${done}/${due}) · aiming for ${target}% · ${window}`,
+  };
+}
+
+/**
+ * Progress as read from the journal, for goals nothing countable measures.
+ *
+ * The number comes from the last reading, which is refreshed every few days
+ * rather than on every render — the arithmetic sources are free to recompute,
+ * this one costs a call. Until the first reading lands it says so rather than
+ * drawing an empty bar that looks like a verdict.
+ */
+function reading(tracker: GoalTracker, today: string): TrackedProgress {
+  const j = tracker.judged;
+  if (!j) {
+    return {
+      value: 0,
+      observed: 0,
+      target: 100,
+      unit: "",
+      basis: tracker.basis,
+      window: "",
+      source: "reflection",
+      measured: false,
+      summary: "Waiting for the first read of your journal.",
+    };
+  }
+  const ago = Math.round((Date.parse(`${today}T00:00:00Z`) - Date.parse(`${j.at.slice(0, 10)}T00:00:00Z`)) / 86_400_000);
+  const when = ago <= 0 ? "today" : ago === 1 ? "yesterday" : `${ago} days ago`;
+  return {
+    value: clamp(Math.round(j.value)),
+    observed: j.value,
+    target: 100,
+    unit: "",
+    basis: tracker.basis,
+    window: when,
+    source: "reflection",
+    measured: true,
+    summary: `${j.why} · read from your journal ${when}`,
   };
 }
 
@@ -175,6 +289,7 @@ function weight(goal: Goal, tracker: GoalTracker, data: AppData): TrackedProgres
       window: "no weigh-ins yet",
       source: "weight",
       measured: false,
+      summary: "No weigh-ins yet.",
     };
   }
 
@@ -192,6 +307,7 @@ function weight(goal: Goal, tracker: GoalTracker, data: AppData): TrackedProgres
     window: `from ${baseline} kg`,
     source: "weight",
     measured: true,
+    summary: `${current} kg → ${tracker.target} kg · started at ${baseline} kg`,
   };
 }
 
@@ -221,6 +337,7 @@ export function progressOf(
 /** Plain English for the spec itself, for the line under the bar. */
 export function describe(tracker: GoalTracker, data: AppData): string {
   if (tracker.source === "weight") return `Towards ${tracker.target} kg`;
+  if (tracker.source === "reflection") return "Read from your journal every few days";
 
   const names = (ids: ID[], from: { id: ID; name: string }[]) =>
     ids
@@ -239,7 +356,12 @@ export function describe(tracker: GoalTracker, data: AppData): string {
           .filter((s) => s !== "")
           .join(" · ");
 
-  const bits = [`${tracker.target} ${SOURCE_LABEL[tracker.source]}`];
+  const bits =
+    tracker.measure === "rate"
+      ? [
+          `${tracker.target}% of ${tracker.source === "plan" ? "planned blocks done" : "habit days kept"}`,
+        ]
+      : [`${tracker.target} ${SOURCE_LABEL[tracker.source]}`];
   if (who !== "" && tracker.source !== "journal") bits.push(who);
   bits.push(tracker.windowDays > 0 ? `rolling ${tracker.windowDays} days` : "cumulative");
   return bits.join(" · ");

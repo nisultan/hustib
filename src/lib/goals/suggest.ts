@@ -12,7 +12,7 @@ import { GoalSource, GoalTracker } from "./tracker";
  * number that means nothing.
  */
 
-const SOURCES: GoalSource[] = ["habits", "tasks", "plan", "journal", "weight"];
+const SOURCES: GoalSource[] = ["habits", "tasks", "plan", "journal", "weight", "reflection"];
 
 interface Handles {
   text: string;
@@ -127,10 +127,14 @@ export async function suggestTracker(
   const source = SOURCES.includes(raw.source) ? (raw.source as GoalSource) : null;
   if (source == null) return { tracker: null, declined: true };
 
-  const target = Number(raw.target);
+  // A journal reading has no target to count towards; anything else needs one.
+  const target = source === "reflection" ? 100 : Number(raw.target);
   if (!Number.isFinite(target) || target <= 0) return { tracker: null, declined: true };
 
   const windowDays = Number(raw.windowDays);
+  // Rate only means something where there is a "due" to be a rate of.
+  const measure: "count" | "rate" =
+    raw.measure === "rate" && (source === "habits" || source === "plan") ? "rate" : "count";
 
   return {
     tracker: {
@@ -145,12 +149,20 @@ export async function suggestTracker(
         : [],
       // Weight is a figure in kg, everything else is a count of things, so the
       // ceiling differs by two orders of magnitude.
-      target: source === "weight" ? clamp(target, 20, 400) : Math.round(clamp(target, 1, 10_000)),
+      // Weight is kilograms, a rate is a percentage, everything else a count.
+      target:
+        source === "weight"
+          ? clamp(target, 20, 400)
+          : measure === "rate"
+            ? Math.round(clamp(target, 10, 100))
+            : Math.round(clamp(target, 1, 10_000)),
       // Capped at 90 to match the instruction. A model that answers 305 for
       // "every day for a month" has stopped describing a rolling window, and a
       // window that long never falls, which is the one thing it exists to do.
       windowDays: Number.isFinite(windowDays) ? Math.round(clamp(windowDays, 0, 90)) : 0,
       basis: typeof raw.basis === "string" ? raw.basis.trim().slice(0, 240) : "",
+      measure,
+      judged: null,
     },
     declined: false,
   };

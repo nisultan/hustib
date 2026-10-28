@@ -29,6 +29,13 @@ You are given the goal and an inventory of what the hub tracks. Return one measu
 - plan — counts finished blocks in the daily planner. For time spent on something that is not coursework and not a habit.
 - journal — counts days with a written reflection. Only for goals about writing, reflecting or self-tracking.
 - weight — the only source measured as a distance. For a target weight. Put the target weight in kg in "target".
+- reflection — progress read from what they write in their journal, every few days, by a separate pass. For any goal nothing above can count: getting into a university, being calmer before exams, stopping procrastinating, getting better at something, a relationship, a mindset. Set target to 100 and windowDays to 0; they are not used.
+
+# Count or rate
+For habits and plan you also choose "measure":
+- "count" — how many, towards a number. "Do 40 study blocks", "pray Fajr 30 times".
+- "rate" — how reliably, as a percentage of what was due or planned. "Follow my plan", "stop skipping training", "be consistent with prayer". Then target is the percentage that counts as success — usually 70 to 90. This is the right answer whenever the goal is about consistency rather than volume.
+For every other source, measure is "count".
 
 # Choosing
 Pick the source with real evidence behind it. A goal about training is measured by the training habit if one exists, not by keywords.
@@ -42,8 +49,8 @@ Otherwise windowDays is a rolling window and the bar falls when they stop, which
 # The target
 Make it reachable by the deadline if there is one, and honest. "Train 3x a week" over a rolling 28 days is a target of 12, not 3.
 
-# When you cannot measure it
-If nothing in the inventory measures this goal, return trackable: false and fill the remaining fields with anything — they are discarded. A goal about getting into a university, or feeling less anxious, is not measurable from ticks, and a made-up proxy is worse than a slider the student sets themselves. Do not stretch.
+# Every goal can be tracked
+Prefer the countable sources when they genuinely measure the goal — they are exact and free. When nothing countable does, use reflection rather than stretching a proxy: a made-up proxy (counting "university" in task titles for "get into NYU") is worse than reading the journal. Only return trackable: false for something that is not a goal at all.
 
 # basis
 One short sentence, addressed to the student, saying what is being counted and why that stands for the goal. It sits under the progress bar. No preamble.`;
@@ -58,7 +65,12 @@ const RESPONSE_SCHEMA = {
     source: {
       type: "STRING",
       format: "enum",
-      enum: ["habits", "tasks", "plan", "journal", "weight"],
+      enum: ["habits", "tasks", "plan", "journal", "weight", "reflection"],
+    },
+    measure: {
+      type: "STRING",
+      format: "enum",
+      enum: ["count", "rate"],
     },
     habitIds: { type: "ARRAY", items: { type: "STRING" }, description: "Handles like H1." },
     courseIds: { type: "ARRAY", items: { type: "STRING" }, description: "Handles like S1." },
@@ -95,6 +107,7 @@ const RESPONSE_SCHEMA = {
     "keywords",
     "target",
     "windowDays",
+    "measure",
     "basis",
   ],
 };

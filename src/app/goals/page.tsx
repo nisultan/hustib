@@ -9,6 +9,7 @@ import { progressOf, TrackedProgress } from "@/lib/goals/tracker";
 import { PageHeader, Panel, SectionTitle } from "@/components/ui";
 import { GoalDialog } from "@/components/GoalDialog";
 import { Celebration } from "@/components/Celebration";
+import { useGoalReadings } from "@/lib/goals/judge";
 
 /**
  * What the student is actually aiming at.
@@ -36,6 +37,10 @@ export default function GoalsPage() {
     };
   }, [store.goals]);
 
+  // Re-reads journal-tracked goals whose reading has gone stale. Cheap when
+  // nothing is stale — it checks a date and returns.
+  const readings = useGoalReadings();
+
   if (!store.ready) return <div className="h-64" aria-busy="true" />;
 
   return (
@@ -52,6 +57,25 @@ export default function GoalsPage() {
           </button>
         }
       />
+
+      {readings.count > 0 && (
+        <div className="mb-5 flex flex-wrap items-center gap-x-3 gap-y-1 rounded-xl border border-line bg-panel px-4 py-2.5 text-[12.5px] text-ink-2 shadow-[var(--shadow),var(--edge)]">
+          <span aria-hidden className="text-accent-text">∿</span>
+          <span>
+            {readings.count === 1 ? "One goal is" : `${readings.count} goals are`} tracked by reading your
+            journal — refreshed every few days.
+          </span>
+          <button
+            type="button"
+            onClick={() => void readings.refresh()}
+            disabled={readings.busy}
+            className="ml-auto font-medium text-accent-text transition-opacity hover:opacity-80 disabled:opacity-50"
+          >
+            {readings.busy ? "Reading…" : "Read again now"}
+          </button>
+          {readings.error && <span className="w-full text-[11.5px] text-[var(--urgent)]">{readings.error}</span>}
+        </div>
+      )}
 
       {store.goals.length === 0 ? (
         <Empty onAdd={() => setEditing("new")} />
@@ -315,21 +339,7 @@ function Progress({ value, tracked }: { value: number; tracked: TrackedProgress 
       </div>
 
       {tracked && (
-        <p className="nums text-[10px] leading-relaxed text-ink-3">
-          {tracked.measured ? (
-            tracked.source === "weight" ? (
-              <>
-                {tracked.observed} kg → {tracked.target} kg · {tracked.window}
-              </>
-            ) : (
-              <>
-                {tracked.observed} of {tracked.target} {tracked.unit} · {tracked.window}
-              </>
-            )
-          ) : (
-            "Nothing recorded to measure this against yet."
-          )}
-        </p>
+        <p className="text-[10.5px] leading-relaxed text-ink-3">{tracked.summary}</p>
       )}
     </div>
   );
