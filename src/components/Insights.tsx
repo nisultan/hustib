@@ -6,6 +6,7 @@ import { useStore } from "@/lib/store";
 import { useReflection } from "@/lib/ai/useReflection";
 import { Insight } from "@/lib/types";
 import { SectionTitle } from "./ui";
+import { InsightIcon } from "./InsightIcon";
 
 /**
  * What the hub noticed, when asked to look.
@@ -123,14 +124,7 @@ function Card({ insight, onDismiss }: { insight: Insight; onDismiss: () => void 
   return (
     <article className="group relative rounded-2xl border border-line bg-panel p-4 shadow-[var(--shadow),var(--edge)] transition-[border-color,box-shadow] hover:border-line-strong">
       <div className="flex items-start gap-3 pr-7">
-        <span
-          aria-hidden
-          title={k.label}
-          className="mt-0.5 grid size-8 shrink-0 place-items-center rounded-full text-[15px]"
-          style={{ background: `color-mix(in srgb, ${k.tone} 13%, transparent)`, color: k.tone }}
-        >
-          {k.glyph}
-        </span>
+        <InsightIcon insight={insight} tone={k.tone} label={k.label} />
 
         <div className="min-w-0 flex-1">
           <h3 className="text-[15.5px] font-semibold leading-snug tracking-tight text-balance">
@@ -203,12 +197,12 @@ function Card({ insight, onDismiss }: { insight: Insight; onDismiss: () => void 
 }
 
 /**
- * A mark per kind. A pattern is a reading of weeks and can be wrong; a
- * suggestion is a thing to do today; a takeaway is a fact restated. The mark
- * carries that difference without a word in capitals.
+ * A colour per kind. A pattern is a reading of weeks and can be wrong; a
+ * suggestion is a thing to do today; a takeaway is a fact restated. The icon
+ * says what the card is about; its colour says which of those it is.
  */
-const KIND: Record<Insight["kind"], { label: string; glyph: string; tone: string }> = {
-  pattern: { label: "Pattern", glyph: "∿", tone: "var(--accent)" },
-  recommendation: { label: "Suggestion", glyph: "→", tone: "var(--up)" },
-  takeaway: { label: "Takeaway", glyph: "•", tone: "var(--text-3)" },
+const KIND: Record<Insight["kind"], { label: string; tone: string }> = {
+  pattern: { label: "Pattern", tone: "var(--accent)" },
+  recommendation: { label: "Suggestion", tone: "var(--up)" },
+  takeaway: { label: "Takeaway", tone: "var(--text-3)" },
 };
