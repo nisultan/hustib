@@ -26,7 +26,9 @@ export type Layer = MarkKind | "plan";
 export const LAYERS: { id: Layer; label: string }[] = [
   { id: "day", label: "Important days" },
   { id: "task", label: "Tasks" },
-  { id: "university", label: "Universities" },
+  // No universities: the page went, and a calendar filter for things you can
+  // no longer open or edit is a switch wired to nothing. The data and the
+  // "university" kind remain, so it can come back without a migration.
   { id: "goal", label: "Goals" },
   { id: "plan", label: "Blocks" },
 ];
