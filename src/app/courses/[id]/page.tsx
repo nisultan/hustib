@@ -78,7 +78,7 @@ export default function CoursePage({ params }: { params: Promise<{ id: string }>
 
       <div className="mb-8 grid gap-3 sm:grid-cols-3">
         <Panel className="px-4 py-3.5">
-          <p className="text-[11px] uppercase tracking-wider text-ink-3">Current average</p>
+          <p className="text-[12.5px] font-semibold text-ink-3">Current average</p>
           <p className="nums mt-1 text-2xl font-semibold">
             {avg.value == null ? "—" : `${avg.value}%`}
           </p>
@@ -86,7 +86,7 @@ export default function CoursePage({ params }: { params: Promise<{ id: string }>
         </Panel>
 
         <Panel className="px-4 py-3.5">
-          <p className="text-[11px] uppercase tracking-wider text-ink-3">Trend</p>
+          <p className="text-[12.5px] font-semibold text-ink-3">Trend</p>
           <p className="mt-1 text-2xl font-semibold">
             {t ? (
               <TrendLabel direction={t.direction} delta={t.delta} />
@@ -100,7 +100,7 @@ export default function CoursePage({ params }: { params: Promise<{ id: string }>
         </Panel>
 
         <Panel className="px-4 py-3.5">
-          <p className="text-[11px] uppercase tracking-wider text-ink-3">Predicted final</p>
+          <p className="text-[12.5px] font-semibold text-ink-3">Predicted final</p>
           <p className="nums mt-1 text-2xl font-semibold">
             {predicted == null ? "—" : `${predicted}%`}
           </p>

@@ -7,6 +7,10 @@ import { motion } from "motion/react";
 import { Logo } from "./Logo";
 import { useNavCollapsed } from "@/lib/use-nav";
 import { springNav, springSnappy } from "@/lib/motion";
+import { useStore } from "@/lib/store";
+import { courseColor } from "@/lib/appearance";
+import { openSearch } from "./Search";
+import { TaskDialog } from "./TaskDialog";
 
 interface NavItem {
   href: string;
@@ -161,9 +165,19 @@ function isActive(pathname: string, href: string): boolean {
 export function Sidebar() {
   const pathname = usePathname();
   const [collapsed] = useNavCollapsed();
+  const store = useStore();
+  const [adding, setAdding] = useState(false);
   // Which link the pointer (or keyboard focus) is on, so the hover highlight
   // can be one shared element that moves rather than one per link.
   const [hover, setHover] = useState<string | null>(null);
+
+  /** Labels fold away when collapsed; one class string so every row agrees. */
+  const label = `overflow-hidden whitespace-nowrap transition-[max-width,opacity] duration-[var(--nav-dur)] ease-[var(--nav-ease)] ${
+    collapsed ? "max-w-0 opacity-0 duration-150" : "max-w-[170px] opacity-100"
+  }`;
+  const row = `relative isolate flex w-full items-center rounded-[7px] py-[6px] text-[14px] transition-[color,padding,gap] duration-[var(--nav-dur)] ease-[var(--nav-ease)] ${
+    collapsed ? "justify-center gap-0 px-0" : "gap-2.5 px-2"
+  }`;
 
   const link = (item: NavItem) => {
     const active = isActive(pathname, item.href);
@@ -182,27 +196,20 @@ export function Sidebar() {
         onMouseLeave={() => setHover((h) => (h === item.href ? null : h))}
         onFocus={() => setHover(item.href)}
         onBlur={() => setHover((h) => (h === item.href ? null : h))}
-        className={`relative isolate flex items-center gap-2.5 rounded-lg py-[7px] text-[13px] font-medium transition-[color,padding,gap] duration-[var(--nav-dur)] ease-[var(--nav-ease)] ${
-          collapsed ? "justify-center gap-0 px-0" : "px-2.5"
-        } ${active ? "text-accent-text" : "text-ink-2 hover:text-ink"}`}
+        className={`${row} ${active ? "font-medium text-accent-text" : "text-ink"}`}
       >
         {/*
-          Two travelling highlights, not eight fading ones.
-
-          The pill marks where you are and the softer one follows the pointer,
-          and both are a single element handed between links by `layoutId`.
-          Fading a background in on one item and out on another says "something
-          changed"; moving the same shape down the rail says "you went there" —
-          and because the hover shape slides out of the pill it left, the two
-          read as one object being passed around rather than two effects that
-          happen to agree.
+          Two travelling highlights, not eight fading ones: the pill marks where
+          you are and the softer one follows the pointer, each a single element
+          handed between links by `layoutId`, so moving down the list reads as
+          one object going somewhere rather than two effects agreeing.
         */}
         {hovered && (
           <motion.span
             layoutId="sidebar-hover"
             transition={springNav}
             aria-hidden
-            className="absolute inset-0 -z-10 rounded-lg bg-panel-2"
+            className="absolute inset-0 -z-10 rounded-[7px] bg-[color-mix(in_srgb,var(--text)_5%,transparent)]"
           />
         )}
         {active && (
@@ -210,66 +217,147 @@ export function Sidebar() {
             layoutId="sidebar-active"
             transition={springNav}
             aria-hidden
-            // The pill alone marks the page now. The accent rail down its
-            // left edge was a second marker saying the same thing, and at
-            // three pixels it read as a stray line rather than as emphasis.
-            className="absolute inset-0 -z-10 rounded-lg bg-accent-soft"
+            className="absolute inset-0 -z-10 rounded-[7px] bg-accent-soft"
           />
         )}
 
-        {/* The icon leads: it lifts a little when the pill arrives under it,
-            and gives way under a press. */}
-        <motion.span
-          className="grid shrink-0 place-items-center"
-          animate={{ scale: active ? 1.08 : 1 }}
-          whileHover={{ scale: 1.12 }}
-          whileTap={{ scale: 0.9 }}
-          transition={springNav}
+        {/* Grey icons, dark words — the icon is a landmark, the word is what
+            you read. On the current page both take the accent. */}
+        <span
+          className={`grid shrink-0 place-items-center ${active ? "text-accent" : "text-ink-3"}`}
         >
           {item.icon}
-        </motion.span>
-
-        <span
-          className={`overflow-hidden whitespace-nowrap transition-[max-width,opacity] duration-[var(--nav-dur)] ease-[var(--nav-ease)] ${
-            collapsed ? "max-w-0 opacity-0 duration-150" : "max-w-[140px] opacity-100"
-          }`}
-        >
-          {item.label}
         </span>
+
+        <span className={label}>{item.label}</span>
       </Link>
     );
   };
 
+  const name = store.profile.name && store.profile.name !== "there" ? store.profile.name : "You";
+
   return (
     <aside
-      className={`fixed inset-y-0 left-0 z-40 hidden w-[var(--nav-w)] flex-col overflow-hidden border-r border-line bg-panel py-4 shadow-[var(--shadow)] transition-[padding] duration-[var(--nav-dur)] ease-[var(--nav-ease)] md:flex ${
+      className={`fixed inset-y-0 left-0 z-40 hidden w-[var(--nav-w)] flex-col overflow-hidden bg-sidebar py-3 transition-[padding] duration-[var(--nav-dur)] ease-[var(--nav-ease)] md:flex ${
         collapsed ? "px-2" : "px-3"
       }`}
     >
+      {/*
+        The top row is the app and the switch that hides it. The sidebar is
+        told apart from the page by a warmer tint alone — no border, no shadow —
+        the way a desk is told apart from the paper on it.
+      */}
+      <div
+        className={`mb-3 flex items-center ${collapsed ? "flex-col gap-2" : "justify-between pl-1.5"}`}
+      >
+        <Link href="/" className="flex min-w-0 items-center gap-2" title="Locked In">
+          <Logo size="sm" />
+          <span className={`text-[14px] font-bold tracking-tight ${label}`}>Locked In</span>
+        </Link>
+        <NavToggle />
+      </div>
+
+      {/*
+        Adding a task is the first thing in the sidebar and the only thing in
+        colour. It is the action the app exists for, and putting it at the top
+        of the list you already scan — rather than in a header button across
+        the screen — is what makes capturing something a reflex.
+      */}
+      <button
+        type="button"
+        onClick={() => setAdding(true)}
+        title={collapsed ? "Add task" : undefined}
+        className={`${row} group font-semibold text-accent-text hover:bg-[color-mix(in_srgb,var(--text)_5%,transparent)]`}
+      >
+        <span className="grid size-[20px] shrink-0 place-items-center rounded-full bg-accent text-white transition-transform group-hover:scale-110">
+          <svg viewBox="0 0 16 16" aria-hidden className="size-3">
+            <path d="M8 3.5v9M3.5 8h9" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+          </svg>
+        </span>
+        <span className={label}>Add task</span>
+      </button>
+
+      <button
+        type="button"
+        onClick={() => openSearch()}
+        title={collapsed ? "Search" : undefined}
+        className={`${row} text-ink hover:bg-[color-mix(in_srgb,var(--text)_5%,transparent)]`}
+      >
+        <span className="grid shrink-0 place-items-center text-ink-3">
+          <Icon>
+            <circle cx="9" cy="9" r="5.25" {...stroke} />
+            <path d="m13 13 3.5 3.5" {...stroke} />
+          </Icon>
+        </span>
+        <span className={`${label} flex-1 text-left`}>Search</span>
+      </button>
+
+      <div className="mt-2 min-h-0 flex-1 overflow-y-auto overflow-x-hidden [scrollbar-width:none]">
+        <nav className="flex flex-col gap-px">{PRIMARY.map(link)}</nav>
+        <div className="my-2" />
+        <nav className="flex flex-col gap-px">{SECONDARY.map(link)}</nav>
+
+        {/*
+          Categories, the way a task app lists projects: a coloured # and a
+          name, each opening the task list filtered to it. They were reachable
+          only as chips at the top of the tasks page, so the parts of your life
+          you sort work into never appeared anywhere you could see at a glance.
+        */}
+        {store.categories.length > 0 && (
+          <div className={`mt-5 ${collapsed ? "hidden" : ""}`}>
+            <p className="mb-1 px-2 text-[13px] font-bold text-ink-2">My categories</p>
+            <nav className="flex flex-col gap-px">
+              {store.categories.map((c) => {
+                const href = `/tasks?category=${c.id}`;
+                const open = store.tasks.filter(
+                  (t) => t.categoryId === c.id && t.status !== "completed",
+                ).length;
+                return (
+                  <Link
+                    key={c.id}
+                    href={href}
+                    className={`${row} group text-ink hover:bg-[color-mix(in_srgb,var(--text)_5%,transparent)]`}
+                  >
+                    <span
+                      aria-hidden
+                      className="grid w-[17px] shrink-0 place-items-center text-[16px] font-semibold leading-none"
+                      style={{ color: courseColor(c.color) }}
+                    >
+                      #
+                    </span>
+                    <span className="min-w-0 flex-1 truncate">{c.name}</span>
+                    {open > 0 && <span className="nums text-[12px] text-ink-3">{open}</span>}
+                  </Link>
+                );
+              })}
+            </nav>
+          </div>
+        )}
+      </div>
+
+      {/*
+        You, at the foot: your initial and your name, opening Settings. A
+        sidebar that ends in a cog is a tool's sidebar; one that ends in the
+        person using it is theirs.
+      */}
       <Link
-        href="/"
-        className={`mb-6 flex items-center gap-2 transition-[padding,gap] duration-[var(--nav-dur)] ease-[var(--nav-ease)] ${
-          collapsed ? "justify-center gap-0" : "px-2.5"
+        href="/settings"
+        title={collapsed ? "Settings" : undefined}
+        aria-current={isActive(pathname, "/settings") ? "page" : undefined}
+        className={`${row} mt-2 group text-ink hover:bg-[color-mix(in_srgb,var(--text)_5%,transparent)] ${
+          isActive(pathname, "/settings") ? "bg-accent-soft" : ""
         }`}
       >
-        <Logo />
-        <span
-          className={`overflow-hidden whitespace-nowrap text-[13px] font-semibold tracking-tight transition-[max-width,opacity] duration-[var(--nav-dur)] ease-[var(--nav-ease)] ${
-            collapsed ? "max-w-0 opacity-0 duration-150" : "max-w-[140px] opacity-100"
-          }`}
-        >
-          Locked In
+        <span className="grid size-[22px] shrink-0 place-items-center rounded-full bg-accent text-[11px] font-bold uppercase text-white">
+          {name.slice(0, 1)}
+        </span>
+        <span className={`${label} flex-1 truncate font-medium`}>{name}</span>
+        <span className={`${collapsed ? "hidden" : ""} text-ink-3 transition-colors group-hover:text-ink`}>
+          {TERTIARY[0].icon}
         </span>
       </Link>
 
-      <nav className="flex flex-col gap-0.5">{PRIMARY.map(link)}</nav>
-
-      <div className="my-3 border-t border-line" />
-      <nav className="flex flex-col gap-0.5">{SECONDARY.map(link)}</nav>
-
-      <div className="mt-auto border-t border-line pt-3">
-        <nav className="flex flex-col gap-0.5">{TERTIARY.map(link)}</nav>
-      </div>
+      <TaskDialog open={adding} onClose={() => setAdding(false)} />
     </aside>
   );
 }

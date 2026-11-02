@@ -130,7 +130,7 @@ function Row({
         aria-label={habit.name}
         disabled={!due}
         onClick={() => store.toggleHabit(date, habit.id)}
-        className={`grid size-5 shrink-0 place-items-center rounded-md border transition-colors ${
+        className={`grid size-5 shrink-0 place-items-center rounded-full border-[1.5px] transition-colors ${
           doneToday
             ? "border-accent bg-accent text-white"
             : due

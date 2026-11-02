@@ -136,7 +136,7 @@ export default function HomePage() {
                 <EmptyState
                   title="Nothing due today"
                   hint="Either you're ahead, or today's work isn't captured yet."
-                  action={<AddTaskButton variant="secondary" />}
+                  action={<AddTaskButton />}
                 />
               }
             />

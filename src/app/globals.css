@@ -1,22 +1,32 @@
 @import "tailwindcss";
 
 /*
- * Palette: a near-neutral canvas with one indigo accent, so the only saturated
- * colour on screen is signal — priority, trend, application status. Tokens are
- * defined once and redefined for dark, never defined only inside the dark block.
+ * Palette: warm paper and one tomato accent.
+ *
+ * The earlier palette was a cool near-neutral with an indigo accent, cards
+ * lifted on shadows and a violet glow behind the page — every surface made a
+ * small claim to be special, and together they read as a dashboard generated
+ * rather than a place someone writes their week. This one is closer to paper:
+ * a white page, a sidebar that differs from it only by a warmer tint, hairline
+ * dividers instead of boxes, and almost no shadow. The accent is warm because
+ * the app is personal; a blue-violet reads as software.
+ *
+ * Tokens are defined once and redefined for dark, never defined only inside the
+ * dark block.
  */
 :root {
-  --bg: #faf9f7;
+  --bg: #ffffff;
+  --sidebar: #fcfaf8;
   --panel: #ffffff;
-  --panel-2: #f5f4f1;
-  --border: #e0ddd5;
-  --border-strong: #c9c5ba;
-  --text: #171614;
-  --text-2: #4f4d47;
-  --text-3: #7a776f;
-  --accent: #5b5bd6;
-  --accent-soft: #eeeefc;
-  --accent-text: #4a4ac4;
+  --panel-2: #f6f4f1;
+  --border: #ece9e4;
+  --border-strong: #dcd8d1;
+  --text: #202020;
+  --text-2: #5c5a56;
+  --text-3: #8d8a84;
+  --accent: #dc4c3e;
+  --accent-soft: #fdeeec;
+  --accent-text: #c3392b;
 
   --urgent: #d64545;
   --high: #d97706;
@@ -27,13 +37,18 @@
   --down: #dc2626;
   --flat: #7c7c88;
 
-  --shadow: 0 1px 2px rgba(28, 26, 22, 0.05), 0 2px 6px -1px rgba(28, 26, 22, 0.04);
-  --shadow-md: 0 2px 4px rgba(28, 26, 22, 0.04), 0 8px 20px -6px rgba(28, 26, 22, 0.09);
-  --shadow-lg: 0 4px 10px rgba(28, 26, 22, 0.05), 0 20px 48px -12px rgba(28, 26, 22, 0.16);
-  /* Catches the light along a surface's top edge. Doing the same job as a
-     second border, but only where a real one would be lit. */
-  --edge: inset 0 1px 0 rgba(255, 255, 255, 0.7);
-  --sheen: linear-gradient(180deg, rgba(255, 255, 255, 0.6), rgba(255, 255, 255, 0));
+  /*
+   * Resting surfaces cast no shadow. Dozens of components carry
+   * `shadow-[var(--shadow),var(--edge)]`, and emptying these two tokens is what
+   * flattens all of them at once — the page reads as one sheet with lines on
+   * it, not a stack of floating cards. Things that genuinely float above the
+   * page (menus, dialogs, a lifted card on hover) still use --shadow-md/-lg.
+   */
+  --shadow: 0 0 #0000;
+  --shadow-md: 0 1px 3px rgba(32, 28, 24, 0.06), 0 8px 24px -8px rgba(32, 28, 24, 0.14);
+  --shadow-lg: 0 4px 12px rgba(32, 28, 24, 0.08), 0 24px 56px -16px rgba(32, 28, 24, 0.22);
+  --edge: 0 0 #0000;
+  --sheen: linear-gradient(180deg, rgba(255, 255, 255, 0), rgba(255, 255, 255, 0));
 
   /*
    * The select popup, the date and time pickers and the scrollbars are drawn
@@ -46,7 +61,7 @@
    * Sidebar width, read by both the sidebar and the content beside it so the
    * two can never disagree. Set before first paint from the saved choice.
    */
-  --nav-w: 232px;
+  --nav-w: 260px;
 
   /*
    * One duration and one curve for the collapse, shared by the sidebar, the
@@ -82,7 +97,7 @@
 @property --nav-w {
   syntax: "<length>";
   inherits: true;
-  initial-value: 232px;
+  initial-value: 260px;
 }
 
 :root[data-nav="collapsed"] {
@@ -97,17 +112,18 @@
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --bg: #0c0c0e;
-    --panel: #151517;
-    --panel-2: #1c1c1f;
-    --border: #2e2e33;
-    --border-strong: #45454c;
-    --text: #f5f4f2;
-    --text-2: #b0aea8;
-    --text-3: #85837d;
-    --accent: #7b7bf0;
-    --accent-soft: #1e1e35;
-    --accent-text: #a5a5f7;
+    --bg: #1e1e1e;
+    --sidebar: #262626;
+    --panel: #242424;
+    --panel-2: #2e2e2e;
+    --border: #333333;
+    --border-strong: #474747;
+    --text: #f2f2f2;
+    --text-2: #c2c2c2;
+    --text-3: #8f8f8f;
+    --accent: #e8604f;
+    --accent-soft: #3a2422;
+    --accent-text: #ff8a78;
 
     --urgent: #f27171;
     --high: #f0a23c;
@@ -118,28 +134,29 @@
     --down: #f87171;
     --flat: #8b8b98;
 
-    --shadow: 0 1px 2px rgba(0, 0, 0, 0.5), 0 2px 6px -1px rgba(0, 0, 0, 0.4);
-    --shadow-md: 0 2px 4px rgba(0, 0, 0, 0.5), 0 8px 20px -6px rgba(0, 0, 0, 0.55);
-    --shadow-lg: 0 4px 10px rgba(0, 0, 0, 0.5), 0 20px 48px -12px rgba(0, 0, 0, 0.7);
-    --edge: inset 0 1px 0 rgba(255, 255, 255, 0.05);
-    --sheen: linear-gradient(180deg, rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0));
+    --shadow: 0 0 #0000;
+    --shadow-md: 0 2px 6px rgba(0, 0, 0, 0.4), 0 10px 28px -8px rgba(0, 0, 0, 0.6);
+    --shadow-lg: 0 4px 12px rgba(0, 0, 0, 0.45), 0 24px 56px -16px rgba(0, 0, 0, 0.75);
+    --edge: 0 0 #0000;
+    --sheen: linear-gradient(180deg, rgba(255, 255, 255, 0), rgba(255, 255, 255, 0));
 
     color-scheme: dark;
   }
 }
 
 :root[data-theme="dark"] {
-  --bg: #0c0c0e;
-  --panel: #151517;
-  --panel-2: #1c1c1f;
-  --border: #2e2e33;
-  --border-strong: #45454c;
-  --text: #f5f4f2;
-  --text-2: #b0aea8;
-  --text-3: #85837d;
-  --accent: #7b7bf0;
-  --accent-soft: #1e1e35;
-  --accent-text: #a5a5f7;
+  --bg: #1e1e1e;
+  --sidebar: #262626;
+  --panel: #242424;
+  --panel-2: #2e2e2e;
+  --border: #333333;
+  --border-strong: #474747;
+  --text: #f2f2f2;
+  --text-2: #c2c2c2;
+  --text-3: #8f8f8f;
+  --accent: #e8604f;
+  --accent-soft: #3a2422;
+  --accent-text: #ff8a78;
 
   --urgent: #f27171;
   --high: #f0a23c;
@@ -150,17 +167,18 @@
   --down: #f87171;
   --flat: #8b8b98;
 
-  --shadow: 0 1px 2px rgba(0, 0, 0, 0.5), 0 2px 6px -1px rgba(0, 0, 0, 0.4);
-  --shadow-md: 0 2px 4px rgba(0, 0, 0, 0.5), 0 8px 20px -6px rgba(0, 0, 0, 0.55);
-  --shadow-lg: 0 4px 10px rgba(0, 0, 0, 0.5), 0 20px 48px -12px rgba(0, 0, 0, 0.7);
-  --edge: inset 0 1px 0 rgba(255, 255, 255, 0.05);
-  --sheen: linear-gradient(180deg, rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0));
+  --shadow: 0 0 #0000;
+  --shadow-md: 0 2px 6px rgba(0, 0, 0, 0.4), 0 10px 28px -8px rgba(0, 0, 0, 0.6);
+  --shadow-lg: 0 4px 12px rgba(0, 0, 0, 0.45), 0 24px 56px -16px rgba(0, 0, 0, 0.75);
+  --edge: 0 0 #0000;
+  --sheen: linear-gradient(180deg, rgba(255, 255, 255, 0), rgba(255, 255, 255, 0));
 
   color-scheme: dark;
 }
 
 @theme inline {
   --color-bg: var(--bg);
+  --color-sidebar: var(--sidebar);
   --color-panel: var(--panel);
   --color-panel-2: var(--panel-2);
   --color-line: var(--border);
@@ -184,21 +202,6 @@ html,
 body {
   background: var(--bg);
   color: var(--text);
-}
-
-/*
- * A very slight warm lift behind the top of the page. Flat fills are what
- * make a screen read as a diagram; one soft gradient is enough to suggest a
- * surface under the cards without becoming a visible thing of its own.
- */
-body::before {
-  content: "";
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  z-index: -1;
-  background: radial-gradient(70rem 32rem at 50% -12rem, var(--accent-soft), transparent 70%);
-  opacity: 0.55;
 }
 
 body {
@@ -713,6 +716,24 @@ summary {
    prefers-dark block, then an explicit [data-theme="dark"] block so the
    toggle wins in both directions.
 --------------------------------------------------------------------------- */
+
+:root[data-accent="tomato"] {
+  --accent: #dc4c3e;
+  --accent-soft: #fdeeec;
+  --accent-text: #c3392b;
+}
+@media (prefers-color-scheme: dark) {
+  :root[data-accent="tomato"]:not([data-theme="light"]) {
+    --accent: #e8604f;
+    --accent-soft: #3a2422;
+    --accent-text: #ff8a78;
+  }
+}
+:root[data-theme="dark"][data-accent="tomato"] {
+  --accent: #e8604f;
+  --accent-soft: #3a2422;
+  --accent-text: #ff8a78;
+}
 
 :root[data-accent="indigo"] {
   --accent: #5b5bd6;

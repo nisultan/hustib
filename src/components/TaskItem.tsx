@@ -2,10 +2,10 @@
 
 import { useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
-import { Task, PRIORITY_LABEL, PRIORITY_RANK } from "@/lib/types";
+import { Task, PRIORITY_RANK } from "@/lib/types";
 import { useCourseMap, useStore } from "@/lib/store";
 import { daysUntil, formatTime, relativeLabel } from "@/lib/dates";
-import { PriorityDot, ConfirmDeleteButton } from "./ui";
+import { ConfirmDeleteButton } from "./ui";
 import { courseColor } from "@/lib/appearance";
 import { TaskDialog } from "./TaskDialog";
 import { listContainer, listItem, spring } from "@/lib/motion";
@@ -31,10 +31,42 @@ export function TaskItem({ task, showCourse = true }: { task: Task; showCourse?:
   const done = task.status === "completed";
   const course = task.courseId ? courses.get(task.courseId) : null;
   const category = store.categories.find((c) => c.id === task.categoryId) ?? null;
-  const overdue = !done && task.dueDate != null && daysUntil(task.dueDate) < 0;
 
   const due = task.dueDate ? relativeLabel(task.dueDate) : null;
-  const dueSoon = !done && task.dueDate != null && daysUntil(task.dueDate) === 0;
+
+  /*
+    The date says how close it is by its colour, the way a planner would mark
+    it: red when it has gone, green for today, orange for tomorrow, violet for
+    later this week, and quiet grey beyond. You read urgency down a list before
+    you read a single date.
+  */
+  const n = task.dueDate != null ? daysUntil(task.dueDate) : null;
+  const dueColour =
+    done || n == null
+      ? "var(--text-3)"
+      : n < 0
+        ? "var(--urgent)"
+        : n === 0
+          ? "var(--up)"
+          : n === 1
+            ? "var(--high)"
+            : n < 7
+              ? "#8b5cf6"
+              : "var(--text-3)";
+
+  /*
+    The checkbox ring carries the priority — the one convention every task app
+    has converged on, because it puts the most important signal exactly where
+    your eye lands to tick the thing off. Low priority is a plain grey ring.
+  */
+  const ring =
+    task.priority === "urgent"
+      ? "var(--urgent)"
+      : task.priority === "high"
+        ? "var(--high)"
+        : task.priority === "medium"
+          ? "var(--medium)"
+          : "var(--border-strong)";
 
   return (
     <>
@@ -51,7 +83,7 @@ export function TaskItem({ task, showCourse = true }: { task: Task; showCourse?:
         animate="show"
         exit="exit"
         transition={spring}
-        className="group flex items-start gap-3 border-b border-line px-3.5 py-3 last:border-b-0 hover:bg-panel-2"
+        className="group flex items-start gap-3 border-b border-line py-2.5 pr-1 last:border-b-0"
       >
         <button
           onClick={() => {
@@ -63,15 +95,34 @@ export function TaskItem({ task, showCourse = true }: { task: Task; showCourse?:
           aria-label={
             done ? `Mark "${task.title}" as not done` : `Mark "${task.title}" as done`
           }
-          className={`mt-0.5 grid size-[18px] shrink-0 place-items-center rounded-md border transition-colors ${
-            done
-              ? "border-accent bg-accent text-white"
-              : "border-line-strong hover:border-accent"
-          }`}
+          style={{
+            borderColor: ring,
+            background: done ? ring : `color-mix(in srgb, ${ring} 9%, transparent)`,
+            color: done ? "#fff" : ring,
+          }}
+          className="mt-px grid size-[19px] shrink-0 place-items-center rounded-full border-[1.75px] transition-[background-color,transform] duration-150 active:scale-90"
         >
           {/* The tick lands rather than appearing — the one moment in the app
               worth a little overshoot, because it is the moment something got
               finished. */}
+          {!done && (
+            <svg
+              width="10"
+              height="10"
+              viewBox="0 0 12 12"
+              fill="none"
+              aria-hidden
+              className="opacity-0 transition-opacity group-hover:opacity-60"
+            >
+              <path
+                d="m2.5 6.2 2.3 2.3L9.5 3.8"
+                stroke="currentColor"
+                strokeWidth="1.8"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          )}
           {done && (
             <motion.svg
               width="11"
@@ -101,9 +152,7 @@ export function TaskItem({ task, showCourse = true }: { task: Task; showCourse?:
         >
           <span className="flex items-baseline gap-2">
             <span
-              className={`truncate text-sm font-medium ${
-                done ? "text-ink-3 line-through" : "text-ink"
-              }`}
+              className={`truncate text-[14px] ${done ? "text-ink-3 line-through" : "text-ink"}`}
             >
               {task.title}
             </span>
@@ -153,11 +202,7 @@ export function TaskItem({ task, showCourse = true }: { task: Task; showCourse?:
             {/* The right-hand column is hidden on a phone, so the deadline
                 rejoins the run there rather than vanishing. */}
             {due && (
-              <span
-                className={`sm:hidden ${
-                  overdue ? "font-medium text-[var(--urgent)]" : dueSoon ? "text-ink" : ""
-                }`}
-              >
+              <span className="sm:hidden" style={{ color: dueColour }}>
                 {(task.lesson || task.dueTime) && (
                   <span aria-hidden className="mr-1.5">
                     ·
@@ -166,15 +211,8 @@ export function TaskItem({ task, showCourse = true }: { task: Task; showCourse?:
                 {due}
               </span>
             )}
-            {!done && PRIORITY_RANK[task.priority] >= PRIORITY_RANK.high && (
-              <span
-                className="inline-flex shrink-0 items-center gap-1 font-medium"
-                style={{ color: `var(--${task.priority})` }}
-              >
-                <PriorityDot priority={task.priority} />
-                {PRIORITY_LABEL[task.priority]}
-              </span>
-            )}
+            {/* No priority label: the checkbox ring already says it, in the
+                place your eye lands to tick the task off. */}
           </span>
 
           {task.notes.length > 0 && (
@@ -189,14 +227,13 @@ export function TaskItem({ task, showCourse = true }: { task: Task; showCourse?:
         */}
         {due && (
           <span
-            className={`mt-0.5 hidden shrink-0 text-xs sm:block ${
-              overdue
-                ? "font-medium text-[var(--urgent)]"
-                : dueSoon
-                  ? "font-medium text-ink"
-                  : "text-ink-3"
-            }`}
+            className="mt-0.5 hidden shrink-0 items-center gap-1 text-[12px] sm:inline-flex"
+            style={{ color: dueColour }}
           >
+            <svg viewBox="0 0 16 16" aria-hidden className="size-3.5">
+              <rect x="2.5" y="3.5" width="11" height="10" rx="2" fill="none" stroke="currentColor" strokeWidth="1.3" />
+              <path d="M2.5 6.5h11M5.5 2v2.5M10.5 2v2.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+            </svg>
             {due}
           </span>
         )}
@@ -230,7 +267,9 @@ export function TaskList({
       variants={listContainer}
       initial="hidden"
       animate="show"
-      className="overflow-hidden rounded-xl border border-line bg-panel shadow-[var(--shadow)]"
+      // Lines between rows and nothing around them — a list on the page, not a
+      // card on top of it.
+      className="border-t border-line"
     >
       {/* `initial={false}` on the presence: rows already on screen when the
           page mounts are dealt in by the container's stagger, not replayed

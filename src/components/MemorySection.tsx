@@ -77,7 +77,7 @@ export function MemorySection() {
         <div className="grid gap-4">
           {[...byTopic.entries()].map(([topic, notes]) => (
             <div key={topic}>
-              <h3 className="mb-1.5 text-[11px] font-medium uppercase tracking-wide text-ink-3">
+              <h3 className="mb-1.5 text-[12.5px] font-semibold text-ink-3">
                 {topic}
               </h3>
               <Panel className="divide-y divide-[var(--border)]">

@@ -33,7 +33,9 @@ const MAX_PER_ROW = 4;
  */
 function rowGrid(count: number, paired: boolean): string {
   const base = "grid items-stretch gap-2.5";
-  if (paired) return count > 2 ? `${base} sm:grid-cols-2` : base;
+  // Sharing the width with the other row, a column is already narrow; two
+  // cards across it left a title three letters wide. One column, always.
+  if (paired) return base;
   return count > 2 ? `${base} sm:grid-cols-2 xl:grid-cols-4` : `${base} sm:grid-cols-2`;
 }
 

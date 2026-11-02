@@ -284,7 +284,7 @@ function Prompt({ date, onUse }: { date: string; onUse: (q: string) => void }) {
 
   return (
     <div className="mb-4 rounded-xl border border-dashed border-line p-3.5">
-      <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-ink-3">If you need somewhere to start</p>
+      <p className="text-[12.5px] font-semibold tracking-[0.08em] text-ink-3">If you need somewhere to start</p>
       <p className="mt-1.5 text-[15px] font-medium leading-snug">{question}</p>
       <div className="mt-2.5 flex items-center gap-3 text-[12px]">
         <button
@@ -385,7 +385,7 @@ function Flashback({
       onClick={() => onPick(pick.day!.date)}
       className="group rounded-xl border border-line bg-panel p-4 text-left shadow-[var(--shadow),var(--edge)] transition-[border-color,transform] hover:-translate-y-0.5 hover:border-line-strong"
     >
-      <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-accent-text">{pick.label}</p>
+      <p className="text-[12.5px] font-semibold tracking-[0.08em] text-accent-text">{pick.label}</p>
       <p className="mt-1 text-[11px] text-ink-3">{formatDate(pick.day.date)}</p>
       <p className="mt-2 text-[14px] font-medium leading-snug">{title}</p>
       {excerpt && <p className="mt-1 line-clamp-4 text-[12.5px] leading-relaxed text-ink-2">{excerpt}</p>}
@@ -435,7 +435,7 @@ function Timeline({
   return (
     <section className="mt-4">
       <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-        <h2 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-ink-3">Earlier</h2>
+        <h2 className="text-[12.5px] font-semibold tracking-[0.08em] text-ink-3">Earlier</h2>
         <input
           value={query}
           onChange={(e) => setQuery(e.target.value)}

@@ -6,7 +6,7 @@
        The brackets are weighted heavier than the component's and pulled a
        little further out: at sixteen pixels a 2.1 stroke closes up against the
        centre dot and the whole thing silts into a blob. -->
-  <rect width="32" height="32" rx="7" fill="#5b5bd6" />
+  <rect width="32" height="32" rx="7" fill="#dc4c3e" />
   <g fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
     <path d="M6.6 12V9a2.4 2.4 0 0 1 2.4-2.4H12" />
     <path d="M20 6.6h3a2.4 2.4 0 0 1 2.4 2.4V12" />

@@ -405,7 +405,7 @@ function Empty({
           variants={listItem}
           className="rounded-lg border border-line bg-panel-2 px-3 py-2.5"
         >
-          <p className="text-[11px] font-medium uppercase tracking-wide text-ink-3">
+          <p className="text-[12.5px] font-semibold text-ink-3">
             I noticed
           </p>
           <p className="mt-1 text-[12px] leading-relaxed text-ink-2">{noticed.body}</p>
@@ -420,7 +420,7 @@ function Empty({
       */}
       {remembered.length > 0 && (
         <motion.div variants={listItem}>
-          <p className="mb-1.5 text-[11px] font-medium uppercase tracking-wide text-ink-3">
+          <p className="mb-1.5 text-[12.5px] font-semibold text-ink-3">
             What {ASSISTANT_NAME} remembers
           </p>
           <ul className="flex flex-col gap-1">

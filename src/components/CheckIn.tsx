@@ -184,7 +184,7 @@ export function CheckIn() {
             <LogoMark className="size-4" />
           </span>
           <div className="min-w-0">
-            <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-ink-3">Lifee</p>
+            <p className="text-[12.5px] font-semibold tracking-[0.08em] text-ink-3">Lifee</p>
             <p className="mt-0.5 text-[15px] font-medium leading-snug">{day.question}</p>
           </div>
         </div>

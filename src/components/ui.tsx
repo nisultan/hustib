@@ -5,7 +5,6 @@ import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "motion/react";
 import { backdrop, dialogPanel, spring, springSnappy } from "@/lib/motion";
 import { useMounted } from "@/lib/useMounted";
-import { LogoMark } from "./Logo";
 import { Choice } from "./Choice";
 import {
   Priority,
@@ -30,7 +29,7 @@ export function Panel({
   /** For values a class cannot carry, such as a per-course tint. */
   style?: CSSProperties;
 }) {
-  const base = `rounded-xl border border-line bg-panel shadow-[var(--shadow),var(--edge)] ${className}`;
+  const base = `rounded-xl border border-line bg-panel ${className}`;
 
   if (!interactive) {
     return (
@@ -48,9 +47,8 @@ export function Panel({
   return (
     <Motion
       style={style}
-      className={`${base} transition-[box-shadow,border-color] duration-200 hover:border-line-strong hover:shadow-[var(--shadow-md),var(--edge)]`}
-      whileHover={{ y: -2 }}
-      whileTap={{ y: 0, scale: 0.995 }}
+      className={`${base} transition-[background-color,border-color] duration-150 hover:border-line-strong hover:bg-panel-2/40`}
+      whileTap={{ scale: 0.995 }}
       transition={spring}
     >
       {children}
@@ -68,10 +66,13 @@ export function PageHeader({
   action?: ReactNode;
 }) {
   return (
-    <div className="mb-7 flex flex-wrap items-end justify-between gap-4">
+    <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
-        {subtitle && <p className="mt-1 text-sm text-ink-2">{subtitle}</p>}
+        {/* Big and bold, the way a page in a notebook is headed. A 24px
+            semibold title over a grey subtitle was the voice of a settings
+            screen; the page name is the one thing on it that should be loud. */}
+        <h1 className="text-[26px] font-bold leading-tight tracking-tight">{title}</h1>
+        {subtitle && <p className="mt-1 text-[14px] text-ink-3">{subtitle}</p>}
       </div>
       {action}
     </div>
@@ -80,10 +81,17 @@ export function PageHeader({
 
 export function SectionTitle({ children, right }: { children: ReactNode; right?: ReactNode }) {
   return (
-    <div className="mb-3 flex items-center justify-between">
-      <h2 className="text-[11px] font-semibold uppercase tracking-[0.09em] text-ink-3">
-        {children}
-      </h2>
+    /*
+      Plain bold words, not a label.
+
+      Every section used to open with eleven-pixel capitals spaced apart —
+      CLOSEST DEADLINES, WHAT I NOTICED — the typographic voice of a monitoring
+      dashboard, and on a page that is half headers it was most of why the app
+      read as generated. A heading in the same type as the content, just
+      heavier, reads as somebody's own list.
+    */
+    <div className="mb-2.5 flex items-center justify-between gap-3">
+      <h2 className="text-[15px] font-bold tracking-tight text-ink">{children}</h2>
       {right}
     </div>
   );
@@ -104,23 +112,26 @@ export function Button({
 }: ButtonProps) {
   // The press is what makes a button feel like an object rather than a
   // rectangle that changes colour: it moves under the finger, then settles.
+  /*
+    Flat, and still. The old buttons rose a pixel on hover and carried a
+    highlight along their top edge — small flourishes, but on every button they
+    added up to an interface performing for you. A solid accent button that
+    darkens a touch, and a quiet grey one, is all a button needs to be. The
+    press still gives slightly, because that is feedback rather than ornament.
+  */
   const base =
-    "inline-flex items-center justify-center gap-1.5 rounded-lg font-medium whitespace-nowrap transition-[background-color,box-shadow,border-color,color] duration-150 disabled:opacity-40 disabled:pointer-events-none";
+    "inline-flex items-center justify-center gap-1.5 rounded-[7px] font-medium whitespace-nowrap transition-[background-color,border-color,color,filter] duration-150 disabled:opacity-40 disabled:pointer-events-none";
   const sizes = { sm: "h-8 px-2.5 text-[13px]", md: "h-9 px-3.5 text-sm" };
   const variants = {
-    primary:
-      "bg-accent text-white shadow-[var(--shadow),inset_0_1px_0_rgba(255,255,255,0.18)] hover:brightness-110 hover:shadow-[var(--shadow-md),inset_0_1px_0_rgba(255,255,255,0.18)] active:brightness-95 active:shadow-[var(--shadow)]",
-    secondary:
-      "border border-line bg-panel text-ink shadow-[var(--shadow)] hover:border-line-strong hover:bg-panel-2 active:shadow-none",
+    primary: "bg-accent text-white hover:brightness-[0.93] active:brightness-[0.88]",
+    secondary: "bg-panel-2 text-ink hover:bg-[var(--border)]",
     ghost: "text-ink-2 hover:bg-panel-2 hover:text-ink",
-    danger:
-      "border border-line text-[var(--urgent)] shadow-[var(--shadow)] hover:border-[var(--urgent)]/40 hover:bg-[var(--urgent)]/8 active:shadow-none",
+    danger: "text-[var(--urgent)] hover:bg-[color-mix(in_srgb,var(--urgent)_10%,transparent)]",
   };
   return (
     <motion.button
       className={`${base} ${sizes[size]} ${variants[variant]} ${className}`}
-      whileHover={rest.disabled ? undefined : { y: -1 }}
-      whileTap={rest.disabled ? undefined : { y: 1, scale: 0.97 }}
+      whileTap={rest.disabled ? undefined : { scale: 0.98 }}
       transition={springSnappy}
       {...(rest as React.ComponentProps<typeof motion.button>)}
     >
@@ -354,6 +365,14 @@ export function UniStatusBadge({ status }: { status: UniStatus }) {
   );
 }
 
+/**
+ * Nothing here yet — said kindly.
+ *
+ * A small drawing, a line in plain words, and the one action that fixes it.
+ * The old one was a logo in a dashed box, which is how a system reports an
+ * absence; a picture of an empty tray with a little sparkle is how a person
+ * would show you there is room to put something.
+ */
 export function EmptyState({
   title,
   hint,
@@ -364,14 +383,41 @@ export function EmptyState({
   action?: ReactNode;
 }) {
   return (
-    <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-line bg-panel-2/50 px-6 py-8 text-center">
-      <span className="mb-2.5 grid size-8 place-items-center rounded-lg bg-accent-soft text-accent-text">
-        <LogoMark className="size-4" />
-      </span>
-      <p className="text-sm font-medium text-ink">{title}</p>
-      {hint && <p className="mt-1 max-w-xs text-[13px] leading-relaxed text-ink-2">{hint}</p>}
-      {action && <div className="mt-3.5">{action}</div>}
+    <div className="flex flex-col items-center justify-center px-6 py-8 text-center">
+      <EmptyArt className="mb-3 h-[92px] w-[124px]" />
+      <p className="text-[15px] font-bold tracking-tight text-ink">{title}</p>
+      {hint && <p className="mt-1 max-w-xs text-[13.5px] leading-relaxed text-ink-2">{hint}</p>}
+      {action && <div className="mt-4">{action}</div>}
     </div>
+  );
+}
+
+/**
+ * An open tray, two leaves and a few sparkles.
+ *
+ * Fixed warm colours rather than the accent, so it looks the same whatever the
+ * student picked — an illustration that changes colour with a setting stops
+ * looking drawn.
+ */
+export function EmptyArt({ className = "" }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 160 120" aria-hidden className={className}>
+      <ellipse cx="80" cy="104" rx="46" ry="6" fill="currentColor" className="text-ink-3" opacity="0.14" />
+      {/* leaves */}
+      <path d="M44 92c-14-6-18-22-12-34 9 6 16 20 12 34Z" fill="#5f8f5a" opacity="0.75" />
+      <path d="M116 92c13-8 15-25 7-36-8 8-13 23-7 36Z" fill="#4f7d4b" opacity="0.7" />
+      {/* tray */}
+      <rect x="46" y="50" width="68" height="44" rx="9" fill="#f2a72a" />
+      <rect x="51" y="50" width="58" height="16" rx="6" fill="#ffd27a" />
+      <path
+        d="M46 70h19c1.6 0 3 .8 3.9 2.1l3 4.3c.9 1.3 2.3 2.1 3.9 2.1h8.4c1.6 0 3-.8 3.9-2.1l3-4.3c.9-1.3 2.3-2.1 3.9-2.1H114v15a9 9 0 0 1-9 9H55a9 9 0 0 1-9-9V70Z"
+        fill="#ffbe45"
+      />
+      {/* sparkles */}
+      <path d="M124 30l2.6 7.4L134 40l-7.4 2.6L124 50l-2.6-7.4L114 40l7.4-2.6L124 30Z" fill="#f2a72a" />
+      <path d="M36 52l1.4 4L41.4 57.4 37.4 58.8 36 62.8l-1.4-4-4-1.4 4-1.4L36 52Z" fill="#f2a72a" opacity="0.85" />
+      <path d="M134 66l1 2.8 2.8 1-2.8 1-1 2.8-1-2.8-2.8-1 2.8-1 1-2.8Z" fill="#f2a72a" opacity="0.7" />
+    </svg>
   );
 }
 

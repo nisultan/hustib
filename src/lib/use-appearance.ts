@@ -26,7 +26,7 @@ function store(key: string, value: string) {
 
 export function useAppearance() {
   const [theme, setThemeState] = useState<Theme>("system");
-  const [accent, setAccentState] = useState<AccentId>("indigo");
+  const [accent, setAccentState] = useState<AccentId>("tomato");
   const [density, setDensityState] = useState<Density>("comfortable");
   // Stored values are only readable on the client, so the first render uses
   // the defaults and this corrects them immediately after mount.

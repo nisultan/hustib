@@ -164,7 +164,7 @@ function Tick({ checked, onChange }: { checked: boolean; onChange: () => void })
       role="checkbox"
       aria-checked={checked}
       onClick={onChange}
-      className={`grid size-4 shrink-0 place-items-center rounded border transition-colors ${
+      className={`grid size-[17px] shrink-0 place-items-center rounded-full border-[1.5px] transition-colors ${
         checked
           ? "border-accent bg-accent text-white"
           : "border-line-strong hover:border-accent"

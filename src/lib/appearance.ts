@@ -9,7 +9,7 @@ export type Theme = "system" | "light" | "dark";
 export const THEMES: Theme[] = ["system", "light", "dark"];
 
 export type AccentId =
-  "indigo" | "blue" | "teal" | "green" | "amber" | "rose" | "violet" | "slate";
+  "tomato" | "indigo" | "blue" | "teal" | "green" | "amber" | "rose" | "violet" | "slate";
 
 export interface Accent {
   id: AccentId;
@@ -25,6 +25,12 @@ export interface Accent {
  * and the "soft" background has to stay subtle in both.
  */
 export const ACCENTS: Accent[] = [
+  {
+    id: "tomato",
+    label: "Tomato",
+    light: ["#dc4c3e", "#fdeeec", "#c3392b"],
+    dark: ["#e8604f", "#3a2422", "#ff8a78"],
+  },
   {
     id: "indigo",
     label: "Indigo",
@@ -117,7 +123,7 @@ export function readAccent(): AccentId {
   return read(
     ACCENT_KEY,
     ACCENTS.map((a) => a.id),
-    "indigo",
+    "tomato",
   );
 }
 

@@ -147,7 +147,19 @@ function excerpt(text: string, q: string): string {
   return `${start > 0 ? "…" : ""}${slice}${start + 80 < text.length ? "…" : ""}`;
 }
 
-export function GlobalSearch() {
+const OPEN_EVENT = "lockedin:search";
+
+/**
+ * Opens the search palette from anywhere — the sidebar's Search item.
+ *
+ * An event rather than a second <GlobalSearch>: each instance listens for
+ * Ctrl+K, so two of them would open two palettes on top of each other.
+ */
+export function openSearch() {
+  window.dispatchEvent(new Event(OPEN_EVENT));
+}
+
+export function GlobalSearch({ triggerClassName = "" }: { triggerClassName?: string }) {
   const data = useStore();
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -182,8 +194,16 @@ export function GlobalSearch() {
       }
       if (e.key === "Escape") setOpen(false);
     };
+    const onOpen = () => {
+      setOpen(true);
+      requestAnimationFrame(() => inputRef.current?.focus());
+    };
     document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
+    window.addEventListener(OPEN_EVENT, onOpen);
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      window.removeEventListener(OPEN_EVENT, onOpen);
+    };
   }, []);
 
   // Keep the keyboard cursor on screen. Arrowing past the fold used to move a
@@ -221,7 +241,7 @@ export function GlobalSearch() {
           setOpen(true);
           requestAnimationFrame(() => inputRef.current?.focus());
         }}
-        className="flex h-9 w-full items-center gap-2 rounded-lg border border-line bg-panel px-3 text-sm text-ink-3 transition-colors hover:border-line-strong md:w-72"
+        className={`flex h-9 w-full items-center gap-2 rounded-lg border border-line bg-panel px-3 text-sm text-ink-3 transition-colors hover:border-line-strong md:w-72 ${triggerClassName}`}
       >
         <svg width="15" height="15" viewBox="0 0 20 20" fill="none" aria-hidden>
           <circle cx="9" cy="9" r="5.5" stroke="currentColor" strokeWidth="1.6" />
@@ -325,7 +345,7 @@ export function GlobalSearch() {
                         return (
                           <div key={`${r.href}-${i}`}>
                             {header && (
-                              <p className="px-2.5 pb-1 pt-2.5 text-[10px] font-semibold uppercase tracking-wider text-ink-3">
+                              <p className="px-2.5 pb-1 pt-2.5 text-[12.5px] font-semibold text-ink-3">
                                 {header === "Pages" && query.trim().length < 2
                                   ? "Jump to"
                                   : header}

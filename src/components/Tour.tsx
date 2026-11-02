@@ -204,7 +204,7 @@ export function Tour({ open, onClose }: { open: boolean; onClose: () => void }) 
           <div key={step.id} className={direction === 1 ? "tour-enter" : "tour-enter-back"}>
             <div className="grid gap-5 px-4 py-5 sm:grid-cols-2 sm:items-center sm:gap-7 sm:px-6 sm:py-7">
               <div className="order-2 sm:order-1">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.09em] text-accent-text">
+                <p className="text-[12.5px] font-semibold tracking-[0.09em] text-accent-text">
                   {step.eyebrow}
                 </p>
                 <h2 className="mt-2 text-xl font-semibold leading-tight tracking-tight sm:text-2xl">

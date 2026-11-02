@@ -947,14 +947,14 @@ function Loose({ date, items }: { date: string; items: PlanItem[] }) {
                   for "23:59" with room to spare.
                 */}
                 <div className="flex items-center gap-1.5">
-                  <span className="text-[10px] uppercase tracking-wide text-ink-3">From</span>
+                  <span className="text-[12.5px] font-semibold text-ink-3">From</span>
                   <div className="w-[76px]">
                     <TimeField value={from} onChange={setFrom} compact />
                   </div>
                 </div>
 
                 <div className="flex items-center gap-1.5">
-                  <span className="text-[10px] uppercase tracking-wide text-ink-3">To</span>
+                  <span className="text-[12.5px] font-semibold text-ink-3">To</span>
                   <div className="w-[76px]">
                     <TimeField value={to} onChange={setTo} compact />
                   </div>
@@ -967,7 +967,7 @@ function Loose({ date, items }: { date: string; items: PlanItem[] }) {
                   now says its name, and the rest are a dot plus a label too.
                 */}
                 <div className="flex items-center gap-1">
-                  <span className="text-[10px] uppercase tracking-wide text-ink-3">Priority</span>
+                  <span className="text-[12.5px] font-semibold text-ink-3">Priority</span>
                   <div className="flex items-center gap-0.5 rounded-lg bg-panel-2 p-0.5">
                     {PRIORITIES.map((p) => (
                       <button
@@ -1132,7 +1132,7 @@ function Tick({ checked, onChange }: { checked: boolean; onChange: () => void })
       role="checkbox"
       aria-checked={checked}
       onClick={onChange}
-      className={`grid size-4 shrink-0 place-items-center rounded border transition-colors ${
+      className={`grid size-[17px] shrink-0 place-items-center rounded-full border-[1.5px] transition-colors ${
         checked
           ? "border-accent bg-accent text-white"
           : "border-line-strong hover:border-accent"

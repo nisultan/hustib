@@ -80,7 +80,7 @@ export function PlanItemMenu({
       </MenuItem>
 
       <div className="my-1 border-t border-line" />
-      <p className="px-2 pb-0.5 text-[10px] uppercase tracking-wide text-ink-3">Priority</p>
+      <p className="px-2 pb-0.5 text-[12.5px] font-semibold text-ink-3">Priority</p>
       {PRIORITIES.map((p) => (
         <MenuItem
           key={p}

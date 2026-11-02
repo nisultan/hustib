@@ -196,7 +196,7 @@ function ScoreTile({
       </span>
 
       <div className="relative min-w-0">
-        <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-ink-3">Consistency</p>
+        <p className="text-[12.5px] font-semibold tracking-[0.08em] text-ink-3">Consistency</p>
         <p className="mt-1 text-[14px] font-medium leading-snug">{verdict(score)}</p>
         <p className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11.5px] text-ink-3">
           {delta != null && delta !== 0 && (
@@ -241,7 +241,7 @@ function Stat({
   const moved = trend != null && Math.abs(trend) >= 0.05;
   return (
     <div className="rounded-2xl border border-line bg-panel p-4 shadow-[var(--shadow),var(--edge)]">
-      <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-ink-3">{label}</p>
+      <p className="text-[12.5px] font-semibold tracking-[0.08em] text-ink-3">{label}</p>
       <p className="mt-2 flex items-baseline gap-2">
         <span
           className="nums text-[28px] font-semibold leading-none tracking-tight"
@@ -320,7 +320,7 @@ function Suggestion({
       </span>
       <span className="min-w-0 flex-1">
         <span
-          className="block text-[10.5px] font-semibold uppercase tracking-[0.08em]"
+          className="block text-[12.5px] font-semibold tracking-[0.08em]"
           style={{ color: k.tone }}
         >
           {k.label}
@@ -391,7 +391,7 @@ function Group({
 }) {
   return (
     <div className="grid gap-2.5">
-      <p className="text-[10.5px] font-semibold uppercase tracking-[0.08em]" style={{ color: tone }}>
+      <p className="text-[12.5px] font-semibold tracking-[0.08em]" style={{ color: tone }}>
         {title}
       </p>
       {habits.map((h) => {
