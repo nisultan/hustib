@@ -72,6 +72,7 @@ export function CheckIn() {
   const [day, setDay] = useState<Day | null>(null);
   const [draft, setDraft] = useState("");
   const [waiting, setWaiting] = useState(false);
+  const [replying, setReplying] = useState(false);
   const decided = useRef(false);
 
   // The store through a ref: it is a new object every render, and the
@@ -148,106 +149,96 @@ export function CheckIn() {
   };
 
   const answered = day.status === "answered";
+  const close = () => update({ status: answered ? "closed" : "dismissed" });
 
+  /*
+    A line, not a card. The first version was a full-width panel with an input
+    always showing — the largest thing on the dashboard, for a question you
+    answer in five seconds or not at all. Now it is one row: who is asking,
+    what, and "Reply". The field opens when you take it up on it.
+  */
   return (
     <section
-      className="relative mb-8 overflow-hidden rounded-2xl border border-line bg-panel p-4 shadow-[var(--shadow),var(--edge)]"
-      style={{ animation: "fade-up 420ms ease-out both" }}
+      className="mb-6 rounded-xl border border-line bg-panel px-3 py-2.5"
+      style={{ animation: "fade-up 360ms ease-out both" }}
     >
-      {/* A wash from the corner Lifee speaks from, so the card reads as a
-          voice rather than as another panel of data. */}
-      <span
-        aria-hidden
-        className="pointer-events-none absolute inset-0"
-        style={{
-          background:
-            "radial-gradient(420px 160px at 0% 0%, color-mix(in srgb, var(--accent) 10%, transparent), transparent 70%)",
-        }}
-      />
-
-      <button
-        type="button"
-        onClick={() => update({ status: answered ? "closed" : "dismissed" })}
-        aria-label={answered ? "Close" : "Not now"}
-        title={answered ? "Close" : "Not now"}
-        className="absolute right-2.5 top-2.5 grid size-7 place-items-center rounded-md text-ink-3 transition-colors hover:bg-panel-2 hover:text-ink"
-      >
-        <svg viewBox="0 0 16 16" aria-hidden className="size-3.5">
-          <path d="m4 4 8 8M12 4l-8 8" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
-        </svg>
-      </button>
-
-      <div className="relative grid gap-3">
-        {/* Lifee's line */}
-        <div className="flex items-start gap-2.5 pr-8">
-          <span className="grid size-7 shrink-0 place-items-center rounded-full bg-accent text-white">
-            <LogoMark className="size-4" />
-          </span>
-          <div className="min-w-0">
-            <p className="text-[12.5px] font-semibold tracking-[0.08em] text-ink-3">Lifee</p>
-            <p className="mt-0.5 text-[15px] font-medium leading-snug">{day.question}</p>
-          </div>
-        </div>
-
-        {answered && day.answer && (
-          <div className="flex justify-end">
-            <p className="max-w-[85%] rounded-2xl rounded-tr-md bg-accent px-3.5 py-2 text-[13.5px] leading-relaxed text-white">
-              {day.answer}
-            </p>
-          </div>
+      <div className="flex items-center gap-3">
+        <span className="grid size-7 shrink-0 place-items-center rounded-full bg-accent text-white">
+          <LogoMark className="size-4" />
+        </span>
+        <p className="min-w-0 flex-1 text-[14px] leading-snug">
+          <span className="font-semibold">Lifee</span>{" "}
+          <span className="text-ink-2">{answered ? "— you answered:" : "asks:"}</span>{" "}
+          <span className={answered ? "text-ink-3" : "text-ink"}>{day.question}</span>
+        </p>
+        {!answered && !replying && (
+          <button
+            type="button"
+            onClick={() => setReplying(true)}
+            className="shrink-0 rounded-[7px] bg-accent-soft px-3 py-1.5 text-[13px] font-medium text-accent-text transition-colors hover:brightness-95"
+          >
+            Reply
+          </button>
         )}
+        <button
+          type="button"
+          onClick={close}
+          aria-label={answered ? "Close" : "Not now"}
+          title={answered ? "Close" : "Not now"}
+          className="grid size-7 shrink-0 place-items-center rounded-md text-ink-3 transition-colors hover:bg-panel-2 hover:text-ink"
+        >
+          <svg viewBox="0 0 16 16" aria-hidden className="size-3.5">
+            <path d="m4 4 8 8M12 4l-8 8" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+          </svg>
+        </button>
+      </div>
 
-        {answered && (waiting || day.reply) && (
-          <div className="flex items-start gap-2.5">
-            <span className="grid size-7 shrink-0 place-items-center rounded-full bg-accent-soft text-accent-text">
-              <LogoMark className="size-4" />
+      {!answered && replying && (
+        <div className="mt-2.5 flex items-center gap-2 pl-10">
+          <input
+            autoFocus
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") void send();
+              if (e.key === "Escape") setReplying(false);
+            }}
+            placeholder="Say it however — a word is fine"
+            className="min-w-0 flex-1 rounded-lg border border-line bg-panel-2 px-3 py-1.5 text-[13.5px] placeholder:text-ink-3 focus:border-accent focus:outline-none"
+          />
+          <button
+            type="button"
+            onClick={() => void send()}
+            disabled={draft.trim() === ""}
+            className="rounded-[7px] bg-accent px-3 py-1.5 text-[13px] font-medium text-white transition-opacity disabled:opacity-40"
+          >
+            Send
+          </button>
+        </div>
+      )}
+
+      {answered && (
+        <div className="mt-2 grid gap-1.5 pl-10">
+          {day.answer && <p className="text-[13px] text-ink-2">“{day.answer}”</p>}
+          {waiting && !day.reply ? (
+            <span className="flex gap-1 py-1" aria-label="Lifee is typing">
+              {[0, 1, 2].map((k) => (
+                <span
+                  key={k}
+                  className="size-1.5 rounded-full bg-ink-3"
+                  style={{ animation: `pop 900ms ease-in-out ${k * 150}ms infinite alternate` }}
+                />
+              ))}
             </span>
-            {waiting && !day.reply ? (
-              <span className="mt-2 flex gap-1" aria-label="Lifee is typing">
-                {[0, 1, 2].map((i) => (
-                  <span
-                    key={i}
-                    className="size-1.5 rounded-full bg-ink-3"
-                    style={{ animation: `pop 900ms ease-in-out ${i * 150}ms infinite alternate` }}
-                  />
-                ))}
-              </span>
-            ) : (
-              <p className="min-w-0 max-w-[85%] rounded-2xl rounded-tl-md bg-panel-2 px-3.5 py-2 text-[13.5px] leading-relaxed text-ink">
+          ) : (
+            day.reply && (
+              <p className="rounded-lg bg-accent-soft/60 px-3 py-2 text-[13.5px] leading-relaxed text-ink">
                 {day.reply}
               </p>
-            )}
-          </div>
-        )}
-
-        {!answered && (
-          <div className="flex items-center gap-2 pl-[38px]">
-            <input
-              value={draft}
-              onChange={(e) => setDraft(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") void send();
-              }}
-              placeholder="Say it however — a word is fine"
-              className="min-w-0 flex-1 rounded-xl border border-line bg-panel-2 px-3 py-2 text-[13.5px] placeholder:text-ink-3 focus:border-accent focus:outline-none"
-            />
-            <button
-              type="button"
-              onClick={() => void send()}
-              disabled={draft.trim() === ""}
-              className="rounded-xl bg-accent px-3.5 py-2 text-[13px] font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-40"
-            >
-              Send
-            </button>
-          </div>
-        )}
-
-        <p className="pl-[38px] text-[10.5px] text-ink-3">
-          {answered
-            ? "Saved to today's journal."
-            : "Goes into today's journal, so Lifee remembers it."}
-        </p>
-      </div>
+            )
+          )}
+        </div>
+      )}
     </section>
   );
 }

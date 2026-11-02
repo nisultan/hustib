@@ -29,13 +29,13 @@ interface Draft {
   notes: string;
 }
 
-function emptyDraft(courseId = "", categoryId = ""): Draft {
+function emptyDraft(courseId = "", categoryId = "", dueDate = ""): Draft {
   return {
     title: "",
     courseId,
     categoryId,
     lesson: "",
-    dueDate: "",
+    dueDate,
     dueTime: "",
     priority: "medium",
     status: "not_started",
@@ -62,25 +62,28 @@ export function TaskDialog({
   onClose,
   task,
   defaultCourseId = "",
+  defaultDueDate = "",
 }: {
   open: boolean;
   onClose: () => void;
   /** Present when editing; absent when creating. */
   task?: Task;
   defaultCourseId?: string;
+  /** Pre-filled for an add opened from a day's list — adding to Today means today. */
+  defaultDueDate?: string;
 }) {
   const store = useStore();
-  const [draft, setDraft] = useState<Draft>(emptyDraft(defaultCourseId));
+  const [draft, setDraft] = useState<Draft>(emptyDraft(defaultCourseId, "", defaultDueDate));
   const [quick, setQuick] = useState("");
   const [extracted, setExtracted] = useState<string[] | null>(null);
 
   // Reset whenever the dialog opens so a previous draft never leaks in.
   useEffect(() => {
     if (!open) return;
-    setDraft(task ? toDraft(task) : emptyDraft(defaultCourseId));
+    setDraft(task ? toDraft(task) : emptyDraft(defaultCourseId, "", defaultDueDate));
     setQuick("");
     setExtracted(null);
-  }, [open, task, defaultCourseId]);
+  }, [open, task, defaultCourseId, defaultDueDate]);
 
   const set = <K extends keyof Draft>(key: K, value: Draft[K]) =>
     setDraft((d) => ({ ...d, [key]: value }));
