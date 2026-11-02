@@ -28,7 +28,11 @@ export function Insights({ limit }: { limit?: number }) {
   const { reflect, running, error, outcome, ready } = useReflection();
 
   const live = store.insights.filter((i) => i.dismissedAt == null);
-  const shown = limit ? live.slice(0, limit) : live;
+  const [all, setAll] = useState(false);
+  // Three at first. Five cards of three sentences each was the wall this page
+  // was criticised for; the titles are the message, and the rest is one tap.
+  const cap = limit ?? 3;
+  const shown = all ? live : live.slice(0, cap);
   const untouched = shown.length === 0 && !running && outcome == null && error == null;
 
   return (
@@ -72,14 +76,23 @@ export function Insights({ limit }: { limit?: number }) {
           {running ? "Reading back through your week…" : "Nothing new since last time."}
         </p>
       ) : (
-        <div className="grid gap-2">
+        <div className="overflow-hidden rounded-xl border border-line bg-panel">
           {shown.map((insight) => (
-            <Card
+            <Row
               key={insight.id}
               insight={insight}
               onDismiss={() => store.dismissInsight(insight.id)}
             />
           ))}
+          {live.length > cap && (
+            <button
+              type="button"
+              onClick={() => setAll((v) => !v)}
+              className="w-full border-t border-line px-4 py-2.5 text-left text-[13px] font-medium text-accent-text transition-colors hover:bg-panel-2"
+            >
+              {all ? "Show fewer" : `Show all ${live.length}`}
+            </button>
+          )}
         </div>
       )}
 
@@ -100,98 +113,76 @@ export function Insights({ limit }: { limit?: number }) {
 }
 
 /**
- * One thing it noticed.
+ * One thing it noticed, as a line that opens.
  *
- * Built to read like a note from someone rather than an output from something.
- * The earlier card had every tell: a shouted SUGGESTION label, a coloured rail
- * down the side, a wall of three sentences, and a "Going off…" citation line
- * under each — four cards of that and the page looked like a model's
- * scratchpad.
- *
- * So the title does the talking, large, the way you would say the point
- * first. The body is held to two lines until it is asked for; most of the
- * time the title was the message. The evidence is still one tap away under
- * "why?", because being able to check the reasoning matters — it just does not
- * need to be on screen every time. The kind survives as a small mark rather
- * than a label: it says how much to trust the card, and that is a glance, not
- * a heading.
+ * Closed, a row shows the picture and the title and nothing else — the title
+ * is written to be the point, so most of the time it is enough. Open, it shows
+ * the full note, what it was drawn from, and where to act on it. A page of
+ * these reads like an inbox you can scan in five seconds, instead of five
+ * paragraphs you have to get through.
  */
-function Card({ insight, onDismiss }: { insight: Insight; onDismiss: () => void }) {
+function Row({ insight, onDismiss }: { insight: Insight; onDismiss: () => void }) {
   const [open, setOpen] = useState(false);
-  const [why, setWhy] = useState(false);
   const k = KIND[insight.kind];
 
   return (
-    <article className="group relative rounded-2xl border border-line bg-panel p-4 shadow-[var(--shadow),var(--edge)] transition-[border-color,box-shadow] hover:border-line-strong">
-      <div className="flex items-start gap-3 pr-7">
-        <InsightIcon insight={insight} tone={k.tone} label={k.label} />
-
-        <div className="min-w-0 flex-1">
-          <h3 className="text-[15.5px] font-semibold leading-snug tracking-tight text-balance">
-            {insight.title}
-          </h3>
-
-          <p
-            className={`mt-1.5 text-[13.5px] leading-relaxed text-ink-2 ${open ? "" : "line-clamp-2"}`}
+    <article className="group border-b border-line last:border-b-0">
+      <div className="flex items-center gap-3 px-3 py-2.5">
+        <button
+          type="button"
+          onClick={() => setOpen((v) => !v)}
+          aria-expanded={open}
+          className="flex min-w-0 flex-1 items-center gap-3 text-left"
+        >
+          <InsightIcon insight={insight} tone={k.tone} label={k.label} />
+          <span className="min-w-0 flex-1">
+            <span className="block truncate text-[14.5px] font-semibold tracking-tight">
+              {insight.title}
+            </span>
+            <span className="block text-[12px]" style={{ color: k.tone }}>
+              {k.label}
+            </span>
+          </span>
+          <svg
+            viewBox="0 0 16 16"
+            aria-hidden
+            className={`size-4 shrink-0 text-ink-3 transition-transform duration-200 ${open ? "rotate-180" : ""}`}
           >
-            {insight.body}
-          </p>
+            <path d="m4 6 4 4 4-4" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        </button>
+        <button
+          onClick={onDismiss}
+          aria-label={`Dismiss "${insight.title}"`}
+          title="Dismiss"
+          className="grid size-7 shrink-0 place-items-center rounded-md text-ink-3 opacity-0 transition-opacity hover:bg-panel-2 hover:text-ink focus-visible:opacity-100 group-hover:opacity-100 max-md:opacity-60"
+        >
+          <svg viewBox="0 0 16 16" aria-hidden className="size-3.5">
+            <path d="m4 4 8 8M12 4l-8 8" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+          </svg>
+        </button>
+      </div>
 
-          {why && insight.basis && (
-            <p className="mt-2 rounded-lg bg-panel-2 px-2.5 py-1.5 text-[11.5px] leading-snug text-ink-3">
+      {open && (
+        <div className="grid gap-2.5 px-3 pb-3.5 pl-[64px]" style={{ animation: "fade-up 220ms ease-out both" }}>
+          <p className="text-[13.5px] leading-relaxed text-ink-2">{insight.body}</p>
+          {insight.basis && (
+            <p className="text-[12px] text-ink-3">
+              <span className="font-semibold text-ink-2">Why: </span>
               {insight.basis}
             </p>
           )}
-
-          <div className="mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px]">
-            {insight.body.length > 140 && (
-              <button
-                type="button"
-                onClick={() => setOpen((v) => !v)}
-                className="text-ink-3 transition-colors hover:text-ink"
-              >
-                {open ? "Less" : "More"}
-              </button>
-            )}
-            {insight.basis && (
-              <button
-                type="button"
-                onClick={() => setWhy((v) => !v)}
-                className="text-ink-3 transition-colors hover:text-ink"
-              >
-                {why ? "Hide why" : "Why?"}
-              </button>
-            )}
-            {insight.href && (
-              <Link
-                href={insight.href}
-                className="ml-auto font-medium transition-opacity hover:opacity-80"
-                style={{ color: k.tone }}
-              >
-                Go there →
-              </Link>
-            )}
-          </div>
+          {insight.href && (
+            <Link
+              href={insight.href}
+              className="justify-self-start rounded-[7px] px-2.5 py-1 text-[12.5px] font-medium transition-colors hover:brightness-95"
+              style={{ color: k.tone, background: `color-mix(in srgb, ${k.tone} 12%, transparent)` }}
+            >
+              Go there →
+            </Link>
+          )}
         </div>
-      </div>
-
-      <button
-        onClick={onDismiss}
-        aria-label={`Dismiss "${insight.title}"`}
-        title="Dismiss"
-        // Always reachable by keyboard and on touch, where there is no hover.
-        className="absolute right-2.5 top-2.5 grid size-7 place-items-center rounded-md text-ink-3 opacity-0 transition-opacity hover:bg-panel-2 hover:text-ink focus-visible:opacity-100 group-hover:opacity-100 max-md:opacity-60"
-      >
-        <svg viewBox="0 0 16 16" aria-hidden className="size-3.5">
-          <path
-            d="m4 4 8 8M12 4l-8 8"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.6"
-            strokeLinecap="round"
-          />
-        </svg>
-      </button>
+      )}
     </article>
   );
 }

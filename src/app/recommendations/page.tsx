@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useStore } from "@/lib/store";
 import { recommend, RecKind } from "@/lib/recommendations";
 import { productivity } from "@/lib/productivity";
@@ -99,7 +99,7 @@ export default function RecommendationsPage() {
 
       <div className="grid gap-x-6 gap-y-8 lg:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)] lg:items-start">
         {/* ---- what to do --------------------------------------------- */}
-        <div className="grid min-w-0 gap-2">
+        <div className="grid min-w-0 grid-cols-1 gap-2">
           <Insights />
 
           <section>
@@ -112,21 +112,13 @@ export default function RecommendationsPage() {
                 hint="Add tasks and deadlines and suggestions will appear here."
               />
             ) : (
-              <div className="grid gap-2">
-                {recs.map((r, i) => (
-                  <Suggestion key={r.id} kind={r.kind} text={r.text} href={r.href} index={i} />
-                ))}
-              </div>
+              <Suggestions recs={recs} />
             )}
-            <p className="mt-4 text-[11px] leading-relaxed text-ink-3">
-              Fourteen rules read your own data and each produces at most one line. The strongest
-              few are shown. Nothing here is sent anywhere.
-            </p>
           </section>
         </div>
 
         {/* ---- the evidence ------------------------------------------- */}
-        <div className="grid min-w-0 gap-8">
+        <div className="grid min-w-0 grid-cols-1 gap-8">
           <HoldingSlipping habits={habits} />
           <Rhythm plan={plan} />
           <Signals signals={score.signals} />
@@ -293,47 +285,52 @@ const KIND: Record<RecKind, { label: string; tone: string; glyph: string }> = {
   weight: { label: "Weight", tone: "var(--accent)", glyph: "⚖" },
 };
 
-function Suggestion({
-  kind,
-  text,
-  href,
-  index,
-}: {
-  kind: RecKind;
-  text: string;
-  href: string;
-  index: number;
-}) {
-  const k = KIND[kind];
+/**
+ * The rule-based suggestions: three lines, the rest on request.
+ *
+ * Eight full sentences in separate cards was the "too much information" this
+ * page was called out for. Each is now a single line in one list — its mark,
+ * its sentence cut to fit, an arrow — and "Show all" opens the rest. Hovering
+ * a cut line shows the whole sentence; opening it goes where it points.
+ */
+function Suggestions({ recs }: { recs: { id: string; kind: RecKind; text: string; href: string }[] }) {
+  const [all, setAll] = useState(false);
+  const shown = all ? recs : recs.slice(0, 3);
   return (
-    <Link
-      href={href}
-      className="group flex items-start gap-3 rounded-xl border border-line bg-panel px-3.5 py-3 shadow-[var(--shadow),var(--edge)] transition-[transform,border-color,box-shadow] duration-200 hover:-translate-y-0.5 hover:border-line-strong hover:shadow-[var(--shadow-md),var(--edge)]"
-      style={{ animation: `fade-up 360ms ease-out ${index * 40}ms both` }}
-    >
-      <span
-        aria-hidden
-        className="grid size-8 shrink-0 place-items-center rounded-lg text-[14px] font-semibold"
-        style={{ background: `color-mix(in srgb, ${k.tone} 14%, transparent)`, color: k.tone }}
-      >
-        {k.glyph}
-      </span>
-      <span className="min-w-0 flex-1">
-        <span
-          className="block text-[12.5px] font-semibold tracking-[0.08em]"
-          style={{ color: k.tone }}
+    <div className="overflow-hidden rounded-xl border border-line bg-panel">
+      {shown.map((r) => {
+        const k = KIND[r.kind];
+        return (
+          <Link
+            key={r.id}
+            href={r.href}
+            title={r.text}
+            className="group flex items-center gap-3 border-b border-line px-3 py-2.5 transition-colors last:border-b-0 hover:bg-panel-2"
+          >
+            <span
+              aria-hidden
+              className="grid size-7 shrink-0 place-items-center rounded-lg text-[13px] font-semibold"
+              style={{ background: `color-mix(in srgb, ${k.tone} 14%, transparent)`, color: k.tone }}
+            >
+              {k.glyph}
+            </span>
+            <span className={`min-w-0 flex-1 text-[13.5px] text-ink ${all ? "" : "truncate"}`}>{r.text}</span>
+            <span aria-hidden className="shrink-0 text-ink-3 transition-transform group-hover:translate-x-0.5">
+              →
+            </span>
+          </Link>
+        );
+      })}
+      {recs.length > 3 && (
+        <button
+          type="button"
+          onClick={() => setAll((v) => !v)}
+          className="w-full border-t border-line px-4 py-2.5 text-left text-[13px] font-medium text-accent-text transition-colors hover:bg-panel-2"
         >
-          {k.label}
-        </span>
-        <span className="mt-0.5 block text-[13.5px] leading-relaxed text-ink-2">{text}</span>
-      </span>
-      <span
-        aria-hidden
-        className="mt-2 shrink-0 text-ink-3 transition-transform duration-200 group-hover:translate-x-0.5"
-      >
-        →
-      </span>
-    </Link>
+          {all ? "Show fewer" : `Show all ${recs.length}`}
+        </button>
+      )}
+    </div>
   );
 }
 
@@ -360,18 +357,40 @@ function HoldingSlipping({ habits }: { habits: HabitPattern[] }) {
     .filter((h) => !slipping.includes(h))
     .sort((a, b) => (b.recent ?? 0) - (a.recent ?? 0));
 
+  return <HabitsCard holding={holding} slipping={slipping} />;
+}
+
+/**
+ * Four habits at most until asked — the two worst slipping and the two best
+ * holding — and the per-habit reasons only once the list is opened. Nine bars
+ * each with a "last kept 26 days ago" under it was a report; the four that say
+ * the most are a glance.
+ */
+function HabitsCard({ holding, slipping }: { holding: HabitPattern[]; slipping: HabitPattern[] }) {
+  const [all, setAll] = useState(false);
+  const total = holding.length + slipping.length;
+  const s = all ? slipping : slipping.slice(0, 2);
+  const h = all ? holding : holding.slice(0, Math.max(0, 4 - s.length));
+
   return (
     <section>
       <SectionTitle right={<span className="text-xs text-ink-3">last 14 days</span>}>
         What you keep
       </SectionTitle>
-      <div className="grid gap-3 rounded-2xl border border-line bg-panel p-4 shadow-[var(--shadow),var(--edge)]">
-        {holding.length > 0 && (
-          <Group title="Holding" tone="var(--up)" habits={holding} />
-        )}
-        {holding.length > 0 && slipping.length > 0 && <div className="border-t border-line" />}
-        {slipping.length > 0 && (
-          <Group title="Slipping" tone="var(--urgent)" habits={slipping} showWhy />
+      <div className="overflow-hidden rounded-xl border border-line bg-panel">
+        <div className="grid gap-3 p-4">
+          {s.length > 0 && <Group title="Slipping" tone="var(--urgent)" habits={s} showWhy={all} />}
+          {s.length > 0 && h.length > 0 && <div className="border-t border-line" />}
+          {h.length > 0 && <Group title="Holding" tone="var(--up)" habits={h} showWhy={all} />}
+        </div>
+        {total > 4 && (
+          <button
+            type="button"
+            onClick={() => setAll((v) => !v)}
+            className="w-full border-t border-line px-4 py-2.5 text-left text-[13px] font-medium text-accent-text transition-colors hover:bg-panel-2"
+          >
+            {all ? "Show fewer" : `Show all ${total} habits`}
+          </button>
         )}
       </div>
     </section>
@@ -420,7 +439,7 @@ function Group({
                 "holds, except Fridays" is the most useful thing on this card.
                 How long since it was last kept only matters once it is
                 slipping. */}
-            {(h.weakDays.length > 0 || (showWhy && (h.lastKept == null || h.lastKept > 2))) && (
+            {showWhy && (h.weakDays.length > 0 || h.lastKept == null || h.lastKept > 2) && (
               <p className="text-[11px] text-ink-3">
                 {h.weakDays.length > 0 && `Usually missed on ${weekdayNames(h.weakDays)}. `}
                 {showWhy &&
@@ -497,13 +516,36 @@ function Rhythm({ plan }: { plan: ReturnType<typeof planPatterns> }) {
 
 /** What the score is made of, so it can be argued with. */
 function Signals({ signals }: { signals: ReturnType<typeof productivity>["signals"] }) {
+  const [open, setOpen] = useState(false);
   const used = signals.filter((s) => s.rate != null);
   if (used.length === 0) return null;
 
+  // The working, for anyone who wants to argue with the number — and folded
+  // away for everyone else.
+  if (!open) {
+    return (
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className="justify-self-start text-[13px] font-medium text-accent-text hover:underline"
+      >
+        How is the consistency score worked out?
+      </button>
+    );
+  }
+
   return (
     <section>
-      <SectionTitle>What the score is made of</SectionTitle>
-      <div className="grid gap-3 rounded-2xl border border-line bg-panel p-4 shadow-[var(--shadow),var(--edge)]">
+      <SectionTitle
+        right={
+          <button type="button" onClick={() => setOpen(false)} className="text-xs text-ink-3 hover:text-ink">
+            Hide
+          </button>
+        }
+      >
+        What the score is made of
+      </SectionTitle>
+      <div className="grid gap-3 rounded-xl border border-line bg-panel p-4">
         {used.map((s) => {
           const r = s.rate ?? 0;
           return (
