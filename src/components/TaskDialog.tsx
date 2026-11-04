@@ -11,8 +11,6 @@ import {
   STATUSES,
   STATUS_LABEL,
 } from "@/lib/types";
-import { parseQuickAdd } from "@/lib/quickparse";
-import { formatDate, relativeLabel } from "@/lib/dates";
 import { Button, Field, Input, Modal, Select, Textarea } from "./ui";
 import { TimeField } from "./TimeField";
 import { DateField } from "./DateField";
@@ -74,47 +72,15 @@ export function TaskDialog({
 }) {
   const store = useStore();
   const [draft, setDraft] = useState<Draft>(emptyDraft(defaultCourseId, "", defaultDueDate));
-  const [quick, setQuick] = useState("");
-  const [extracted, setExtracted] = useState<string[] | null>(null);
 
   // Reset whenever the dialog opens so a previous draft never leaks in.
   useEffect(() => {
     if (!open) return;
     setDraft(task ? toDraft(task) : emptyDraft(defaultCourseId, "", defaultDueDate));
-    setQuick("");
-    setExtracted(null);
   }, [open, task, defaultCourseId, defaultDueDate]);
 
   const set = <K extends keyof Draft>(key: K, value: Draft[K]) =>
     setDraft((d) => ({ ...d, [key]: value }));
-
-  const runQuickAdd = () => {
-    if (quick.trim().length === 0) return;
-    const parsed = parseQuickAdd(quick, store.courses);
-
-    setDraft((d) => ({
-      ...d,
-      title: parsed.title || d.title,
-      courseId: parsed.courseId ?? d.courseId,
-      dueDate: parsed.dueDate ?? d.dueDate,
-      dueTime: parsed.dueTime ?? d.dueTime,
-      priority: parsed.priority,
-    }));
-
-    // Report exactly what was understood, so the student knows what to check.
-    const found: string[] = [];
-    if (parsed.matched.course) {
-      const c = store.courses.find((x) => x.id === parsed.courseId);
-      if (c) found.push(`Course: ${c.name}`);
-    }
-    if (parsed.matched.date && parsed.dueDate) {
-      found.push(`Deadline: ${relativeLabel(parsed.dueDate)} (${formatDate(parsed.dueDate)})`);
-    }
-    if (parsed.matched.time && parsed.dueTime) found.push(`Time: ${parsed.dueTime}`);
-    if (parsed.matched.priority) found.push(`Priority: ${PRIORITY_LABEL[parsed.priority]}`);
-    setExtracted(found);
-    setQuick("");
-  };
 
   const save = () => {
     const title = draft.title.trim();
@@ -151,50 +117,6 @@ export function TaskDialog({
 
   return (
     <Modal open={open} onClose={onClose} title={task ? "Edit task" : "New task"} wide>
-      {!task && (
-        <div className="mb-5 rounded-xl border border-line bg-panel-2 p-3">
-          <p className="mb-2 text-xs font-medium text-ink-2">
-            Quick add — write it the way you would say it
-          </p>
-          <div className="flex gap-2">
-            <Input
-              value={quick}
-              onChange={(e) => setQuick(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                  e.preventDefault();
-                  runQuickAdd();
-                }
-              }}
-              placeholder="Finish physics worksheet tomorrow, high priority"
-              className="min-w-0 flex-1 bg-panel"
-            />
-            <Button onClick={runQuickAdd} disabled={quick.trim().length === 0}>
-              Extract
-            </Button>
-          </div>
-
-          {extracted != null && (
-            <div className="mt-2.5 text-xs">
-              {extracted.length > 0 ? (
-                <>
-                  <span className="text-ink-2">
-                    Filled in below — edit anything before saving:
-                  </span>
-                  <ul className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-accent-text">
-                    {extracted.map((e) => (
-                      <li key={e}>{e}</li>
-                    ))}
-                  </ul>
-                </>
-              ) : (
-                <span className="text-ink-3">Only a title was found — set the rest below.</span>
-              )}
-            </div>
-          )}
-        </div>
-      )}
-
       <div className="grid gap-4">
         <Field label="Title">
           <Input
