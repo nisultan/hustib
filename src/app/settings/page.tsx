@@ -12,6 +12,7 @@ import { PasswordSection } from "@/components/PasswordSection";
 import { MemorySection } from "@/components/MemorySection";
 import { CategorySection } from "@/components/CategorySection";
 import { AccountSection } from "@/components/AccountSection";
+import { TelegramSection } from "@/components/TelegramSection";
 
 export default function SettingsPage() {
   const store = useStore();
@@ -180,6 +181,11 @@ export default function SettingsPage() {
             </button>
           </div>
         </Panel>
+      </section>
+
+      <section className="mb-8">
+        <SectionTitle>Telegram</SectionTitle>
+        <TelegramSection />
       </section>
 
       <section className="mb-8">

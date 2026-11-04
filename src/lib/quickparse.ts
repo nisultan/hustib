@@ -42,7 +42,11 @@ const PRIORITY_WORDS: [RegExp, Priority][] = [
  * Every matched phrase is stripped from the title so the saved task reads
  * cleanly. The caller always shows the result for editing before saving.
  */
-export function parseQuickAdd(input: string, courses: Course[]): ParsedTask {
+/** The day relative words resolve against; the server passes the student's own. */
+let base = "";
+
+export function parseQuickAdd(input: string, courses: Course[], today?: string): ParsedTask {
+  base = today ?? todayISO();
   let text = ` ${input.trim()} `;
   const matched = { course: false, date: false, time: false, priority: false };
 
@@ -115,7 +119,7 @@ interface DateMatch {
 }
 
 function extractDate(text: string): DateMatch | null {
-  const today = todayISO();
+  const today = base || todayISO();
 
   const simple: [RegExp, () => string][] = [
     [/\btoday\b/i, () => today],
@@ -172,9 +176,10 @@ function extractDate(text: string): DateMatch | null {
 
 /** A month/day with no year means the next time that date comes around. */
 function resolveMonthDay(month: number, day: number): string {
-  const now = new Date();
+  const ref = base || todayISO();
+  const now = fromISO(ref);
   let candidate = new Date(now.getFullYear(), month, day);
-  if (toISO(candidate) < todayISO()) {
+  if (toISO(candidate) < ref) {
     candidate = new Date(now.getFullYear() + 1, month, day);
   }
   return toISO(candidate);
