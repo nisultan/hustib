@@ -1,53 +1,100 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { quoteOfTheDay } from "@/lib/quotes";
+import { QUOTES, quoteOfTheDay } from "@/lib/quotes";
 import { todayISO } from "@/lib/dates";
 
 /**
- * The line of the day.
+ * The line of the day, as a card worth stopping on.
  *
- * Was a sentence written each morning by the model from that day's numbers.
- * Accurate, and the wrong thing: the dashboard already says what your week
- * looks like, two lines above this one, and a second machine-made observation
- * about your own data is not encouragement, it is the same report twice.
+ * It was a grey italic line under the greeting, easy to skim past — which is
+ * the opposite of what a quote of the day is for. Now it is set large and
+ * upright, in its own soft tinted card with a big opening mark, and it can be
+ * copied or swapped for another one when today's does not land.
  *
- * So it comes from outside instead — the Qur'an, a hadith, al-Shafi'i, Seneca,
- * a proverb — chosen from a written list rather than fetched, which means no
- * key, no network, no daily call to pay for, and nothing to go wrong on a
- * morning when Google is having one.
+ * Quotes come from a written list (Qur'an, hadith, scholars, Stoics, proverbs)
+ * rather than a network call: no key, no cost, nothing to break.
  *
- * Rendered only after mount. The quote depends on today's date, and a server
- * rendering yesterday's into the HTML while the browser computes today's is a
- * hydration mismatch — one of the few places in this app where the date is
- * genuinely ambiguous between the two.
+ * Rendered only after mount: the quote depends on today's date, and the server
+ * and browser can disagree about what today is.
  */
 export function Spark() {
   const [ready, setReady] = useState(false);
+  const [shift, setShift] = useState(0);
+  const [copied, setCopied] = useState(false);
   useEffect(() => setReady(true), []);
 
   if (!ready) return null;
 
-  const quote = quoteOfTheDay(todayISO());
+  const base = QUOTES.indexOf(quoteOfTheDay(todayISO()));
+  const quote = QUOTES[(base + shift * 37) % QUOTES.length];
+
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(`“${quote.text}” — ${quote.author}${quote.source ? `, ${quote.source}` : ""}`);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch {
+      // Clipboard blocked; nothing to do.
+    }
+  };
 
   return (
-    <figure className="mt-3.5 flex gap-2.5" style={{ animation: "fade-up 400ms ease-out both" }}>
-      {/* A rule rather than a quotation mark. A big curly quote at this size
-          is a glyph competing with the words beside it. */}
+    <figure
+      key={shift}
+      className="relative overflow-hidden rounded-xl border border-line px-5 pb-3.5 pt-4 sm:pl-14"
+      style={{
+        background: "color-mix(in srgb, var(--accent) 7%, var(--panel))",
+        animation: "fade-up 400ms ease-out both",
+      }}
+    >
       <span
         aria-hidden
-        className="mt-1.5 w-[3px] shrink-0 self-stretch rounded-full"
-        style={{ background: "color-mix(in srgb, var(--accent) 55%, transparent)" }}
-      />
+        className="pointer-events-none absolute left-3 top-1 hidden select-none font-serif text-[64px] leading-none sm:block"
+        style={{ color: "color-mix(in srgb, var(--accent) 55%, transparent)" }}
+      >
+        “
+      </span>
 
-      <div className="min-w-0">
-        <blockquote className="text-[13.5px] italic leading-relaxed text-ink-2">
-          {quote.text}
-        </blockquote>
-        <figcaption className="mt-1 text-[11px] text-ink-3">
-          {quote.author}
-          {quote.source && <span className="opacity-70"> · {quote.source}</span>}
+      <p className="text-[11.5px] font-semibold uppercase tracking-[0.12em] text-accent-text">
+        {shift === 0 ? "Today’s line" : "Another one"}
+      </p>
+      <blockquote className="mt-1.5 text-[17px] font-medium leading-snug tracking-[-0.005em] text-ink sm:text-[18px]">
+        {quote.text}
+      </blockquote>
+
+      <div className="mt-2.5 flex flex-wrap items-center justify-between gap-2">
+        <figcaption className="text-[12.5px] text-ink-2">
+          — <span className="font-semibold">{quote.author}</span>
+          {quote.source && <span className="text-ink-3"> · {quote.source}</span>}
         </figcaption>
+
+        <div className="flex items-center gap-1">
+          <button
+            type="button"
+            onClick={copy}
+            className="rounded-md px-2 py-1 text-[12px] font-medium text-ink-3 transition-colors hover:bg-panel-2 hover:text-ink"
+          >
+            {copied ? "Copied ✓" : "Copy"}
+          </button>
+          <button
+            type="button"
+            onClick={() => setShift((s) => s + 1)}
+            className="flex items-center gap-1 rounded-md px-2 py-1 text-[12px] font-medium text-ink-3 transition-colors hover:bg-panel-2 hover:text-ink"
+          >
+            <svg viewBox="0 0 16 16" aria-hidden className="size-3.5">
+              <path
+                d="M13 8a5 5 0 1 1-1.5-3.55M13 2.5V5h-2.5"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+            Another
+          </button>
+        </div>
       </div>
     </figure>
   );

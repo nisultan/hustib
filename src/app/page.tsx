@@ -1,13 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo } from "react";
+import { ReactNode, useMemo } from "react";
 import { useStore } from "@/lib/store";
 import { formatTime, greeting, todayISO } from "@/lib/dates";
 import { appliesOn } from "@/lib/habits";
 import { productivity } from "@/lib/productivity";
 import { Button, Panel } from "@/components/ui";
 import { Spark } from "@/components/Spark";
+import { Flame } from "@/components/Flame";
 import { CheckIn } from "@/components/CheckIn";
 import { openTour } from "@/components/Tour";
 import { TodayList } from "@/components/home/TodayList";
@@ -49,27 +50,30 @@ export default function HomePage() {
   const streak = productivity(store).streak;
 
   /*
-    One line about right now, in order of what would change the next hour.
-    The same greeting every day is furniture; this is the part worth reading.
+    What is going on right now, as chips you can act on rather than a sentence
+    you read: each opens the place that deals with it. Ordered by what would
+    change the next hour — late work, the next block, habits left — with the
+    streak last as the reward.
   */
-  const summary = (() => {
-    const bits: string[] = [];
-    if (overdue > 0) bits.push(`${overdue} overdue`);
-    else if (dueToday > 0) bits.push(`${dueToday} due today`);
+  const next = store.plan
+    .filter((p) => p.date === today && !p.done && p.start != null)
+    .sort((a, b) => (a.start ?? "").localeCompare(b.start ?? ""))[0];
+  const left = habitsLeft(store, today);
+  const chips: { key: string; label: string; href: string; tone: string; icon?: ReactNode }[] = [];
+  if (overdue > 0) chips.push({ key: "late", label: `${overdue} overdue`, href: "/tasks", tone: "var(--urgent)" });
+  if (dueToday > 0) chips.push({ key: "due", label: `${dueToday} due today`, href: "/tasks", tone: "var(--high)" });
+  if (next) chips.push({ key: "next", label: `${formatTime(next.start as string)} · ${next.title || "Untitled"}`, href: "/plan", tone: "var(--accent)" });
+  if (left > 0) chips.push({ key: "habits", label: `${left} habit${left === 1 ? "" : "s"} left`, href: "/plan", tone: "var(--up)" });
+  if (streak > 0) chips.push({ key: "streak", label: `${streak}-day streak`, href: "/progress", tone: "var(--high)", icon: <Flame streak={streak} /> });
 
-    const next = store.plan
-      .filter((p) => p.date === today && !p.done && p.start != null)
-      .sort((a, b) => (a.start ?? "").localeCompare(b.start ?? ""))[0];
-    if (next) bits.push(`next up ${formatTime(next.start as string)} — ${next.title}`);
-    if (streak > 1) bits.push(`${streak}-day streak`);
-
-    if (bits.length === 0) {
-      const left = habitsLeft(store, today);
-      if (left > 0) return `${left} habit${left === 1 ? "" : "s"} left today.`;
-      return open.length === 0 ? "Nothing on your plate." : "Nothing pressing today.";
-    }
-    return bits.join(" · ").replace(/^./, (c) => c.toUpperCase());
-  })();
+  const pep =
+    overdue > 0
+      ? "Clear the late stuff first — then the day is yours."
+      : dueToday > 0 || next
+        ? "Lock in. One thing at a time."
+        : open.length === 0
+          ? "Nothing on your plate. Rest, or get ahead."
+          : "Nothing pressing today. Good day to get ahead.";
 
   const date = new Date(`${today}T12:00:00`).toLocaleDateString("en-US", {
     weekday: "long",
@@ -82,16 +86,38 @@ export default function HomePage() {
       <header className="mb-5 flex items-start justify-between gap-6">
         <div className="min-w-0">
           <p className="text-[13px] font-medium text-ink-3">{date}</p>
-          <h1 className="mt-0.5 text-[28px] font-bold leading-tight tracking-tight">
+          <h1 className="mt-0.5 text-[30px] font-bold leading-tight tracking-tight sm:text-[34px]">
             {greeting()}, {store.profile.name}
           </h1>
-          <p className="mt-1 text-[14px] text-ink-2">{summary}</p>
-          <Spark />
+          <p className="mt-1 text-[14.5px] text-ink-2">{pep}</p>
+          {chips.length > 0 && (
+            <div className="mt-3 flex flex-wrap gap-1.5">
+              {chips.map((c) => (
+                <Link
+                  key={c.key}
+                  href={c.href}
+                  className="nums flex max-w-full items-center gap-1.5 rounded-full border px-3 py-1 text-[12.5px] font-semibold transition-[filter] hover:brightness-110"
+                  style={{
+                    color: c.tone,
+                    borderColor: `color-mix(in srgb, ${c.tone} 30%, transparent)`,
+                    background: `color-mix(in srgb, ${c.tone} 10%, transparent)`,
+                  }}
+                >
+                  {c.icon ?? <span aria-hidden className="size-1.5 shrink-0 rounded-full" style={{ background: c.tone }} />}
+                  <span className="truncate">{c.label}</span>
+                </Link>
+              ))}
+            </div>
+          )}
         </div>
         <TodayRing />
       </header>
 
-      <CheckIn />
+      <Spark />
+
+      <div className="mt-6">
+        <CheckIn />
+      </div>
 
       <div className="grid gap-x-10 gap-y-8 lg:grid-cols-[minmax(0,1fr)_320px] lg:items-start">
         <div className="grid min-w-0 grid-cols-1 gap-8">
