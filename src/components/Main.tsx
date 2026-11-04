@@ -17,6 +17,8 @@ import { ReactNode } from "react";
  * 1680px.
  */
 const WIDE = ["/plan", "/", "/recommendations"];
+/** Pages with a chart or an editor beside a sidebar: wider than reading width, not full. */
+const ROOMY = ["/reflection", "/weight", "/progress"];
 
 export function Main({ children }: { children: ReactNode }) {
   const pathname = usePathname();
@@ -26,12 +28,18 @@ export function Main({ children }: { children: ReactNode }) {
     (p) => pathname === p || (p !== "/" && pathname.startsWith(`${p}/`)),
   );
 
+  const roomy = ROOMY.some((p) => pathname === p || pathname.startsWith(`${p}/`));
+
   // Reading pages keep a generous gutter; the planner gives that space to the
   // calendar instead, where 32px of margin is a visible amount of a day.
   return (
     <main
       className={`mx-auto w-full pb-24 pt-6 md:pb-16 md:pt-8 ${
-        wide ? "max-w-[1680px] px-3 md:px-4" : "max-w-5xl px-4 md:px-8"
+        wide
+          ? "max-w-[1680px] px-3 md:px-4"
+          : roomy
+            ? "max-w-[1280px] px-4 md:px-8"
+            : "max-w-5xl px-4 md:px-8"
       }`}
     >
       {children}

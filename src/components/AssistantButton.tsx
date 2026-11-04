@@ -45,22 +45,27 @@ export function AssistantButton() {
         title={modifier ? `${ASSISTANT_NAME}  ${modifier} J` : ASSISTANT_NAME}
         // The spark turns a little as you reach for it: the one control in the
         // header that opens something with an opinion should look awake.
-        whileHover={{ rotate: 12, scale: 1.08 }}
-        whileTap={{ scale: 0.9, rotate: 0 }}
+        whileHover={{ scale: 1.04 }}
+        whileTap={{ scale: 0.95 }}
         transition={springSnappy}
-        className={`grid size-9 shrink-0 place-items-center rounded-lg transition-colors hover:bg-panel-2 hover:text-ink ${
-          open ? "bg-accent-soft text-accent-text" : "text-ink-3"
+        // A labelled pill in the accent colour rather than a grey outline icon:
+        // the assistant is a main feature, and a faint glyph in the corner read
+        // as decoration that nobody clicked.
+        className={`flex h-10 shrink-0 items-center gap-2 rounded-xl px-3 text-[13.5px] font-semibold text-white shadow-[0_4px_14px_-4px_color-mix(in_srgb,var(--accent)_70%,transparent)] transition-[filter] hover:brightness-110 md:px-3.5 ${
+          open ? "ring-2 ring-accent/40 ring-offset-2 ring-offset-[var(--bg)]" : ""
         }`}
+        style={{ background: "linear-gradient(135deg, var(--accent), color-mix(in srgb, var(--accent) 60%, #ff7ad9))" }}
       >
         <svg viewBox="0 0 20 20" aria-hidden className="size-[18px]">
-          <path
-            d="M10 2.5 11.9 8.1 17.5 10 11.9 11.9 10 17.5 8.1 11.9 2.5 10 8.1 8.1z"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinejoin="round"
-          />
+          <path d="M10 2.5 11.9 8.1 17.5 10 11.9 11.9 10 17.5 8.1 11.9 2.5 10 8.1 8.1z" fill="currentColor" />
+          <path d="M16 2.5l.6 1.6 1.6.6-1.6.6L16 6.9l-.6-1.6-1.6-.6 1.6-.6z" fill="currentColor" opacity="0.8" />
         </svg>
+        <span className="hidden sm:inline">Ask {ASSISTANT_NAME}</span>
+        {modifier && (
+          <kbd className="hidden rounded-md bg-white/20 px-1.5 py-0.5 font-sans text-[10.5px] font-medium md:inline">
+            {modifier} J
+          </kbd>
+        )}
       </motion.button>
 
       {everOpened && <Assistant open={open} onClose={() => setOpen(false)} />}

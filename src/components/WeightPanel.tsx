@@ -3,7 +3,8 @@
 import { useMemo, useState } from "react";
 import { Day } from "@/lib/types";
 import { fromISO, pastLabel } from "@/lib/dates";
-import { WeightChart } from "./WeightChart";
+import { useStore } from "@/lib/store";
+import { Range, WeightChart } from "./WeightChart";
 import { Panel } from "./ui";
 
 /**
@@ -32,62 +33,159 @@ export function WeightSummary({ days }: { days: Day[] }) {
       (d) => t(d.date) <= now - 7 * 86400000 && t(d.date) > now - 14 * 86400000,
     );
 
+    const first = weighed[weighed.length - 1].weight;
     return {
       latest,
+      first,
       change: lastWeek.length > 0 ? mean(thisWeek) - mean(lastWeek) : null,
       average: mean(thisWeek),
+      total: weighed.length > 1 ? mean(thisWeek) - first : null,
       count: weighed.length,
     };
   }, [days]);
 
+  const store = useStore();
+  const [range, setRange] = useState<Range>("all");
+  /** The target weight, if one of their goals is tracked against it. */
+  const target = useMemo(() => {
+    const goal = store.goals.find((g) => g.status === "active" && g.tracker?.source === "weight");
+    return goal?.tracker?.target ?? null;
+  }, [store.goals]);
+
   return (
-    <Panel className="grid gap-5 px-4 py-4 sm:grid-cols-[minmax(0,1fr)_minmax(0,1.6fr)] sm:items-center">
-      <div>
-        {stats ? (
-          <>
-            <p className="flex items-baseline gap-1.5">
-              <span className="nums text-3xl font-semibold tracking-tight">
+    <Panel className="px-5 py-5 sm:px-6">
+      {stats ? (
+        <div className="flex flex-wrap items-start justify-between gap-x-8 gap-y-5">
+          <div>
+            <p className="text-[12.5px] font-medium text-ink-3">{pastLabel(stats.latest.date)}</p>
+            <p className="mt-0.5 flex items-baseline gap-2">
+              <span className="nums text-[46px] font-bold leading-none tracking-tight">
                 {stats.latest.weight.toFixed(1)}
               </span>
-              <span className="text-sm text-ink-2">kg</span>
-            </p>
-            <p className="mt-0.5 text-xs text-ink-3">{pastLabel(stats.latest.date)}</p>
-
-            <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs">
+              <span className="text-[16px] font-medium text-ink-3">kg</span>
               {stats.change != null && (
-                <span className="flex items-center gap-1">
-                  <span
-                    className="nums font-medium"
-                    style={{ color: trendColor(stats.change) }}
-                  >
-                    {stats.change > 0 ? "+" : ""}
-                    {stats.change.toFixed(2)} kg
-                  </span>
-                  <span className="text-ink-3">vs last week</span>
+                <span
+                  className="nums ml-1 rounded-full px-2.5 py-0.5 text-[12.5px] font-semibold"
+                  style={{
+                    color: trendColor(stats.change),
+                    background: `color-mix(in srgb, ${trendColor(stats.change)} 14%, transparent)`,
+                  }}
+                  title="7-day average against the week before"
+                >
+                  {stats.change < 0 ? "▼" : stats.change > 0 ? "▲" : "●"} {Math.abs(stats.change).toFixed(1)} kg / wk
                 </span>
               )}
-              <span className="text-ink-3">
-                <span className="nums font-medium text-ink-2">{stats.average.toFixed(1)}</span>{" "}
-                7-day average
-              </span>
-              <span className="nums text-ink-3">
-                {stats.count} {stats.count === 1 ? "weigh-in" : "weigh-ins"}
-              </span>
-            </div>
-          </>
-        ) : (
-          <>
-            <p className="text-sm font-medium">No weigh-ins yet</p>
-            <p className="mt-1 text-xs leading-relaxed text-ink-3">
-              Log one below. Everything here compares a week against a week, so a heavy dinner
-              never looks like progress lost.
             </p>
-          </>
-        )}
-      </div>
+          </div>
 
-      <WeightChart days={days} />
+          <div className="flex flex-wrap gap-x-7 gap-y-3">
+            <Figure label="7-day average" value={stats.average.toFixed(1)} />
+            {stats.total != null && (
+              <Figure
+                label="since first"
+                value={`${stats.total > 0 ? "+" : ""}${stats.total.toFixed(1)}`}
+                color={trendColor(stats.total)}
+              />
+            )}
+            <Figure label={stats.count === 1 ? "weigh-in" : "weigh-ins"} value={String(stats.count)} />
+          </div>
+        </div>
+      ) : (
+        <div>
+          <p className="text-[15px] font-semibold">No weigh-ins yet</p>
+          <p className="mt-1 text-[13px] leading-relaxed text-ink-3">
+            Log one below. Everything here compares a week against a week, so a heavy dinner
+            never looks like progress lost.
+          </p>
+        </div>
+      )}
+
+      {stats && target != null && (
+        <GoalBar start={stats.first} now={stats.average} target={target} rate={stats.change} />
+      )}
+
+      {stats && stats.count >= 2 && (
+        <div className="mt-5 flex justify-end">
+          <div className="flex gap-0.5 rounded-lg bg-panel-2 p-0.5">
+            {(["1m", "3m", "all"] as Range[]).map((r) => (
+              <button
+                key={r}
+                type="button"
+                onClick={() => setRange(r)}
+                aria-pressed={range === r}
+                className={`rounded-md px-2.5 py-1 text-[12px] font-semibold transition-colors ${
+                  range === r ? "bg-panel text-ink shadow-[var(--shadow)]" : "text-ink-3 hover:text-ink"
+                }`}
+              >
+                {r === "all" ? "All" : r.toUpperCase()}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div className="mt-2">
+        <WeightChart days={days} range={range} target={target} height={280} />
+      </div>
     </Panel>
+  );
+}
+
+function Figure({ label, value, color }: { label: string; value: string; color?: string }) {
+  return (
+    <div>
+      <p className="nums text-[22px] font-bold leading-none tracking-tight" style={color ? { color } : undefined}>
+        {value}
+      </p>
+      <p className="mt-1 text-[11.5px] text-ink-3">{label}</p>
+    </div>
+  );
+}
+
+/**
+ * How far along the way to the goal weight, and when you get there at this
+ * rate — the number the whole page is about, said plainly.
+ */
+function GoalBar({ start, now, target, rate }: { start: number; now: number; target: number; rate: number | null }) {
+  const total = start - target;
+  const done = start - now;
+  const share = total === 0 ? 1 : Math.max(0, Math.min(1, done / total));
+  const left = Math.abs(now - target);
+  const towards = rate != null && Math.abs(rate) >= 0.05 && Math.sign(rate) === Math.sign(target - now);
+  const weeks = towards && rate ? Math.ceil(left / Math.abs(rate)) : null;
+  const eta =
+    weeks != null && weeks < 260
+      ? new Date(Date.now() + weeks * 7 * 86_400_000).toLocaleDateString("en-US", { month: "short", year: "numeric" })
+      : null;
+
+  return (
+    <div className="mt-5 rounded-xl bg-panel-2/70 px-4 py-3">
+      <div className="flex flex-wrap items-baseline justify-between gap-2 text-[12.5px]">
+        <span className="font-semibold">
+          Goal {target} kg <span className="font-normal text-ink-3">· {left.toFixed(1)} kg to go</span>
+        </span>
+        <span className="text-ink-3">
+          {eta ? (
+            <>
+              At this pace: <span className="font-semibold text-ink-2">{eta}</span>
+            </>
+          ) : (
+            "Not moving towards it this week"
+          )}
+        </span>
+      </div>
+      <div className="mt-2 h-2.5 overflow-hidden rounded-full bg-panel">
+        <div
+          className="grow-x h-full rounded-full"
+          style={{ width: `${Math.max(share * 100, 2)}%`, background: "linear-gradient(90deg, var(--accent), var(--up))" }}
+        />
+      </div>
+      <div className="nums mt-1 flex justify-between text-[11px] text-ink-3">
+        <span>{start.toFixed(1)}</span>
+        <span>{Math.round(share * 100)}%</span>
+        <span>{target}</span>
+      </div>
+    </div>
   );
 }
 

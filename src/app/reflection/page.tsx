@@ -16,7 +16,13 @@ const WIDE_KEY = "iblearner.reflectionWide";
 
 export default function ReflectionPage() {
   const store = useStore();
-  const [date, setDate] = useState(() => todayISO());
+  // `?date=` opens a particular day — search results for journal entries land
+  // on the entry they matched rather than on today.
+  const [date, setDate] = useState(() => {
+    if (typeof window === "undefined") return todayISO();
+    const d = new URLSearchParams(window.location.search).get("date");
+    return d && /^\d{4}-\d{2}-\d{2}$/.test(d) ? d : todayISO();
+  });
   const [focus, setFocus] = useState(false);
 
   // Escape leaves focus mode. It is the only way out that does not require
@@ -73,12 +79,15 @@ export default function ReflectionPage() {
     to start, not a form to complete, and once it is in the page it belongs to
     the page like anything else written there.
   */
-  const usePrompt = (question: string) => {
+  const usePrompt = (question: string | string[]) => {
+    const list = Array.isArray(question) ? question : [question];
     store.setDay(date, {
       reflection: [
         ...reflection.filter((b) => b.text.trim() !== "" || b.type !== "text"),
-        { id: newId(), type: "h3", text: question, done: false },
-        { id: newId(), type: "text", text: "", done: false },
+        ...list.flatMap((q) => [
+          { id: newId(), type: "h3" as const, text: q, done: false },
+          { id: newId(), type: "text" as const, text: "", done: false },
+        ]),
       ],
     });
   };
@@ -93,7 +102,7 @@ export default function ReflectionPage() {
         <Month days={store.days} today={today} selected={date} onPick={setDate} />
       </header>
 
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_300px] lg:items-start">
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_280px] lg:items-start">
         <div className="grid min-w-0 gap-4">
           <Panel className="overflow-hidden">
             {/* The day, stated like the top of a page in a notebook rather than
@@ -277,31 +286,131 @@ const PROMPTS = [
   "If this week had a title, what would it be?",
 ];
 
-function Prompt({ date, onUse }: { date: string; onUse: (q: string) => void }) {
-  const base = Math.floor(Date.parse(`${date}T00:00:00Z`) / 86_400_000);
-  const [shift, setShift] = useState(0);
-  const question = PROMPTS[(((base + shift) % PROMPTS.length) + PROMPTS.length) % PROMPTS.length];
+/** Deeper ones, mixed in so a set of questions is not all small talk. */
+const DEEP = [
+  "What emotion showed up most today, and what triggered it?",
+  "What would the version of you a year from now tell you about today?",
+  "Where did you choose comfort over growth today — and was it the right call?",
+  "What are you proud of this week that you haven't given yourself credit for?",
+  "What's a belief you acted on today? Is it actually true?",
+  "What drained you today, and what filled you back up?",
+  "Which habit is quietly shaping you the most right now?",
+  "What's one conversation you need to have but keep delaying?",
+  "How close was today to the day you'd design for yourself?",
+  "What did you do today purely for your future self?",
+  "What's one small win you can build on tomorrow?",
+  "Where did you feel close to Allah today, and where far?",
+];
 
-  return (
-    <div className="mb-4 rounded-xl border border-dashed border-line p-3.5">
-      <p className="text-[12.5px] font-semibold tracking-[0.08em] text-ink-3">If you need somewhere to start</p>
-      <p className="mt-1.5 text-[15px] font-medium leading-snug">{question}</p>
-      <div className="mt-2.5 flex items-center gap-3 text-[12px]">
-        <button
-          type="button"
-          onClick={() => onUse(question)}
-          className="rounded-lg bg-accent px-2.5 py-1 font-medium text-white transition-opacity hover:opacity-90"
-        >
-          Write about this
-        </button>
-        <button
-          type="button"
-          onClick={() => setShift((n) => n + 1)}
-          className="text-ink-3 transition-colors hover:text-ink"
-        >
-          Another one
+const ALL_PROMPTS = [...PROMPTS, ...DEEP];
+const PROMPT_COUNT = 3;
+const DISMISSED_KEY = "lockedin.prompts.dismissed";
+
+/**
+ * Several questions to write from, not one.
+ *
+ * One question was a door; a few are a conversation — a light one, a deeper
+ * one, one about the body or the week. Each can be written about on its own,
+ * all at once, or thrown away with × (remembered per day, so a dismissed one
+ * does not come back on reload). "More" deals a fresh one in.
+ */
+function Prompt({ date, onUse }: { date: string; onUse: (q: string | string[]) => void }) {
+  const base = Math.floor(Date.parse(`${date}T00:00:00Z`) / 86_400_000);
+  const [dismissed, setDismissed] = useState<string[]>(() => {
+    try {
+      const all = JSON.parse(localStorage.getItem(DISMISSED_KEY) ?? "{}") as Record<string, string[]>;
+      return all[date] ?? [];
+    } catch {
+      return [];
+    }
+  });
+  const [extra, setExtra] = useState(0);
+
+  const remember = (list: string[]) => {
+    setDismissed(list);
+    try {
+      const all = JSON.parse(localStorage.getItem(DISMISSED_KEY) ?? "{}") as Record<string, string[]>;
+      all[date] = list;
+      // Only the last few weeks matter; keep the key from growing forever.
+      const keys = Object.keys(all).sort().slice(-30);
+      localStorage.setItem(DISMISSED_KEY, JSON.stringify(Object.fromEntries(keys.map((k) => [k, all[k]]))));
+    } catch {
+      // Private browsing: dismissals hold for this visit only.
+    }
+  };
+
+  // Walk the list from a per-day starting point with a stride, so each day
+  // gets a different mix and consecutive picks are not neighbours.
+  const questions: string[] = [];
+  const n = ALL_PROMPTS.length;
+  for (let i = 0; questions.length < PROMPT_COUNT + extra && i < n; i += 1) {
+    const q = ALL_PROMPTS[(((base * 7 + i * 5) % n) + n) % n];
+    if (!dismissed.includes(q) && !questions.includes(q)) questions.push(q);
+  }
+
+  if (questions.length === 0) {
+    return (
+      <div className="mb-4 flex items-center justify-between rounded-xl border border-dashed border-line px-4 py-3 text-[13px] text-ink-3">
+        No questions left for today.
+        <button type="button" onClick={() => remember([])} className="font-medium text-accent-text hover:underline">
+          Bring them back
         </button>
       </div>
+    );
+  }
+
+  return (
+    <div className="mb-5 rounded-xl border border-line bg-panel-2/40 p-4">
+      <div className="flex items-baseline justify-between gap-3">
+        <p className="text-[12.5px] font-semibold text-ink-3">A few questions, if you need somewhere to start</p>
+        <button
+          type="button"
+          onClick={() => onUse(questions)}
+          className="shrink-0 rounded-lg bg-accent px-2.5 py-1 text-[12px] font-semibold text-white transition-opacity hover:opacity-90"
+        >
+          Answer all
+        </button>
+      </div>
+      <ul className="mt-3 grid gap-1.5">
+        {questions.map((q, i) => (
+          <li
+            key={q}
+            className="group flex items-center gap-3 rounded-lg border border-line bg-panel px-3 py-2.5 transition-colors hover:border-line-strong"
+          >
+            <span className="nums grid size-6 shrink-0 place-items-center rounded-full bg-accent-soft text-[11px] font-bold text-accent-text">
+              {i + 1}
+            </span>
+            <button type="button" onClick={() => onUse(q)} className="min-w-0 flex-1 text-left text-[14.5px] font-medium leading-snug hover:text-accent-text">
+              {q}
+            </button>
+            <button
+              type="button"
+              onClick={() => onUse(q)}
+              className="hidden shrink-0 text-[12px] font-medium text-accent-text group-hover:block"
+            >
+              Write →
+            </button>
+            <button
+              type="button"
+              onClick={() => remember([...dismissed, q])}
+              aria-label={`Remove question: ${q}`}
+              title="Remove this question"
+              className="grid size-7 shrink-0 place-items-center rounded-md text-ink-3 transition-colors hover:bg-panel-2 hover:text-[var(--urgent)]"
+            >
+              <svg viewBox="0 0 16 16" aria-hidden className="size-3.5">
+                <path d="m4 4 8 8M12 4l-8 8" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+              </svg>
+            </button>
+          </li>
+        ))}
+      </ul>
+      <button
+        type="button"
+        onClick={() => setExtra((x) => x + 1)}
+        className="mt-2.5 text-[12.5px] font-medium text-ink-3 transition-colors hover:text-ink"
+      >
+        + Another question
+      </button>
     </div>
   );
 }

@@ -59,7 +59,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                   <div className="flex-1 md:hidden">
                     <GlobalSearch />
                   </div>
-                  <div className="ml-auto flex items-center gap-1">
+                  <div className="ml-auto flex items-center gap-2">
                     <AssistantButton />
                     <ThemeToggle />
                     <MobileHeaderLinks />

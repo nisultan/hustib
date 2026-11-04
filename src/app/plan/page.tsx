@@ -768,7 +768,7 @@ function Item({ item }: { item: PlanItem }) {
           </>
         ) : (
           <button
-            onClick={() => store.updatePlanItem(item.id, { start: "09:00" })}
+            onClick={() => store.updatePlanItem(item.id, { start: nextFreeStart(store.plan, item.date) })}
             className="shrink-0 rounded px-1.5 py-0.5 text-[11px] text-ink-3 transition-colors hover:bg-panel-2 hover:text-ink"
           >
             Set a time
@@ -779,6 +779,39 @@ function Item({ item }: { item: PlanItem }) {
       {menu && <PlanItemMenu item={item} x={menu.x} y={menu.y} onClose={() => setMenu(null)} />}
     </>
   );
+}
+
+/**
+ * Where the next block should go: straight after the last one already on that
+ * day, rounded up to the quarter hour — and never in the past when it is today.
+ *
+ * Every way of giving something a time used to start from the same place
+ * (09:00, or the picker opening at the clock), so a second and third block
+ * landed on top of the first and had to be dragged down one by one. Following
+ * the day instead means each new thing queues up behind the last.
+ */
+function nextFreeStart(plan: PlanItem[], date: string): string {
+  const at = (clock: string) => {
+    const [h, m] = clock.split(":").map(Number);
+    return h * 60 + (m || 0);
+  };
+  let t = 0;
+  for (const p of plan) {
+    if (p.date === date && p.start) t = Math.max(t, at(p.start) + p.minutes);
+  }
+  if (date === todayISO()) {
+    const now = new Date();
+    t = Math.max(t, now.getHours() * 60 + now.getMinutes());
+  }
+  if (t === 0) t = 9 * 60;
+  t = Math.min(23 * 60 + 45, Math.ceil(t / 15) * 15);
+  return `${String(Math.floor(t / 60)).padStart(2, "0")}:${String(t % 60).padStart(2, "0")}`;
+}
+
+function addClock(clock: string, minutes: number): string {
+  const [h, m] = clock.split(":").map(Number);
+  const t = Math.min(23 * 60 + 59, h * 60 + (m || 0) + minutes);
+  return `${String(Math.floor(t / 60)).padStart(2, "0")}:${String(t % 60).padStart(2, "0")}`;
 }
 
 /** Minutes between two clock times on the same day. */
@@ -807,8 +840,13 @@ function Loose({ date, items }: { date: string; items: PlanItem[] }) {
   const [draft, setDraft] = useState("");
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
-  const [priority, setPriority] = useState<Priority>("medium");
+  // Four priority levels on every quick entry went unused — almost everything
+  // stayed "Medium". One flag for "this matters" is the decision people
+  // actually make; it maps to high, everything else to medium.
+  const [important, setImportant] = useState(false);
+  const [dur, setDur] = useState<number | null>(null);
   const [over, setOver] = useState(false);
+  const suggestion = nextFreeStart(store.plan, date);
 
   const add = () => {
     const title = draft.trim();
@@ -816,24 +854,27 @@ function Loose({ date, items }: { date: string; items: PlanItem[] }) {
 
     // Both times are optional and independent: a start with no end is the
     // common case, an end with no start says nothing useful, and neither is
-    // worth refusing the whole entry over.
-    const start = /^([01]\d|2[0-3]):[0-5]\d$/.test(from) ? from : null;
+    // worth refusing the whole entry over. Picking a length without a start
+    // means "fit it in" — it goes right after the last block.
+    const typed = /^([01]\d|2[0-3]):[0-5]\d$/.test(from) ? from : null;
+    const start = typed ?? (dur != null ? suggestion : null);
     const span = start && to ? spanMinutes(start, to) : null;
 
     store.addPlanItem({
       date,
       title,
       start,
-      minutes: span && span > 0 ? span : start ? 45 : 30,
+      minutes: span && span > 0 ? span : dur ?? (start ? 45 : 30),
       done: false,
-      priority,
+      priority: important ? "high" : "medium",
       categoryId: null,
       taskId: null,
     });
     setDraft("");
     setFrom("");
     setTo("");
-    setPriority("medium");
+    setDur(null);
+    setImportant(false);
   };
 
   const left = items.filter((i) => !i.done).length;
@@ -949,48 +990,84 @@ function Loose({ date, items }: { date: string; items: PlanItem[] }) {
                 <div className="flex items-center gap-1.5">
                   <span className="text-[12.5px] font-semibold text-ink-3">From</span>
                   <div className="w-[76px]">
-                    <TimeField value={from} onChange={setFrom} compact />
+                    <TimeField value={from} onChange={setFrom} compact suggest={suggestion} />
                   </div>
                 </div>
 
                 <div className="flex items-center gap-1.5">
                   <span className="text-[12.5px] font-semibold text-ink-3">To</span>
                   <div className="w-[76px]">
-                    <TimeField value={to} onChange={setTo} compact />
+                    <TimeField
+                      value={to}
+                      onChange={(v) => {
+                        setTo(v);
+                        setDur(null);
+                      }}
+                      compact
+                      suggest={addClock(from || suggestion, dur ?? 60)}
+                    />
                   </div>
                 </div>
 
-                {/*
-                  Four bare dots said nothing. A colour is only a priority once
-                  you already know the code, and nobody learns a code from a row
-                  of dots with no word anywhere near them — so the chosen one
-                  now says its name, and the rest are a dot plus a label too.
-                */}
-                <div className="flex items-center gap-1">
-                  <span className="text-[12.5px] font-semibold text-ink-3">Priority</span>
-                  <div className="flex items-center gap-0.5 rounded-lg bg-panel-2 p-0.5">
-                    {PRIORITIES.map((p) => (
-                      <button
-                        key={p}
-                        type="button"
-                        onClick={() => setPriority(p)}
-                        aria-pressed={priority === p}
-                        className={`flex items-center gap-1 rounded-md px-1.5 py-1 text-[11px] font-medium transition-colors ${
-                          priority === p
-                            ? "bg-panel text-ink shadow-[var(--shadow)]"
-                            : "text-ink-3 hover:text-ink"
-                        }`}
-                      >
-                        <PriorityDot priority={p} />
-                        {PRIORITY_LABEL[p]}
-                      </button>
-                    ))}
-                  </div>
-                </div>
+                {/* "Next free" in one click — the end of the last block. */}
+                {from !== suggestion && (
+                  <button
+                    type="button"
+                    onClick={() => setFrom(suggestion)}
+                    className="nums rounded-md border border-dashed border-line-strong px-2 py-1 text-[11.5px] font-medium text-accent-text transition-colors hover:border-accent hover:bg-accent-soft"
+                  >
+                    Next free · {suggestion}
+                  </button>
+                )}
               </div>
 
-              <span className="text-[10px] text-ink-3">
-                Both times are optional. Enter adds it.
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+                <div className="flex items-center gap-1">
+                  <span className="mr-0.5 text-[12.5px] font-semibold text-ink-3">For</span>
+                  {[15, 30, 60, 90, 120].map((m) => (
+                    <button
+                      key={m}
+                      type="button"
+                      aria-pressed={dur === m}
+                      onClick={() => {
+                        const next = dur === m ? null : m;
+                        setDur(next);
+                        if (next != null) setTo(addClock(from || suggestion, next));
+                        else setTo("");
+                      }}
+                      className={`nums rounded-md px-1.5 py-1 text-[11.5px] font-medium transition-colors ${
+                        dur === m ? "bg-accent text-white" : "bg-panel-2 text-ink-3 hover:text-ink"
+                      }`}
+                    >
+                      {m < 60 ? `${m}m` : `${m / 60}h`}
+                    </button>
+                  ))}
+                </div>
+
+                <button
+                  type="button"
+                  aria-pressed={important}
+                  onClick={() => setImportant((v) => !v)}
+                  className={`flex items-center gap-1 rounded-md px-2 py-1 text-[11.5px] font-semibold transition-colors ${
+                    important ? "text-white" : "bg-panel-2 text-ink-3 hover:text-ink"
+                  }`}
+                  style={important ? { background: "var(--high)" } : undefined}
+                >
+                  <svg viewBox="0 0 20 20" aria-hidden className="size-3.5">
+                    <path
+                      d="M10 3l2.1 4.3 4.7.7-3.4 3.3.8 4.7L10 13.8 5.8 16l.8-4.7L3.2 8l4.7-.7z"
+                      fill={important ? "currentColor" : "none"}
+                      stroke="currentColor"
+                      strokeWidth="1.5"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                  Important
+                </button>
+              </div>
+
+              <span className="text-[10.5px] text-ink-3">
+                No time keeps it loose. A length alone fits it in after your last block. Enter adds it.
               </span>
             </div>
           )}
@@ -1043,7 +1120,9 @@ function FromTasks({ date }: { date: string }) {
                 store.addPlanItem({
                   date,
                   title: task.title,
-                  start: null,
+                  // Into the day, right after what is already planned, rather
+                  // than every pulled task piling into the same untimed spot.
+                  start: nextFreeStart(store.plan, date),
                   minutes: 45,
                   done: false,
                   // The work already has an importance; the block inherits it

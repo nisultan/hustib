@@ -20,6 +20,7 @@ export function TimeField({
   disabled,
   id,
   compact = false,
+  suggest,
 }: {
   /** "HH:MM", or "" for unset. */
   value: string;
@@ -35,6 +36,12 @@ export function TimeField({
    * The picker still opens on focus, so nothing is actually lost.
    */
   compact?: boolean;
+  /**
+   * The time the picker opens on when empty, and marks as the suggestion —
+   * e.g. the end of the last block, so times move forward through the day
+   * instead of always opening at the same place.
+   */
+  suggest?: string;
 }) {
   const wrapRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -68,7 +75,7 @@ export function TimeField({
         autoComplete="off"
         disabled={disabled}
         value={text}
-        placeholder={compact ? "--:--" : "e.g. 16:30 or 4pm"}
+        placeholder={suggest && compact ? format(suggest, true) : compact ? "--:--" : "e.g. 16:30 or 4pm"}
         onChange={(e) => setText(e.target.value)}
         onFocus={() => setOpen(true)}
         onBlur={commitText}
@@ -143,8 +150,9 @@ export function TimeField({
 
       <Popover anchorRef={wrapRef} open={open && !disabled} onClose={() => setOpen(false)}>
         <ul role="listbox" aria-label="Times">
-          {QUARTERS.map((t) => {
+          {(suggest && !QUARTERS.includes(suggest) ? [...QUARTERS, suggest].sort() : QUARTERS).map((t) => {
             const selected = t === value;
+            const suggested = !value && t === suggest;
             return (
               <li key={t}>
                 <button
@@ -160,16 +168,16 @@ export function TimeField({
                   ref={(el) => {
                     // Open on the current time rather than at midnight, so the
                     // useful part of a 96-row list is the part you land on.
-                    if (el && (selected || (!value && t === nearestQuarter()))) {
+                    if (el && (selected || (!value && t === (suggest ?? nearestQuarter())))) {
                       el.scrollIntoView({ block: "center" });
                     }
                   }}
                   className={`nums flex w-full items-center justify-between gap-3 rounded-lg px-2.5 py-1.5 text-left text-sm transition-colors ${
-                    selected ? "bg-accent-soft text-accent-text" : "text-ink hover:bg-panel-2"
+                    selected || suggested ? "bg-accent-soft text-accent-text" : "text-ink hover:bg-panel-2"
                   }`}
                 >
                   <span>{format(t)}</span>
-                  <span className="text-xs text-ink-3">{t}</span>
+                  <span className="text-xs text-ink-3">{suggested ? "next free" : t}</span>
                 </button>
               </li>
             );

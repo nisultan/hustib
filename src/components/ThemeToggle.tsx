@@ -31,7 +31,7 @@ export function ThemeToggle() {
       }
       title={`Theme: ${LABEL[theme]}`}
       aria-label={`Theme: ${LABEL[theme]}. Switch to ${LABEL[NEXT[theme]]}.`}
-      className="grid size-9 shrink-0 place-items-center rounded-lg text-ink-3 transition-colors hover:bg-panel-2 hover:text-ink"
+      className="grid size-10 shrink-0 place-items-center rounded-xl border border-line bg-panel text-ink-2 shadow-[var(--shadow)] transition-colors hover:border-line-strong hover:bg-panel-2 hover:text-ink"
     >
       {/* Until the stored value is read, render the system glyph so the server
           and client markup match and no icon flickers on hydration. */}
@@ -42,8 +42,8 @@ export function ThemeToggle() {
 
 function ThemeIcon({ theme }: { theme: Theme }) {
   const common = {
-    width: 17,
-    height: 17,
+    width: 19,
+    height: 19,
     viewBox: "0 0 20 20",
     fill: "none",
     "aria-hidden": true,
