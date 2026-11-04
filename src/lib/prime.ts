@@ -51,9 +51,9 @@ export interface Rank {
 export const RANKS: Rank[] = [
   { key: "prime", name: "Prime", line: "This is you at your best. Everything's firing — protect it.", color: "var(--up)", min: 80 },
   { key: "locked", name: "Locked In", line: "Strong and steady. A couple of things away from your prime.", color: "var(--accent)", min: 65 },
-  { key: "rising", name: "Building", line: "Decent footing. Tighten the weak spot and you're climbing.", color: "var(--medium)", min: 50 },
-  { key: "drifting", name: "Drifting", line: "Things are slipping a bit. Not a crisis — a nudge.", color: "var(--high)", min: 36 },
-  { key: "slump", name: "Slump", line: "Rough stretch. Pick one small thing and win it today.", color: "var(--urgent)", min: 22 },
+  { key: "rising", name: "Cooking", line: "Something's on the stove. Fix the weak spot and you're climbing.", color: "var(--medium)", min: 50 },
+  { key: "drifting", name: "Mid", line: "Not bad, not good. Pick a lane and lock back in.", color: "var(--high)", min: 36 },
+  { key: "slump", name: "Cooked", line: "Rough stretch. Win one small thing today and climb out.", color: "var(--urgent)", min: 22 },
   { key: "anti", name: "Anti-Prime", line: "Everything's down at once. Reset: sleep, one habit, one task. That's it.", color: "#be123c", min: 0 },
 ];
 
@@ -75,7 +75,7 @@ export interface PrimeReading {
   pillars: Pillar[];
   weakest: Pillar | null;
   strongest: Pillar | null;
-  /** Same model run a week earlier, for "up from Drifting". */
+  /** Same model run a week earlier, for "up from Mid". */
   previous: { score: number; rank: Rank } | null;
   /** Why it is not one rank higher, when a floor held it back. */
   heldBack: string | null;

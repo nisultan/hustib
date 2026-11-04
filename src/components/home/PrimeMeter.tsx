@@ -5,7 +5,7 @@ import { useStore } from "@/lib/store";
 import { Pillar, PillarKey, primeReading, RANKS } from "@/lib/prime";
 
 /**
- * Prime → Locked In → Building → Drifting → Slump → Anti-Prime.
+ * Prime → Locked In → Cooking → Mid → Cooked → Anti-Prime.
  *
  * The verdict sits on a ladder so you can see how far you are from the next
  * step, with six small bars underneath, one per pillar, so you can see why.
