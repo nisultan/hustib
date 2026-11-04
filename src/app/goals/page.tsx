@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
 import { useStore } from "@/lib/store";
-import { Goal, GOAL_STATUS_LABEL, GoalStatus, PRIORITY_LABEL } from "@/lib/types";
-import { countdownLabel, daysUntil, formatDate } from "@/lib/dates";
+import { Goal, GOAL_STATUS_LABEL, GoalStatus, needsVerdict, PRIORITY_LABEL } from "@/lib/types";
+import { countdownLabel, daysUntil, formatDate, todayISO } from "@/lib/dates";
 import { courseColor } from "@/lib/appearance";
 import { progressOf, TrackedProgress } from "@/lib/goals/tracker";
 import { PageHeader, Panel, SectionTitle } from "@/components/ui";
@@ -28,14 +29,19 @@ export default function GoalsPage() {
   const [editing, setEditing] = useState<Goal | "new" | null>(null);
   const [celebrating, setCelebrating] = useState<string | null>(null);
 
-  const { active, achieved, paused } = useMemo(() => {
+  const today = todayISO();
+  const { active, achieved, paused, verdicts, missed } = useMemo(() => {
     const sorted = [...store.goals].sort((a, b) => a.position - b.position);
+    const due = sorted.filter((g) => needsVerdict(g, today));
+    const open = (g: Goal) => !due.includes(g);
     return {
-      active: sorted.filter((g) => g.status === "active"),
+      active: sorted.filter((g) => g.status === "active" && open(g)),
       achieved: sorted.filter((g) => g.status === "achieved"),
-      paused: sorted.filter((g) => g.status === "paused"),
+      paused: sorted.filter((g) => g.status === "paused" && open(g)),
+      verdicts: due,
+      missed: sorted.filter((g) => g.status === "missed").length,
     };
-  }, [store.goals]);
+  }, [store.goals, today]);
 
   // Re-reads journal-tracked goals whose reading has gone stale. Cheap when
   // nothing is stale — it checks a date and returns.
@@ -49,14 +55,26 @@ export default function GoalsPage() {
         title="Goals"
         subtitle="The things the rest of this is for."
         action={
-          <button
-            onClick={() => setEditing("new")}
-            className="rounded-lg bg-accent px-3 py-1.5 text-[13px] font-medium text-white transition-opacity hover:opacity-90"
-          >
-            New goal
-          </button>
+          <div className="flex items-center gap-2">
+            <Link
+              href="/goals/archive"
+              className="rounded-lg border border-line px-3 py-1.5 text-[13px] font-medium text-ink-2 transition-colors hover:border-line-strong hover:text-ink"
+            >
+              Archive{missed > 0 ? ` · ${missed}` : ""}
+            </Link>
+            <button
+              onClick={() => setEditing("new")}
+              className="rounded-lg bg-accent px-3 py-1.5 text-[13px] font-medium text-white transition-opacity hover:opacity-90"
+            >
+              New goal
+            </button>
+          </div>
         }
       />
+
+      {verdicts.map((g) => (
+        <Verdict key={g.id} goal={g} onAchieved={setCelebrating} />
+      ))}
 
       {readings.count > 0 && (
         <div className="mb-5 flex flex-wrap items-center gap-x-3 gap-y-1 rounded-xl border border-line bg-panel px-4 py-2.5 text-[12.5px] text-ink-2 shadow-[var(--shadow),var(--edge)]">
@@ -113,6 +131,61 @@ export default function GoalsPage() {
         <Celebration title={celebrating} onDone={() => setCelebrating(null)} />
       )}
     </div>
+  );
+}
+
+/**
+ * The deadline has passed: did you do it?
+ *
+ * Asked once, plainly, at the top of the page. "Yes" is the normal achieved
+ * path, celebration and all. "No" asks again — it is final — and then closes
+ * the goal as missed: read-only, off this page, into the archive.
+ */
+function Verdict({ goal, onAchieved }: { goal: Goal; onAchieved: (title: string) => void }) {
+  const store = useStore();
+  const [sure, setSure] = useState(false);
+  return (
+    <section className="mb-4 flex flex-wrap items-center gap-x-4 gap-y-3 rounded-xl border border-[var(--high)]/40 bg-[color-mix(in_srgb,var(--high)_8%,var(--panel))] px-4 py-3.5">
+      <div className="min-w-0 flex-1">
+        <p className="text-[12px] font-semibold text-[var(--high)]">
+          Deadline passed · {formatDate(goal.deadline as string)}
+        </p>
+        <p className="mt-0.5 text-[15px] font-semibold">Did you achieve “{goal.title}”?</p>
+      </div>
+      {sure ? (
+        <div className="flex items-center gap-2">
+          <span className="text-[12.5px] text-ink-2">Final — it locks and goes to the archive.</span>
+          <button
+            onClick={() => store.setGoalStatus(goal.id, "missed")}
+            className="rounded-lg bg-[var(--urgent)] px-3 py-1.5 text-[13px] font-semibold text-white"
+          >
+            Yes, close it
+          </button>
+          <button onClick={() => setSure(false)} className="rounded-lg px-2 py-1.5 text-[13px] text-ink-3 hover:text-ink">
+            Back
+          </button>
+        </div>
+      ) : (
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => {
+              store.setGoalStatus(goal.id, "achieved");
+              onAchieved(goal.title);
+            }}
+            className="rounded-lg px-3 py-1.5 text-[13px] font-semibold text-white"
+            style={{ background: "var(--up)" }}
+          >
+            Yes, I did
+          </button>
+          <button
+            onClick={() => setSure(true)}
+            className="rounded-lg border border-line px-3 py-1.5 text-[13px] font-semibold text-ink-2 hover:border-line-strong hover:text-ink"
+          >
+            No, I didn&apos;t
+          </button>
+        </div>
+      )}
+    </section>
   );
 }
 

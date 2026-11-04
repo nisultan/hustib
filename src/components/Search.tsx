@@ -297,7 +297,7 @@ export function GlobalSearch({ triggerClassName = "" }: { triggerClassName?: str
         push({ ...base, key: `n-${t.id}`, kind: "note", section: "Notes", detail: excerpt(t.notes, q) }, 2 + (done ? 3 : 0));
     }
 
-    for (const g of store.goals) push({ key: `g-${g.id}`, kind: "goal", section: "Goals", title: g.title, detail: g.status === "achieved" ? "Achieved" : g.deadline ? `Due ${formatDate(g.deadline)}` : "Goal", icon: ICON.goals, href: "/goals" }, Math.max(score(g.title, q), g.note.toLowerCase().includes(q) ? 2 : -1));
+    for (const g of store.goals) push({ key: `g-${g.id}`, kind: "goal", section: "Goals", title: g.title, detail: g.status === "achieved" ? "Achieved" : g.status === "missed" ? "Missed · archived" : g.deadline ? `Due ${formatDate(g.deadline)}` : "Goal", icon: ICON.goals, href: g.status === "missed" ? "/goals/archive" : "/goals" }, Math.max(score(g.title, q), g.note.toLowerCase().includes(q) ? 2 : -1));
 
     const ticked = store.days.find((d) => d.date === today)?.habitsDone ?? [];
     for (const h of store.habits.filter((h) => h.archivedAt == null)) {

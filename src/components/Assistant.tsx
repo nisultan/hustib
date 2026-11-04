@@ -7,11 +7,11 @@ import { AnimatePresence, motion } from "motion/react";
 import { useAssistant, Message } from "@/lib/ai/useAssistant";
 import { useStore } from "@/lib/store";
 import { useMounted } from "@/lib/useMounted";
-import { courseAverage } from "@/lib/grades";
-import { daysUntil, greeting, relativeLabel, todayISO } from "@/lib/dates";
+import { greeting, todayISO } from "@/lib/dates";
 import { ToolResult } from "@/lib/ai/tools";
 import { listContainer, listItem, spring, springSnappy } from "@/lib/motion";
 import { play } from "@/lib/sound";
+import { primeReading } from "@/lib/prime";
 
 /**
  * Lifee, as a dock on the right rather than a page of its own.
@@ -24,51 +24,6 @@ import { play } from "@/lib/sound";
 
 /** The name in the header, the placeholder, and the tour. One place. */
 export const ASSISTANT_NAME = "Lifee";
-
-/**
- * What to open with, drawn from the hub rather than written in advance.
- *
- * A panel that greets everyone identically is a search box with a personality
- * bolted on. This costs no request — it is all data already in memory — and it
- * means opening the assistant already tells you something, and the things it
- * offers to do are about your actual week.
- */
-function brief(store: ReturnType<typeof useStore>): { line: string; prompts: string[] } {
-  const open = store.tasks.filter((t) => t.status !== "completed");
-  const overdue = open.filter((t) => t.dueDate != null && daysUntil(t.dueDate) < 0);
-  const today = open.filter((t) => t.dueDate === todayISO());
-
-  const soon = open
-    .filter((t) => t.dueDate != null && daysUntil(t.dueDate) >= 0 && daysUntil(t.dueDate) <= 7)
-    .sort((a, b) => (a.dueDate ?? "").localeCompare(b.dueDate ?? ""))[0];
-
-  const weakest = store.courses
-    .map((c) => ({ course: c, avg: courseAverage(store.grades, c.id).value }))
-    .filter((x): x is { course: (typeof store.courses)[number]; avg: number } => x.avg != null)
-    .sort((a, b) => a.avg - b.avg)[0];
-
-  const journalled = store.days.filter((d) =>
-    d.reflection.some((b) => b.text.trim() !== ""),
-  ).length;
-
-  const line =
-    overdue.length > 0
-      ? `${overdue.length} ${overdue.length === 1 ? "thing is" : "things are"} overdue.`
-      : today.length > 0
-        ? `${today.length} ${today.length === 1 ? "task is" : "tasks are"} due today.`
-        : soon
-          ? `Next up is "${soon.title}", ${relativeLabel(soon.dueDate as string).toLowerCase()}.`
-          : "Nothing is pressing right now.";
-
-  const prompts: string[] = [];
-  if (overdue.length > 0) prompts.push("Help me get out from under the overdue work");
-  if (soon) prompts.push(`How should I approach "${soon.title}"?`);
-  if (weakest) prompts.push(`Why is ${weakest.course.name} the one slipping?`);
-  if (journalled >= 3) prompts.push("What patterns do you see in my journal?");
-  prompts.push("What should I work on right now?");
-
-  return { line, prompts: prompts.slice(0, 3) };
-}
 
 /**
  * The standing instructions, always one tap away.
@@ -182,7 +137,7 @@ export function Assistant({ open, onClose }: { open: boolean; onClose: () => voi
       >
         <header className="flex items-center gap-2 border-b border-line px-4 py-3">
           <Spark active={pending} />
-          <span className="text-[13px] font-semibold tracking-tight">{ASSISTANT_NAME}</span>
+          <span className="text-[14px] font-semibold tracking-tight">{ASSISTANT_NAME}</span>
           <AnimatePresence>
             {pending && (
               <motion.span
@@ -215,6 +170,24 @@ export function Assistant({ open, onClose }: { open: boolean; onClose: () => voi
                 </motion.button>
               )}
             </AnimatePresence>
+            <Link
+              href="/settings"
+              onClick={onClose}
+              title={`What ${ASSISTANT_NAME} remembers`}
+              aria-label={`What ${ASSISTANT_NAME} remembers`}
+              className="grid size-8 place-items-center rounded-lg text-ink-3 transition-colors hover:bg-panel-2 hover:text-ink"
+            >
+              <svg viewBox="0 0 20 20" aria-hidden className="size-[17px]">
+                <path
+                  d="M10 4.5a3 3 0 0 0-5.6 1.5A3 3 0 0 0 4 11.5a3 3 0 0 0 3 4 2.5 2.5 0 0 0 3 1M10 4.5a3 3 0 0 1 5.6 1.5 3 3 0 0 1 .4 5.5 3 3 0 0 1-3 4 2.5 2.5 0 0 1-3 1M10 4.5v12"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            </Link>
             <motion.button
               onClick={onClose}
               whileHover={{ rotate: 90 }}
@@ -267,7 +240,13 @@ export function Assistant({ open, onClose }: { open: boolean; onClose: () => voi
             buttons over a text box.
           */}
           <Chips
-            items={suggestions.length > 0 ? suggestions : QUICK_ACTIONS.map((q) => q.label)}
+            items={
+              suggestions.length > 0
+                ? suggestions
+                : messages.length > 0
+                  ? QUICK_ACTIONS.map((q) => q.label)
+                  : []
+            }
             onPick={(label) =>
               ask(
                 suggestions.length > 0
@@ -322,8 +301,7 @@ export function Assistant({ open, onClose }: { open: boolean; onClose: () => voi
             </motion.button>
           </div>
           <p className="mt-2 px-1 text-[10px] leading-snug text-ink-3">
-            Your hub is sent to Google Gemini to answer. {ASSISTANT_NAME} can add and edit
-            things, but never delete.
+            Runs on Gemini · can add and edit, never delete.
           </p>
         </div>
       </motion.aside>
@@ -371,6 +349,15 @@ function Chips({
   );
 }
 
+/**
+ * The opening screen: glance, then tap.
+ *
+ * It used to be a paragraph of greeting, a paragraph of "I noticed", two
+ * remembered notes and three long prompt buttons, with four more chips under
+ * that — a page to read before asking anything. Now it is three numbers, your
+ * form, one line of what it noticed (tap for the rest), and four big tiles to
+ * start from. What it remembers lives behind the brain icon in the header.
+ */
 function Empty({
   store,
   onPick,
@@ -378,84 +365,143 @@ function Empty({
   store: ReturnType<typeof useStore>;
   onPick: (s: string) => void;
 }) {
-  const { line, prompts } = brief(store);
+  const [more, setMore] = useState(false);
+  const today = todayISO();
+  const open = store.tasks.filter((t) => t.status !== "completed");
+  const overdue = open.filter((t) => t.dueDate != null && t.dueDate < today).length;
+  const dueToday = open.filter((t) => t.dueDate === today).length;
+  const blocks = store.plan.filter((p) => p.date === today);
+  const blocksDone = blocks.filter((p) => p.done).length;
+  const reading = primeReading(store);
   const noticed = store.insights.filter((i) => i.dismissedAt == null)[0];
-  // What it has learned, newest first. Two is the whole point — a wall of
-  // notes turns the greeting into a settings page.
-  const remembered = [...store.memory]
-    .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
-    .slice(0, 2);
+  const headline = noticed ? (noticed.body.match(/^.*?[.!?](\s|$)/)?.[0] ?? noticed.body).trim() : null;
+
+  const tiles: { label: string; prompt: string; icon: string; tone: string }[] = [
+    { label: "Plan my day", prompt: QUICK_ACTIONS[0].prompt, icon: "M3.5 5h13v11h-13zM3.5 8.5h13M7 3v3M13 3v3", tone: "var(--accent)" },
+    overdue > 0
+      ? { label: "Fix overdue", prompt: "Help me get out from under the overdue work", icon: "M10 6v4.5M10 13.5h.01M10 17a7 7 0 1 0 0-14 7 7 0 0 0 0 14z", tone: "var(--urgent)" }
+      : { label: "What's next", prompt: QUICK_ACTIONS[1].prompt, icon: "M5 10h10M11 6l4 4-4 4", tone: "var(--up)" },
+    { label: "Catch me up", prompt: QUICK_ACTIONS[2].prompt, icon: "M3 14 8 9l3 3 6-6M12.5 6H17v4.5", tone: "var(--medium)" },
+    { label: "Journal this", prompt: QUICK_ACTIONS[3].prompt, icon: "M5 3.5h9a1 1 0 0 1 1 1v11a1 1 0 0 1-1 1H5zM8.5 8h3.5M8.5 11h3.5", tone: "var(--high)" },
+  ];
 
   return (
-    <motion.div
-      variants={listContainer}
-      initial="hidden"
-      animate="show"
-      className="flex h-full flex-col justify-center gap-5 px-1 pb-8"
-    >
-      <motion.div variants={listItem}>
-        <p className="text-[15px] font-semibold tracking-tight">
-          {greeting()}, {store.profile.name}.
-        </p>
-        <p className="mt-1 text-[13px] leading-relaxed text-ink-2">{line}</p>
+    <motion.div variants={listContainer} initial="hidden" animate="show" className="flex flex-col gap-4 px-1 pb-4">
+      <motion.p variants={listItem} className="text-[18px] font-bold tracking-tight">
+        {greeting()}, {store.profile.name}.
+      </motion.p>
+
+      {/* Today in three numbers. */}
+      <motion.div variants={listItem} className="grid grid-cols-3 gap-2">
+        <Stat value={overdue} label="overdue" tone={overdue > 0 ? "var(--urgent)" : undefined} />
+        <Stat value={dueToday} label="due today" tone={dueToday > 0 ? "var(--high)" : undefined} />
+        <Stat
+          value={blocks.length ? `${blocksDone}/${blocks.length}` : "—"}
+          label="blocks done"
+          tone="var(--accent)"
+          ring={blocks.length ? blocksDone / blocks.length : undefined}
+        />
       </motion.div>
 
-      {noticed && (
-        <motion.div
+      {reading.rank && (
+        <motion.div variants={listItem} className="flex items-center gap-3 rounded-xl border border-line px-3 py-2.5">
+          <span
+            className="nums grid size-9 shrink-0 place-items-center rounded-lg text-[13px] font-bold"
+            style={{ background: `color-mix(in srgb, ${reading.rank.color} 15%, transparent)`, color: reading.rank.color }}
+          >
+            {reading.score}
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block text-[11px] text-ink-3">Your form</span>
+            <span className="block text-[14px] font-bold" style={{ color: reading.rank.color }}>
+              {reading.rank.name}
+            </span>
+          </span>
+          {reading.weakest && (
+            <button
+              type="button"
+              onClick={() =>
+                onPick(
+                  `My weakest area is ${reading.weakest!.label.toLowerCase()} (${reading.weakest!.why}). Give me one concrete thing to fix it today.`,
+                )
+              }
+              className="shrink-0 rounded-lg bg-panel-2 px-2.5 py-1.5 text-[11.5px] font-semibold text-ink-2 transition-colors hover:text-ink"
+            >
+              Fix {reading.weakest.label.toLowerCase()} →
+            </button>
+          )}
+        </motion.div>
+      )}
+
+      {noticed && headline && (
+        <motion.button
           variants={listItem}
-          className="rounded-lg border border-line bg-panel-2 px-3 py-2.5"
+          type="button"
+          onClick={() => setMore((m) => !m)}
+          className="flex items-start gap-2.5 rounded-xl bg-panel-2 px-3 py-2.5 text-left"
         >
-          <p className="text-[12.5px] font-semibold text-ink-3">
-            I noticed
-          </p>
-          <p className="mt-1 text-[12px] leading-relaxed text-ink-2">{noticed.body}</p>
-        </motion.div>
+          <span aria-hidden className="mt-1.5 size-2 shrink-0 rounded-full bg-accent" />
+          <span className="min-w-0 text-[13px] leading-snug">
+            <span className="font-medium">{more ? noticed.body : headline}</span>
+            {!more && headline !== noticed.body.trim() && <span className="text-ink-3"> more</span>}
+          </span>
+        </motion.button>
       )}
 
-      {/*
-        What it has picked up about them, shown rather than filed away. An
-        assistant that quietly adapts is indistinguishable from one that is
-        inconsistent; showing the notes is what makes the adaptation legible —
-        and the link is how a wrong one gets removed.
-      */}
-      {remembered.length > 0 && (
-        <motion.div variants={listItem}>
-          <p className="mb-1.5 text-[12.5px] font-semibold text-ink-3">
-            What {ASSISTANT_NAME} remembers
-          </p>
-          <ul className="flex flex-col gap-1">
-            {remembered.map((note) => (
-              <li key={note.id} className="text-[12px] leading-relaxed text-ink-2">
-                <span className="text-ink-3">{note.topic} · </span>
-                {note.note}
-              </li>
-            ))}
-          </ul>
-          <Link
-            href="/settings"
-            className="mt-1.5 inline-block text-[11px] text-ink-3 underline-offset-2 hover:text-ink hover:underline"
-          >
-            Manage what it remembers
-          </Link>
-        </motion.div>
-      )}
-
-      <motion.div variants={listContainer} className="flex flex-col items-start gap-1.5">
-        {prompts.map((s) => (
+      <motion.div variants={listContainer} className="grid grid-cols-2 gap-2">
+        {tiles.map((t) => (
           <motion.button
-            key={s}
+            key={t.label}
             variants={listItem}
-            whileHover={{ x: 2 }}
-            whileTap={{ scale: 0.98 }}
+            whileTap={{ scale: 0.97 }}
             transition={springSnappy}
-            onClick={() => onPick(s)}
-            className="rounded-lg border border-line px-2.5 py-1.5 text-left text-[12px] text-ink-2 transition-colors hover:border-line-strong hover:bg-panel-2 hover:text-ink"
+            onClick={() => onPick(t.prompt)}
+            className="flex flex-col items-start gap-3 rounded-xl border border-line bg-panel px-3 py-3 text-left transition-colors hover:border-line-strong hover:bg-panel-2"
           >
-            {s}
+            <span
+              className="grid size-8 place-items-center rounded-lg"
+              style={{ background: `color-mix(in srgb, ${t.tone} 15%, transparent)`, color: t.tone }}
+            >
+              <svg viewBox="0 0 20 20" aria-hidden className="size-[18px]">
+                <path d={t.icon} fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </span>
+            <span className="text-[13.5px] font-semibold">{t.label}</span>
           </motion.button>
         ))}
       </motion.div>
     </motion.div>
+  );
+}
+
+function Stat({ value, label, tone, ring }: { value: number | string; label: string; tone?: string; ring?: number }) {
+  const r = 9;
+  const c = 2 * Math.PI * r;
+  return (
+    <div className="rounded-xl border border-line px-3 py-2.5">
+      <div className="flex items-center justify-between">
+        <span className="nums text-[20px] font-bold leading-none" style={tone && value !== 0 ? { color: tone } : undefined}>
+          {value}
+        </span>
+        {ring != null && (
+          <svg viewBox="0 0 24 24" aria-hidden className="size-5 -rotate-90" style={{ color: tone }}>
+            <circle cx="12" cy="12" r={r} fill="none" stroke="currentColor" strokeWidth="3" opacity="0.18" />
+            <circle
+              cx="12"
+              cy="12"
+              r={r}
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="3"
+              strokeLinecap="round"
+              strokeDasharray={c}
+              strokeDashoffset={c * (1 - ring)}
+            />
+          </svg>
+        )}
+      </div>
+      <span className="mt-1 block text-[11px] text-ink-3">{label}</span>
+    </div>
   );
 }
 
@@ -652,27 +698,30 @@ function bold(text: string): React.ReactNode {
   );
 }
 
-/** Turns over while the model is working, so the header shows life. */
+/** A speech bubble whose dots pulse while the model is working. */
 function Spark({ active }: { active: boolean }) {
   return (
-    <motion.svg
-      viewBox="0 0 16 16"
-      aria-hidden
-      className="size-4 shrink-0 text-accent"
-      animate={active ? { rotate: 360, scale: [1, 1.15, 1] } : { rotate: 0, scale: 1 }}
-      transition={
-        active
-          ? {
-              rotate: { duration: 1.6, repeat: Infinity, ease: "linear" },
-              scale: { duration: 1.6, repeat: Infinity },
-            }
-          : springSnappy
-      }
-    >
-      <path
-        d="M8 1.5 9.6 6.4 14.5 8 9.6 9.6 8 14.5 6.4 9.6 1.5 8 6.4 6.4z"
-        fill="currentColor"
-      />
-    </motion.svg>
+    <span className="relative grid size-6 shrink-0 place-items-center rounded-md bg-accent text-white">
+      <svg viewBox="0 0 20 20" aria-hidden className="size-[14px]">
+        <path
+          d="M4.5 4h11a1.5 1.5 0 0 1 1.5 1.5v7a1.5 1.5 0 0 1-1.5 1.5H9l-3.5 3v-3h-1A1.5 1.5 0 0 1 3 12.5v-7A1.5 1.5 0 0 1 4.5 4z"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.8"
+          strokeLinejoin="round"
+        />
+        {[7, 10, 13].map((x, i) => (
+          <motion.circle
+            key={x}
+            cx={x}
+            cy="9"
+            r="1"
+            fill="currentColor"
+            animate={active ? { opacity: [0.3, 1, 0.3] } : { opacity: 1 }}
+            transition={active ? { duration: 0.9, repeat: Infinity, delay: i * 0.15 } : { duration: 0.2 }}
+          />
+        ))}
+      </svg>
+    </span>
   );
 }

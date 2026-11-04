@@ -1059,7 +1059,7 @@ function toHabit(row: HabitRow): Habit {
   };
 }
 
-const GOAL_STATUSES = ["active", "achieved", "paused"];
+const GOAL_STATUSES = ["active", "achieved", "paused", "missed"];
 
 const UNI_FIELD_TYPES = ["text", "number", "date", "url", "select"];
 

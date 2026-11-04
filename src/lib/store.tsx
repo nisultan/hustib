@@ -719,7 +719,15 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         }
         mutate((d) => ({ ...d, goals: [{ ...base, id: uid() }, ...d.goals] }));
       },
-      updateGoal: (id, patch) => {
+      updateGoal: (id, raw) => {
+        const current = latest.current.goals.find((g) => g.id === id);
+        // A missed goal is closed for good, and a deadline, once set, is a
+        // promise rather than a draft — moving it is how goals quietly never
+        // fail. Enforced here so no path (dialog, assistant) can get round it.
+        if (current?.status === "missed") return;
+        const patch = { ...raw };
+        if (current?.deadline != null && "deadline" in patch) delete patch.deadline;
+        if (patch.status === "missed") delete patch.status;
         mutate((d) => ({ ...d, goals: upsert(d.goals, id, patch) }));
         if (cloud) push(repo.updateGoal(id, patch));
       },
@@ -728,6 +736,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         if (cloud) push(repo.deleteGoal(id));
       },
       setGoalStatus: (id, status) => {
+        if (latest.current.goals.find((g) => g.id === id)?.status === "missed") return;
         const achievedAt = status === "achieved" ? todayISO() : null;
         mutate((d) => ({ ...d, goals: upsert(d.goals, id, { status, achievedAt }) }));
         if (cloud) push(repo.updateGoal(id, { status, achievedAt }));

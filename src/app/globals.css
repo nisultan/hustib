@@ -556,26 +556,109 @@ summary {
  * tiny movements — a few percent — because this appears a dozen times down a
  * list and anything larger turns the page into a fairground.
  */
-@keyframes flame-body {
+.flame-outer,
+.flame-mid,
+.flame-core {
+  transform-box: fill-box;
+  transform-origin: 50% 100%;
+  animation-timing-function: ease-in-out;
+  animation-iteration-count: infinite;
+}
+.flame-outer {
+  animation-name: flame-outer;
+}
+.flame-mid {
+  animation-name: flame-mid;
+}
+.flame-core {
+  animation-name: flame-core;
+}
+@keyframes flame-outer {
   0%,
   100% {
-    transform: scaleY(1) scaleX(1) rotate(0deg);
+    transform: scale(1, 1) skewX(0deg);
   }
-  30% {
-    transform: scaleY(1.07) scaleX(0.96) rotate(-1.5deg);
+  25% {
+    transform: scale(0.97, 1.06) skewX(-3deg);
   }
-  65% {
-    transform: scaleY(0.96) scaleX(1.03) rotate(1.5deg);
+  50% {
+    transform: scale(1.03, 0.97) skewX(2deg);
+  }
+  75% {
+    transform: scale(0.98, 1.04) skewX(-1.5deg);
   }
 }
-
+@keyframes flame-mid {
+  0%,
+  100% {
+    transform: scale(1, 1) skewX(0deg) translateY(0);
+  }
+  30% {
+    transform: scale(0.94, 1.1) skewX(4deg) translateY(-0.4px);
+  }
+  60% {
+    transform: scale(1.04, 0.94) skewX(-3deg) translateY(0.3px);
+  }
+}
 @keyframes flame-core {
   0%,
   100% {
-    transform: scaleY(0.92) translateY(0.4px);
+    transform: scale(1, 0.92);
   }
-  45% {
-    transform: scaleY(1.12) translateY(-0.3px);
+  40% {
+    transform: scale(0.9, 1.15);
+  }
+  70% {
+    transform: scale(1.05, 0.98);
+  }
+}
+.flame-glow {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: flame-glow ease-in-out infinite;
+}
+@keyframes flame-glow {
+  0%,
+  100% {
+    opacity: 0.75;
+    transform: scale(1);
+  }
+  35% {
+    opacity: 1;
+    transform: scale(1.08);
+  }
+  60% {
+    opacity: 0.6;
+    transform: scale(0.95);
+  }
+}
+.flame-ember {
+  transform-box: fill-box;
+  animation: flame-ember ease-out infinite;
+  opacity: 0;
+}
+@keyframes flame-ember {
+  0% {
+    opacity: 0;
+    transform: translate(0, 0);
+  }
+  15% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(var(--drift, 1px), -11px) scale(0.4);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .flame-outer,
+  .flame-mid,
+  .flame-core,
+  .flame-glow {
+    animation: none;
+  }
+  .flame-ember {
+    display: none;
   }
 }
 

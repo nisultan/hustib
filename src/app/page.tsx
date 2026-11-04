@@ -3,12 +3,14 @@
 import Link from "next/link";
 import { ReactNode, useMemo } from "react";
 import { useStore } from "@/lib/store";
+import { needsVerdict } from "@/lib/types";
 import { formatTime, greeting, todayISO } from "@/lib/dates";
 import { appliesOn } from "@/lib/habits";
 import { productivity } from "@/lib/productivity";
 import { Button, Panel } from "@/components/ui";
 import { Spark } from "@/components/Spark";
 import { Flame } from "@/components/Flame";
+import { PrimeMeter } from "@/components/home/PrimeMeter";
 import { CheckIn } from "@/components/CheckIn";
 import { openTour } from "@/components/Tour";
 import { TodayList } from "@/components/home/TodayList";
@@ -60,6 +62,9 @@ export default function HomePage() {
     .sort((a, b) => (a.start ?? "").localeCompare(b.start ?? ""))[0];
   const left = habitsLeft(store, today);
   const chips: { key: string; label: string; href: string; tone: string; icon?: ReactNode }[] = [];
+  const verdicts = store.goals.filter((g) => needsVerdict(g, today)).length;
+  if (verdicts > 0)
+    chips.push({ key: "verdict", label: `${verdicts} goal deadline${verdicts === 1 ? "" : "s"} passed — did you do it?`, href: "/goals", tone: "var(--high)" });
   if (overdue > 0) chips.push({ key: "late", label: `${overdue} overdue`, href: "/tasks", tone: "var(--urgent)" });
   if (dueToday > 0) chips.push({ key: "due", label: `${dueToday} due today`, href: "/tasks", tone: "var(--high)" });
   if (next) chips.push({ key: "next", label: `${formatTime(next.start as string)} · ${next.title || "Untitled"}`, href: "/plan", tone: "var(--accent)" });
@@ -114,6 +119,10 @@ export default function HomePage() {
       </header>
 
       <Spark />
+
+      <div className="mt-4">
+        <PrimeMeter />
+      </div>
 
       <div className="mt-6">
         <CheckIn />

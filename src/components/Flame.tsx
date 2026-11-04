@@ -1,69 +1,111 @@
 "use client";
 
+import { useId } from "react";
+
 /**
  * The streak flame.
  *
- * Was an emoji, which is the wrong tool twice over: it renders as a different
- * picture on every platform — Apple's is a cartoon, Windows' is flat, Android's
- * is a third thing — and none of them can carry information. This one can. It
- * gets taller, hotter and quicker as the run gets longer, so a 40-day streak
- * and a 3-day streak no longer look identical beside different numbers.
+ * Built like a real flame rather than a flat icon:
  *
- * The flicker is two counter-rotating phases rather than one pulse. A single
- * scale animation reads as a throb, which looks like a notification demanding
- * attention; offsetting the inner core against the body gives the irregular,
- * self-absorbed motion a flame actually has, and it stops the eye locking onto
- * a beat.
+ *  - Three tongues — a red outer, an orange middle, a pale yellow-white core —
+ *    each filled with a vertical gradient (hotter at the base, cooling to the
+ *    tip) and each on its own clock, swaying, stretching and skewing. Because
+ *    the durations never line up, the shape never repeats into a pulse.
+ *  - A soft glow behind it that flickers in brightness on yet another clock.
+ *  - Embers that drift up and fade, once a streak is a week or more — more of
+ *    them, faster, as it gets hotter.
  *
- * Motion is capped early. This sits in a list of a dozen habits, and twelve
- * synchronised flames would turn a quiet page into a fairground.
+ * Size, speed and heat all scale with the streak, so 3 days and 40 days look
+ * different. Respects reduced motion (see globals.css).
  */
 
 /** Where a run stops being new and starts being a habit. */
 const HOT = 30;
 
 export function Flame({ streak, className = "" }: { streak: number; className?: string }) {
-  // 0 at one day, 1 at a month. Everything else is interpolated off this.
+  const id = useId().replace(/:/g, "");
+  // 0 at one day, 1 at a month.
   const heat = Math.min(1, Math.max(0, (streak - 1) / (HOT - 1)));
-
-  // A young flame is amber and still; an established one burns toward white
-  // at the core and moves a little faster.
-  const body = heat < 0.5 ? "var(--high)" : "var(--urgent)";
-  // Not --medium, which is the blue of the "medium" priority: it put a blue
-  // core inside an amber flame. A pale amber reads as the hottest part.
-  const core =
-    heat < 0.5 ? "color-mix(in srgb, var(--high) 45%, #fff6d6)" : "var(--high)";
-  const duration = 2.6 - heat * 0.9;
+  const speed = 1.6 - heat * 0.6; // seconds per sway, quicker when hot
+  const scale = 0.9 + heat * 0.25;
+  const embers = streak >= 7 ? (heat > 0.6 ? 3 : 2) : 0;
 
   return (
     <span
       aria-hidden
-      className={`inline-grid place-items-center ${className}`}
-      style={{ width: 13, height: 15 }}
+      className={`flame relative inline-grid place-items-center ${className}`}
+      style={{ width: 14 * scale, height: 17 * scale }}
     >
-      <svg viewBox="0 0 14 16" className="size-full overflow-visible">
-        {/* The body. Drawn as one closed path rather than a teardrop plus a
-            base, so the silhouette stays a flame at nine pixels. */}
-        <path
-          d="M7 .8c2.6 2.9 4.9 4.6 4.9 8A4.9 4.9 0 0 1 7 15.2 4.9 4.9 0 0 1 2.1 8.8c0-2 .9-3.3 2-4.6.3 1.1.8 1.9 1.5 2.3C5.3 4.3 5.8 2.3 7 .8Z"
-          fill={body}
-          style={{
-            transformOrigin: "50% 95%",
-            animation: `flame-body ${duration}s ease-in-out infinite`,
-          }}
+      <svg viewBox="0 0 20 24" className="size-full overflow-visible">
+        <defs>
+          <linearGradient id={`${id}o`} x1="0" y1="1" x2="0" y2="0">
+            <stop offset="0%" stopColor="#ff3d00" />
+            <stop offset="55%" stopColor="#ff6a1a" />
+            <stop offset="100%" stopColor="#ff9f1c" stopOpacity="0.85" />
+          </linearGradient>
+          <linearGradient id={`${id}m`} x1="0" y1="1" x2="0" y2="0">
+            <stop offset="0%" stopColor="#ff8a00" />
+            <stop offset="100%" stopColor="#ffc533" />
+          </linearGradient>
+          <linearGradient id={`${id}c`} x1="0" y1="1" x2="0" y2="0">
+            <stop offset="0%" stopColor="#fff7d6" />
+            <stop offset="100%" stopColor="#ffe066" />
+          </linearGradient>
+          <radialGradient id={`${id}g`} cx="50%" cy="70%" r="50%">
+            <stop offset="0%" stopColor="#ff7a1a" stopOpacity={0.55 + heat * 0.25} />
+            <stop offset="100%" stopColor="#ff7a1a" stopOpacity="0" />
+          </radialGradient>
+        </defs>
+
+        {/* Glow */}
+        <ellipse
+          cx="10"
+          cy="16"
+          rx="10"
+          ry="9"
+          fill={`url(#${id}g)`}
+          className="flame-glow"
+          style={{ animationDuration: `${speed * 1.3}s` }}
         />
 
-        {/* The core, running on its own clock and a little slower, which is
-            what keeps the two from ever lining up into a pulse. */}
+        {/* Outer tongue */}
         <path
-          d="M7 6.6c1.3 1.5 2.2 2.4 2.2 4a2.2 2.2 0 0 1-4.4 0c0-1.3.9-2.4 2.2-4Z"
-          fill={core}
-          style={{
-            transformOrigin: "50% 95%",
-            animation: `flame-core ${duration * 1.35}s ease-in-out infinite`,
-            opacity: 0.55 + heat * 0.45,
-          }}
+          d="M10 1.2c3.4 3.7 6.6 6.3 6.6 11.2A6.6 6.6 0 0 1 10 22.8a6.6 6.6 0 0 1-6.6-6.6c0-2.8 1.2-4.6 2.7-6.3.4 1.6 1.1 2.6 2 3.2C7.6 9.6 8.3 4.6 10 1.2Z"
+          fill={`url(#${id}o)`}
+          className="flame-outer"
+          style={{ animationDuration: `${speed}s` }}
         />
+        {/* Middle tongue */}
+        <path
+          d="M10.4 7.5c2.2 2.4 4 4.2 4 7.3a4.4 4.4 0 0 1-8.8 0c0-1.7.8-2.9 1.8-4 .3 1 .7 1.6 1.3 2 0-2 .5-3.7 1.7-5.3Z"
+          fill={`url(#${id}m)`}
+          className="flame-mid"
+          style={{ animationDuration: `${speed * 0.83}s` }}
+        />
+        {/* Core */}
+        <path
+          d="M10 12.5c1.3 1.5 2.3 2.6 2.3 4.3a2.3 2.3 0 0 1-4.6 0c0-1.6 1-2.8 2.3-4.3Z"
+          fill={`url(#${id}c)`}
+          className="flame-core"
+          style={{ animationDuration: `${speed * 1.17}s`, opacity: 0.75 + heat * 0.25 }}
+        />
+
+        {/* Embers */}
+        {Array.from({ length: embers }, (_, i) => (
+          <circle
+            key={i}
+            cx={8 + i * 2.4}
+            cy="8"
+            r={0.7 + (i % 2) * 0.3}
+            fill="#ffb347"
+            className="flame-ember"
+            style={{
+              animationDuration: `${1.8 + i * 0.5}s`,
+              animationDelay: `${i * 0.6}s`,
+              ["--drift" as string]: `${(i % 2 ? 1 : -1) * (1.5 + i)}px`,
+            }}
+          />
+        ))}
       </svg>
     </span>
   );

@@ -293,13 +293,7 @@ function PlanView() {
       {view !== "month" && (
       <Split>
         <section>
-          <SectionTitle
-            right={
-              <span className="text-[11px] text-ink-3">
-                Drag to move · pull the bottom edge to lengthen
-              </span>
-            }
-          >
+          <SectionTitle>
             {view === "week" ? "The week" : "The day"}
           </SectionTitle>
 
@@ -927,15 +921,7 @@ function Loose({ date, items }: { date: string; items: PlanItem[] }) {
           over ? "border-accent/50 bg-accent-soft/40" : "border-line"
         }`}
       >
-        {items.length === 0 ? (
-          /* Not a blank panel. An empty box with a text field in it does not
-             say what the box is for, and this one is for the half of a day
-             that has no hour — errands, calls, the thing you keep forgetting. */
-          <p className="px-3.5 pb-1 pt-3 text-[12px] leading-relaxed text-ink-3">
-            Anything meant for today that has no particular hour. Drag a block
-            here to strip its time.
-          </p>
-        ) : (
+        {items.length === 0 ? null : (
           items.map((item) => (
             <div key={item.id} className="px-2 py-1.5">
               <Item item={item} />
@@ -1022,9 +1008,9 @@ function Loose({ date, items }: { date: string; items: PlanItem[] }) {
               </div>
 
               <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-                <div className="flex items-center gap-1">
+                <div className="flex flex-wrap items-center gap-1">
                   <span className="mr-0.5 text-[12.5px] font-semibold text-ink-3">For</span>
-                  {[15, 30, 60, 90, 120].map((m) => (
+                  {[15, 30, 45, 60, 90, 120, 180].map((m) => (
                     <button
                       key={m}
                       type="button"
@@ -1066,9 +1052,6 @@ function Loose({ date, items }: { date: string; items: PlanItem[] }) {
                 </button>
               </div>
 
-              <span className="text-[10.5px] text-ink-3">
-                No time keeps it loose. A length alone fits it in after your last block. Enter adds it.
-              </span>
             </div>
           )}
         </div>

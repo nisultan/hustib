@@ -18,6 +18,7 @@ import { suggestTracker } from "@/lib/goals/suggest";
 import { COURSE_COLORS, courseColor } from "@/lib/appearance";
 import { Button, ConfirmDeleteButton, Field, Input, Modal, Select, Textarea } from "./ui";
 import { DateField } from "./DateField";
+import { formatDate } from "@/lib/dates";
 
 /**
  * Writing down a goal, or changing one.
@@ -125,7 +126,7 @@ export function GoalDialog({
       title: clean,
       note: note.trim(),
       image,
-      deadline: deadline || null,
+      deadline: deadlineLocked ? (goal!.deadline as string) : deadline || null,
       priority,
       status,
       // A tracked goal keeps no hand-set number. Leaving one behind would sit
@@ -151,6 +152,31 @@ export function GoalDialog({
     }
     onClose();
   };
+
+  // Missed is final: shown, not edited.
+  if (goal?.status === "missed") {
+    return (
+      <Modal open={open} onClose={onClose} title="Missed goal">
+        <div className="grid gap-3">
+          {goal.image && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={goal.image} alt="" className="aspect-[16/9] w-full rounded-xl object-cover opacity-70 grayscale" />
+          )}
+          <p className="text-[17px] font-semibold">{goal.title}</p>
+          {goal.note && <p className="text-[13.5px] leading-relaxed text-ink-2">{goal.note}</p>}
+          <p className="flex items-center gap-2 rounded-lg bg-panel-2 px-3 py-2 text-[13px] text-ink-2">
+            <LockGlyph />
+            Deadline was {goal.deadline ? formatDate(goal.deadline) : "—"}. Closed as not done — it can&apos;t be edited.
+          </p>
+          <div className="pt-1">
+            <Button onClick={onClose}>Close</Button>
+          </div>
+        </div>
+      </Modal>
+    );
+  }
+
+  const deadlineLocked = goal?.deadline != null;
 
   return (
     <Modal open={open} onClose={onClose} title={goal ? "Edit goal" : "New goal"}>
@@ -178,8 +204,15 @@ export function GoalDialog({
         </Field>
 
         <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="Deadline" hint="Optional.">
-            <DateField value={deadline} onChange={setDeadline} />
+          <Field label="Deadline" hint={deadlineLocked ? "Locked once set." : "Optional. Can't be changed after saving."}>
+            {deadlineLocked ? (
+              <div className="flex h-[38px] items-center gap-2 rounded-lg border border-line bg-panel-2 px-3 text-[13px] text-ink-2">
+                <LockGlyph />
+                {formatDate(goal!.deadline as string)}
+              </div>
+            ) : (
+              <DateField value={deadline} onChange={setDeadline} />
+            )}
           </Field>
 
           <Field label="Priority">
@@ -337,6 +370,15 @@ export function GoalDialog({
  * half-filled form along with it. The categories themselves are shared with
  * tasks and plan blocks — this creates a real one, not a goals-only label.
  */
+function LockGlyph() {
+  return (
+    <svg viewBox="0 0 16 16" aria-hidden className="size-3.5 shrink-0 text-ink-3">
+      <rect x="3.5" y="7" width="9" height="6.5" rx="1.5" fill="none" stroke="currentColor" strokeWidth="1.5" />
+      <path d="M5.5 7V5a2.5 2.5 0 0 1 5 0v2" fill="none" stroke="currentColor" strokeWidth="1.5" />
+    </svg>
+  );
+}
+
 function CategoryChoice({
   value,
   onChange,

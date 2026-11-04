@@ -185,6 +185,7 @@ function goals(data: AppData, today: string): string {
       const bits: string[] = [g.priority];
       if (g.status === "achieved")
         bits.push(`ACHIEVED${g.achievedAt ? ` ${g.achievedAt}` : ""}`);
+      if (g.status === "missed") bits.push("MISSED (deadline passed, not done; locked)");
       if (g.deadline) bits.push(`deadline ${g.deadline} (in ${daysUntil(g.deadline)}d)`);
       /*
         A tracked goal reports what it was counted from, not just the

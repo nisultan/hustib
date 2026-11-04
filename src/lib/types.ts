@@ -235,7 +235,12 @@ export interface Habit {
 
 export const WEEKDAY_LABEL = ["S", "M", "T", "W", "T", "F", "S"];
 
-export type GoalStatus = "active" | "achieved" | "paused";
+/**
+ * "missed" is final: the deadline passed and the student said it was not done.
+ * It is never offered as a choice — only reached through that verdict — and a
+ * missed goal is read-only from then on, kept in the archive.
+ */
+export type GoalStatus = "active" | "achieved" | "paused" | "missed";
 
 export const GOAL_STATUSES: GoalStatus[] = ["active", "achieved", "paused"];
 
@@ -243,7 +248,13 @@ export const GOAL_STATUS_LABEL: Record<GoalStatus, string> = {
   active: "Working on it",
   achieved: "Achieved",
   paused: "On hold",
+  missed: "Missed",
 };
+
+/** The deadline has passed and nobody has said yet whether it was done. */
+export function needsVerdict(goal: { status: GoalStatus; deadline: string | null }, today: string): boolean {
+  return (goal.status === "active" || goal.status === "paused") && goal.deadline != null && goal.deadline < today;
+}
 
 /**
  * Something the student is aiming at.
