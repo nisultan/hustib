@@ -257,7 +257,7 @@ export function Assistant({ open, onClose }: { open: boolean; onClose: () => voi
             disabled={pending}
           />
 
-          <div className="flex items-end gap-2 rounded-xl border border-line bg-bg px-3 py-2 transition-colors focus-within:border-line-strong">
+          <div className="flex items-end gap-2 rounded-2xl border border-line bg-bg py-1.5 pl-3.5 pr-1.5 transition-colors focus-within:border-[var(--accent)]">
             <textarea
               ref={inputRef}
               rows={1}
@@ -276,7 +276,7 @@ export function Assistant({ open, onClose }: { open: boolean; onClose: () => voi
                 }
               }}
               placeholder="Ask anything, or tell it what to do"
-              className="max-h-[140px] flex-1 resize-none bg-transparent text-[13px] leading-relaxed outline-none placeholder:text-ink-3"
+              className="bare max-h-[140px] min-h-[24px] flex-1 resize-none self-center bg-transparent py-1 text-[13.5px] leading-6 placeholder:text-ink-3"
             />
             <motion.button
               onClick={() => draft.trim() !== "" && !pending && ask(draft)}
@@ -286,7 +286,7 @@ export function Assistant({ open, onClose }: { open: boolean; onClose: () => voi
               whileTap={{ scale: 0.88 }}
               animate={{ opacity: draft.trim() === "" || pending ? 0.3 : 1 }}
               transition={springSnappy}
-              className="mb-0.5 grid size-7 shrink-0 place-items-center rounded-lg bg-accent text-white"
+              className="grid size-8 shrink-0 place-items-center rounded-xl bg-accent text-white"
             >
               <svg viewBox="0 0 16 16" aria-hidden className="size-4">
                 <path
@@ -300,9 +300,6 @@ export function Assistant({ open, onClose }: { open: boolean; onClose: () => voi
               </svg>
             </motion.button>
           </div>
-          <p className="mt-2 px-1 text-[10px] leading-snug text-ink-3">
-            Runs on Gemini · can add and edit, never delete.
-          </p>
         </div>
       </motion.aside>
     </>,
@@ -621,28 +618,58 @@ function Action({ result }: { result: ToolResult }) {
 }
 
 /** Three dots, breathing in sequence. */
+const STEPS = ["Reading your day", "Checking tasks and plan", "Looking at your goals", "Thinking it through", "Writing it up"];
+
+/**
+ * What shows while the model works: a breathing mark and a status line that
+ * shimmers and walks through what it is actually doing, so a slow answer
+ * reads as work rather than a hang.
+ */
 function Thinking() {
+  const [step, setStep] = useState(0);
+  const [secs, setSecs] = useState(0);
+  useEffect(() => {
+    const t = setInterval(() => setSecs((s) => s + 1), 1000);
+    const u = setInterval(() => setStep((s) => Math.min(s + 1, STEPS.length - 1)), 1800);
+    return () => {
+      clearInterval(t);
+      clearInterval(u);
+    };
+  }, []);
   return (
     <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
+      initial={{ opacity: 0, y: 4 }}
+      animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0 }}
-      className="flex items-center gap-1 py-1"
+      className="flex items-center gap-2.5 py-1"
+      role="status"
       aria-label="Thinking"
     >
-      {[0, 1, 2].map((i) => (
+      <span className="relative grid size-6 shrink-0 place-items-center">
         <motion.span
-          key={i}
-          className="size-1.5 rounded-full bg-ink-3"
-          animate={{ y: [0, -3, 0], opacity: [0.4, 1, 0.4] }}
-          transition={{
-            duration: 0.9,
-            repeat: Infinity,
-            ease: "easeInOut",
-            delay: i * 0.12,
-          }}
+          className="absolute inset-0 rounded-full bg-accent"
+          animate={{ scale: [0.55, 1, 0.55], opacity: [0.35, 0.12, 0.35] }}
+          transition={{ duration: 1.6, repeat: Infinity, ease: "easeInOut" }}
         />
-      ))}
+        <motion.span
+          className="size-2.5 rounded-full bg-accent"
+          animate={{ scale: [1, 0.7, 1] }}
+          transition={{ duration: 1.6, repeat: Infinity, ease: "easeInOut" }}
+        />
+      </span>
+      <AnimatePresence mode="wait">
+        <motion.span
+          key={step}
+          initial={{ opacity: 0, y: 5 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -5 }}
+          transition={{ duration: 0.22 }}
+          className="shimmer-text text-[13px] font-medium"
+        >
+          {STEPS[step]}…
+        </motion.span>
+      </AnimatePresence>
+      {secs >= 3 && <span className="nums text-[11px] text-ink-3">{secs}s</span>}
     </motion.div>
   );
 }

@@ -1076,3 +1076,20 @@ summary {
 ::view-transition-new(root) {
   z-index: 1;
 }
+
+/* A status line with light sweeping across it, for "the model is working". */
+.shimmer-text {
+  background: linear-gradient(90deg, var(--text-3) 0%, var(--text-3) 35%, var(--text) 50%, var(--text-3) 65%, var(--text-3) 100%);
+  background-size: 250% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: shimmer-sweep 1.6s linear infinite;
+}
+@keyframes shimmer-sweep {
+  from { background-position: 100% 0; }
+  to { background-position: -150% 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .shimmer-text { animation: none; color: var(--text-2); background: none; }
+}
