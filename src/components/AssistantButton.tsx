@@ -43,26 +43,28 @@ export function AssistantButton() {
         onClick={show}
         aria-label={`Open ${ASSISTANT_NAME}`}
         title={modifier ? `${ASSISTANT_NAME}  ${modifier} J` : ASSISTANT_NAME}
-        // The spark turns a little as you reach for it: the one control in the
-        // header that opens something with an opinion should look awake.
-        whileHover={{ scale: 1.04 }}
-        whileTap={{ scale: 0.95 }}
+        whileTap={{ scale: 0.96 }}
         transition={springSnappy}
-        // A labelled pill in the accent colour rather than a grey outline icon:
-        // the assistant is a main feature, and a faint glyph in the corner read
-        // as decoration that nobody clicked.
-        className={`flex h-10 shrink-0 items-center gap-2 rounded-xl px-3 text-[13.5px] font-semibold text-white shadow-[0_4px_14px_-4px_color-mix(in_srgb,var(--accent)_70%,transparent)] transition-[filter] hover:brightness-110 md:px-3.5 ${
-          open ? "ring-2 ring-accent/40 ring-offset-2 ring-offset-[var(--bg)]" : ""
+        // A plain, solid button with a word on it — the way Todoist or Linear
+        // label a primary action. No gradient, no glow and no sparkle: those
+        // are the "AI feature" clichés, and this is just someone to talk to.
+        className={`flex h-10 shrink-0 items-center gap-2 rounded-lg bg-accent px-3 text-[13.5px] font-semibold text-white transition-[filter] hover:brightness-[0.93] md:px-3.5 ${
+          open ? "brightness-[0.88]" : ""
         }`}
-        style={{ background: "linear-gradient(135deg, var(--accent), color-mix(in srgb, var(--accent) 60%, #ff7ad9))" }}
       >
-        <svg viewBox="0 0 20 20" aria-hidden className="size-[18px]">
-          <path d="M10 2.5 11.9 8.1 17.5 10 11.9 11.9 10 17.5 8.1 11.9 2.5 10 8.1 8.1z" fill="currentColor" />
-          <path d="M16 2.5l.6 1.6 1.6.6-1.6.6L16 6.9l-.6-1.6-1.6-.6 1.6-.6z" fill="currentColor" opacity="0.8" />
+        {/* A speech bubble: it is a conversation. */}
+        <svg viewBox="0 0 20 20" aria-hidden className="size-[17px]">
+          <path
+            d="M4.5 4h11a1.5 1.5 0 0 1 1.5 1.5v7a1.5 1.5 0 0 1-1.5 1.5H9l-3.5 3v-3h-1A1.5 1.5 0 0 1 3 12.5v-7A1.5 1.5 0 0 1 4.5 4z"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.7"
+            strokeLinejoin="round"
+          />
         </svg>
         <span className="hidden sm:inline">Ask {ASSISTANT_NAME}</span>
         {modifier && (
-          <kbd className="hidden rounded-md bg-white/20 px-1.5 py-0.5 font-sans text-[10.5px] font-medium md:inline">
+          <kbd className="hidden rounded bg-black/15 px-1.5 py-0.5 font-sans text-[10.5px] font-medium md:inline">
             {modifier} J
           </kbd>
         )}
