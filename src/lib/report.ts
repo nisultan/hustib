@@ -84,6 +84,9 @@ export interface Report {
   reading: Evaluated;
   previous: Evaluated | null;
   total: number;
+  /** Same-length stretch just before, for "vs before". */
+  prevTotal: number;
+  prevActive: number;
   activeDays: number;
   bestRun: number;
   facts: Fact[];
@@ -127,6 +130,8 @@ export function buildReport(data: AppData, p: Period, span: Span, today: string)
     reading,
     previous: previous.score != null ? previous : null,
     total,
+    prevTotal: prevDays.reduce((s, d) => s + d.total, 0),
+    prevActive: prevDays.filter((d) => d.total > 0).length,
     activeDays,
     bestRun,
     facts,
