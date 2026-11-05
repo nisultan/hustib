@@ -18,16 +18,16 @@ import {
   Visual,
 } from "@/lib/report";
 import { Button, PageHeader, Segmented } from "@/components/ui";
+import { ReportTimers, TimeLeft, useNow } from "@/components/ReportTimers";
 
 /**
- * Reports: a sealed card per week, fortnight or month. Opening it reveals the
+ * Reports: a sealed card per week or month. Opening it reveals the
  * rank that period earned, then five facts about you. Above Mid it rains
  * confetti; at Mid or below the crowd boos.
  */
 
 const SPANS = [
   { id: "week" as Span, label: "Week" },
-  { id: "fortnight" as Span, label: "2 weeks" },
   { id: "month" as Span, label: "Month" },
 ];
 
@@ -114,6 +114,10 @@ export default function ReportPage() {
         title="Report"
         subtitle="Who you were, period by period — ranked, explained, no sugar-coating."
       />
+
+      <div className="mb-5">
+        <ReportTimers linked={false} />
+      </div>
 
       <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
         <Segmented
@@ -215,15 +219,20 @@ function NavArrow({
 
 /* --------------------------------- Sealed --------------------------------- */
 
+function LiveLeft({ date }: { date: string }) {
+  const now = useNow();
+  return <TimeLeft ms={new Date(`${date}T00:00:00`).getTime() - now} big />;
+}
+
 function unlockLabel(date: string, today: string): string {
   const days = Math.round(
     (new Date(`${date}T12:00:00`).getTime() - new Date(`${today}T12:00:00`).getTime()) /
       86_400_000,
   );
   const wd = WEEKDAYS_LONG[new Date(`${date}T12:00:00`).getDay()];
-  if (days === 1) return `Unlocks tomorrow — ${wd}`;
-  if (days < 7) return `Unlocks ${wd} · in ${days} days`;
-  return `Unlocks ${formatDate(date)} · in ${days} days`;
+  if (days === 1) return `Unlocks tomorrow — ${wd}, 00:00`;
+  if (days < 7) return `Unlocks ${wd}, 00:00`;
+  return `Unlocks ${formatDate(date)}, 00:00`;
 }
 
 const WEEKDAYS_LONG = [
@@ -323,6 +332,9 @@ function Sealed({
             <span className="text-[12.5px] font-medium text-ink-3">
               {unlockLabel(unlocks, today)}
             </span>
+            <div className="mt-3">
+              <LiveLeft date={unlocks} />
+            </div>
           </div>
         ) : (
           !empty && (

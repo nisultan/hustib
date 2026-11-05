@@ -16,9 +16,9 @@ import { AppData } from "./types";
  * that beat the last one by half.
  */
 
-export type Span = "week" | "fortnight" | "month";
+export type Span = "week" | "month";
 
-export const SPAN_LABEL: Record<Span, string> = { week: "week", fortnight: "two weeks", month: "month" };
+export const SPAN_LABEL: Record<Span, string> = { week: "week", month: "month" };
 
 export interface Period {
   from: string;
@@ -44,15 +44,8 @@ export function period(span: Span, offset: number, today: string): Period {
     to = toISO(last);
     label = `${MONTHS[first.getMonth()]} ${first.getFullYear()}`;
   } else {
-    let monday = startOfWeek(today);
-    const len = span === "week" ? 7 : 14;
-    if (span === "fortnight") {
-      // Fortnights are fixed pairs of weeks, so they don't slide every Monday.
-      const weeks = Math.round((fromISO(monday).getTime() - fromISO("2024-01-01").getTime()) / (7 * 86_400_000));
-      if (weeks % 2 !== 0) monday = addDays(monday, -7);
-    }
-    from = addDays(monday, -len * offset);
-    to = addDays(from, len - 1);
+    from = addDays(startOfWeek(today), -7 * offset);
+    to = addDays(from, 6);
     label = `${formatDate(from)} – ${formatDate(to)}`;
   }
   return { from, to, label, current: to >= today };
