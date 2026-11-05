@@ -69,7 +69,12 @@ export function Heatmap({
     : MIN_CELL;
   useEffect(() => {
     const el = strip.current;
-    if (el) el.scrollLeft = el.scrollWidth;
+    if (!el) return;
+    // Open at today, which is no longer always the last column.
+    const now = el.querySelector<HTMLElement>("[data-today]");
+    el.scrollLeft = now
+      ? el.scrollLeft + now.getBoundingClientRect().left - el.getBoundingClientRect().left - el.clientWidth / 2
+      : el.scrollWidth;
   }, [weeks.length, cell]);
 
   // How often each weekday is an active one: which days carry you.
@@ -131,7 +136,7 @@ export function Heatmap({
                         key={row}
                         aria-hidden
                         style={{ width: cell, height: cell }}
-                        className="rounded-[3px] border border-dashed border-line opacity-60"
+                        className="rounded-[3px] ring-1 ring-inset ring-line/50 opacity-50"
                       />
                     ) : (
                       <Square
@@ -240,6 +245,7 @@ function Square({
       onFocus={(e) => onHover(day, e.currentTarget)}
       onBlur={() => onHover(null, null)}
       onClick={() => onPick?.(day.date)}
+      data-today={isToday || undefined}
       style={{ width: size, height: size, background: fill(day.level) }}
       className={`rounded-[3px] ring-1 ring-inset ring-line/60 transition-transform hover:z-10 hover:scale-125 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent ${
         isToday ? "outline outline-2 outline-offset-1 outline-[var(--accent)]" : ""

@@ -153,21 +153,23 @@ export function wall(data: AppData, weeks = 53, today = todayISO()): Wall {
   const lastMonday = startOfWeek(today);
 
   /*
-    The full window, always, even when the hub is younger than it.
-
-    Shrinking the grid to the history that exists was an attempt to avoid a
-    wall of grey, and it cost more than it saved: a two-week-old hub drew two
-    columns floating in white space, which reads as a broken chart rather than
-    as a new one. The empty squares are the point — they are the room the year
-    has left in it.
+    The window starts where your history does, not a year before it. Weeks
+    before the first logged day are dead space that says nothing; the room the
+    range has left goes to the right instead, as the empty weeks still ahead.
+    Once the history is longer than the range, it is the usual last-N-weeks.
   */
-  const firstMonday = addDays(lastMonday, -(weeks - 1) * 7);
-  const days = activityRange(data, firstMonday, addDays(lastMonday, 6));
+  const history = activityRange(data, addDays(today, -730), today);
+  const firstActive = history.find((d) => d.total > 0)?.date ?? today;
+  const fullBack = addDays(lastMonday, -(weeks - 1) * 7);
+  const firstMonday = startOfWeek(firstActive) > fullBack ? startOfWeek(firstActive) : fullBack;
+  const days = activityRange(data, firstMonday, addDays(firstMonday, weeks * 7 - 1));
 
+  // null marks a square that is not part of your record: before you started,
+  // or still to come.
   const columns: (DayActivity | null)[][] = [];
   for (let w = 0; w < weeks; w += 1) {
     const column = days.slice(w * 7, w * 7 + 7);
-    columns.push(column.map((d) => (d.date > today ? null : d)));
+    columns.push(column.map((d) => (d.date > today || d.date < firstActive ? null : d)));
   }
 
   // A label goes above the column holding that month's first Monday, and only
@@ -175,7 +177,8 @@ export function wall(data: AppData, weeks = 53, today = todayISO()): Wall {
   // something unreadable.
   const months: { label: string; column: number }[] = [];
   columns.forEach((column, i) => {
-    const first = column.find((d): d is DayActivity => d != null) ?? column[0];
+    const week = days.slice(i * 7, i * 7 + 7);
+    const first = column.find((d): d is DayActivity => d != null) ?? week[0];
     if (!first) return;
     const month = fromISO(first.date).getMonth();
     const previous = months[months.length - 1];
@@ -185,7 +188,7 @@ export function wall(data: AppData, weeks = 53, today = todayISO()): Wall {
     months.push({ label, column: i });
   });
 
-  const real = days.filter((d) => d.date <= today);
+  const real = days.filter((d) => d.date <= today && d.date >= firstActive);
   const busiest = real.reduce<DayActivity | null>(
     (best, d) => (d.total > 0 && (best == null || d.total > best.total) ? d : best),
     null,

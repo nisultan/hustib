@@ -93,7 +93,7 @@ export default function ProgressPage() {
             <Stat
               value={chart.total}
               label={chart.total === 1 ? "thing logged" : "things logged"}
-              hint={rangeLabel(weeks)}
+              hint={chart.days[0] && chart.days[0].date > addDays(today, -(weeks * 7 - 7)) ? `since ${formatDate(chart.days[0].date)}` : rangeLabel(weeks)}
             />
             <Stat
               value={chart.activeDays}
