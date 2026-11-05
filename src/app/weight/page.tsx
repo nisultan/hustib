@@ -4,27 +4,14 @@ import { useMemo, useState } from "react";
 import { useStore } from "@/lib/store";
 import { formatDate, pastLabel, todayISO } from "@/lib/dates";
 import { Day } from "@/lib/types";
-import { DateField } from "@/components/DateField";
-import { QuickWeights, WeightInput, WeightSummary, trendColor } from "@/components/WeightPanel";
+import { WeighIn, WeightSummary, trendColor } from "@/components/WeightPanel";
 import { EmptyState, PageHeader, Panel, SectionTitle } from "@/components/ui";
 
 export default function WeightPage() {
   const store = useStore();
   const [date, setDate] = useState(() => todayISO());
 
-  const byDate = useMemo(() => new Map(store.days.map((d) => [d.date, d])), [store.days]);
-
-  const latest = useMemo(
-    () =>
-      [...store.days]
-        .filter((d) => d.weight != null)
-        .sort((a, b) => (a.date < b.date ? 1 : -1))[0] ?? null,
-    [store.days],
-  );
-
   if (!store.ready) return <div className="h-64" aria-busy="true" />;
-
-  const current = byDate.get(date)?.weight ?? null;
 
   return (
     <div className="page-in">
@@ -37,26 +24,12 @@ export default function WeightPage() {
 
       <section className="mt-8">
         <SectionTitle>Log a weigh-in</SectionTitle>
-        <Panel className="flex flex-wrap items-end gap-4 px-4 py-4">
-          <label className="block">
-            <span className="mb-1.5 block text-xs font-medium text-ink-2">Day</span>
-            <div className="w-[190px]">
-              <DateField value={date} onChange={(v) => setDate(v || todayISO())} />
-            </div>
-          </label>
-
-          <WeightInput value={current} onChange={(weight) => store.setDay(date, { weight })} />
-
-          <div className="pb-1">
-            <QuickWeights
-              // Offer neighbours of the most recent weigh-in, not of this
-              // day's blank: the point is one tap from where you were.
-              anchor={current ?? latest?.weight ?? null}
-              current={current}
-              onPick={(weight) => store.setDay(date, { weight })}
-            />
-          </div>
-        </Panel>
+        <WeighIn
+          date={date}
+          onDate={setDate}
+          days={store.days}
+          onSave={(weight) => store.setDay(date, { weight })}
+        />
         {date !== todayISO() && (
           <p className="mt-2 text-xs text-ink-3">
             Logging against {formatDate(date)} — {pastLabel(date).toLowerCase()}.

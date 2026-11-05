@@ -1,8 +1,9 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { Day } from "@/lib/types";
-import { fromISO, pastLabel } from "@/lib/dates";
+import { fromISO, pastLabel, toISO } from "@/lib/dates";
+import { DateField } from "./DateField";
 import { useStore } from "@/lib/store";
 import { Range, WeightChart } from "./WeightChart";
 import { Panel } from "./ui";
@@ -303,5 +304,185 @@ export function QuickWeights({
         </button>
       ))}
     </div>
+  );
+}
+
+/**
+ * The weigh-in, as one card.
+ *
+ * It starts on your last weight, because tomorrow's is almost always within a
+ * few tenths of it: most mornings are two taps on − or + and "Log". Typing
+ * still works, and so does holding a button to run the number. Underneath, the
+ * change against the weigh-in before this day, coloured the way the trend is.
+ */
+export function WeighIn({
+  date,
+  onDate,
+  days,
+  onSave,
+}: {
+  date: string;
+  onDate: (date: string) => void;
+  days: Day[];
+  onSave: (weight: number | null) => void;
+}) {
+  const today = toISO(new Date());
+  const yesterday = toISO(new Date(Date.now() - 86_400_000));
+  const saved = days.find((d) => d.date === date)?.weight ?? null;
+  const before = useMemo(
+    () =>
+      [...days]
+        .filter((d) => d.weight != null && d.date < date)
+        .sort((a, b) => b.date.localeCompare(a.date))[0] ?? null,
+    [days, date],
+  );
+  const start = saved ?? before?.weight ?? null;
+
+  const [text, setText] = useState(start == null ? "" : start.toFixed(1));
+  const [flash, setFlash] = useState(false);
+  const [lastKey, setLastKey] = useState(`${date}|${saved}`);
+  // Re-seed when the day (or its saved value) changes underneath us.
+  if (lastKey !== `${date}|${saved}`) {
+    setLastKey(`${date}|${saved}`);
+    setText(start == null ? "" : start.toFixed(1));
+  }
+
+  const parsed = (() => {
+    const n = Number(text.trim().replace(",", "."));
+    return text.trim() !== "" && Number.isFinite(n) && n > 0 && n < 700 ? Math.round(n * 10) / 10 : null;
+  })();
+  const delta = parsed != null && before?.weight != null ? Math.round((parsed - before.weight) * 10) / 10 : null;
+  const unchanged = parsed != null && parsed === saved;
+
+  const hold = useRef<ReturnType<typeof setInterval> | null>(null);
+  const step = (by: number) =>
+    setText((t) => {
+      const n = Number(t.replace(",", "."));
+      const base = Number.isFinite(n) && t.trim() !== "" ? n : (before?.weight ?? 70);
+      return Math.max(1, Math.round((base + by) * 10) / 10).toFixed(1);
+    });
+  const press = (by: number) => {
+    step(by);
+    let speed = 0;
+    hold.current = setInterval(() => {
+      speed += 1;
+      if (speed > 3) step(by);
+    }, 110);
+  };
+  const release = () => {
+    if (hold.current) clearInterval(hold.current);
+    hold.current = null;
+  };
+
+  const save = () => {
+    if (parsed == null) return;
+    onSave(parsed);
+    setFlash(true);
+    setTimeout(() => setFlash(false), 1400);
+  };
+
+  const dayChip = (d: string, label: string) => (
+    <button
+      type="button"
+      onClick={() => onDate(d)}
+      aria-pressed={date === d}
+      className={`rounded-lg px-3 py-1.5 text-[13px] font-medium transition-colors ${
+        date === d ? "bg-accent-soft text-accent-text" : "text-ink-2 hover:bg-panel-2"
+      }`}
+    >
+      {label}
+    </button>
+  );
+
+  const stepBtn = (by: number, label: string, path: string) => (
+    <button
+      type="button"
+      aria-label={label}
+      onPointerDown={() => press(by)}
+      onPointerUp={release}
+      onPointerLeave={release}
+      onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && (e.preventDefault(), step(by))}
+      className="grid size-12 shrink-0 place-items-center rounded-full border border-line text-ink-2 transition-colors hover:border-line-strong hover:bg-panel-2 hover:text-ink active:scale-95"
+    >
+      <svg viewBox="0 0 20 20" aria-hidden className="size-5">
+        <path d={path} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+      </svg>
+    </button>
+  );
+
+  return (
+    <Panel className="grid gap-5 px-5 py-5 md:grid-cols-[auto_1fr_auto] md:items-center md:gap-8">
+      {/* Day */}
+      <div className="flex flex-col items-start gap-2">
+        <div className="flex gap-1">
+          {dayChip(today, "Today")}
+          {dayChip(yesterday, "Yesterday")}
+        </div>
+        <div className="w-[200px]">
+          <DateField value={date} onChange={(v) => onDate(v || today)} />
+        </div>
+      </div>
+
+      {/* Number */}
+      <div className="flex flex-col items-center">
+        <div className="flex items-center gap-4">
+          {stepBtn(-0.1, "Down 0.1 kg", "M5 10h10")}
+          <label className="flex items-baseline gap-1.5">
+            <input
+              type="text"
+              inputMode="decimal"
+              autoComplete="off"
+              aria-label="Weight in kg"
+              value={text}
+              placeholder={before?.weight?.toFixed(1) ?? "70.0"}
+              onChange={(e) => setText(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") save();
+                if (e.key === "ArrowUp") (e.preventDefault(), step(0.1));
+                if (e.key === "ArrowDown") (e.preventDefault(), step(-0.1));
+              }}
+              className="bare nums w-[150px] bg-transparent text-center text-[44px] font-bold leading-none tracking-tight text-ink placeholder:text-ink-3"
+            />
+            <span className="text-[15px] font-medium text-ink-3">kg</span>
+          </label>
+          {stepBtn(0.1, "Up 0.1 kg", "M5 10h10M10 5v10")}
+        </div>
+        <p className="nums mt-2 h-4 text-[12.5px]">
+          {delta != null && before ? (
+            <>
+              <span className="font-semibold" style={{ color: trendColor(delta) }}>
+                {delta === 0 ? "±0.0" : `${delta > 0 ? "▲ " : "▼ "}${Math.abs(delta).toFixed(1)}`} kg
+              </span>{" "}
+              <span className="text-ink-3">
+                vs {pastLabel(before.date).toLowerCase()} ({(before.weight as number).toFixed(1)})
+              </span>
+            </>
+          ) : (
+            <span className="text-ink-3">{before ? "" : "Your first weigh-in"}</span>
+          )}
+        </p>
+      </div>
+
+      {/* Save */}
+      <div className="flex items-center gap-2 md:flex-col md:items-stretch">
+        <button
+          type="button"
+          onClick={save}
+          disabled={parsed == null || unchanged}
+          className="h-11 min-w-[130px] rounded-xl bg-accent px-5 text-[14px] font-semibold text-white transition-opacity disabled:opacity-40"
+        >
+          {flash ? "Logged ✓" : unchanged ? "Logged ✓" : saved != null ? "Update" : "Log weight"}
+        </button>
+        {saved != null && (
+          <button
+            type="button"
+            onClick={() => onSave(null)}
+            className="rounded-lg px-3 py-1.5 text-[12.5px] text-ink-3 transition-colors hover:text-[var(--urgent)]"
+          >
+            Remove
+          </button>
+        )}
+      </div>
+    </Panel>
   );
 }
