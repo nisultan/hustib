@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { DayActivity, SOURCES } from "@/lib/activity";
-import { formatDate } from "@/lib/dates";
+import { formatDate, todayISO } from "@/lib/dates";
 
 /**
  * A year of days as a wall of squares.
@@ -28,11 +28,13 @@ import { formatDate } from "@/lib/dates";
  * square reads as "no data", and "nothing done" is data.
  */
 
-/** Square edge and the gap between, in pixels. Small enough that a year fits. */
-const CELL = 11;
+/** Square size bounds and the gap between, in pixels. */
+const MIN_CELL = 11;
+const MAX_CELL = 22;
 const GAP = 3;
 
 const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+const WEEKDAY_FULL = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 
 export function Heatmap({
   weeks,
@@ -44,47 +46,59 @@ export function Heatmap({
   /** Opens the day. A wall chart you cannot click is a poster. */
   onPick?: (date: string) => void;
 }) {
-  const [hover, setHover] = useState<DayActivity | null>(null);
+  const [hover, setHover] = useState<{ day: DayActivity; x: number; y: number } | null>(null);
+  const today = todayISO();
 
   /*
-    Opens at the far end, where today is.
-
-    A year of squares is wider than any phone and most sidebars, so the default
-    scroll position decides what the chart is about. Left means last October,
-    which nobody opened this page to see. Re-run when the number of columns
-    changes — switching the range from a year to three months rebuilds the grid
-    and would otherwise leave the scroll pinned wherever it was.
+    Squares grow to fill the panel: a year at 11px left half a wide screen
+    empty. Bounded both ways — below 11 it is a smear, above 22 it is a
+    bathroom floor. Under the minimum it scrolls, opening at today.
   */
   const strip = useRef<HTMLDivElement>(null);
+  const [width, setWidth] = useState(0);
+  useEffect(() => {
+    const el = strip.current;
+    if (!el) return;
+    const ro = new ResizeObserver(() => setWidth(el.clientWidth));
+    ro.observe(el);
+    setWidth(el.clientWidth);
+    return () => ro.disconnect();
+  }, []);
+  const cell = width
+    ? Math.max(MIN_CELL, Math.min(MAX_CELL, Math.floor((width - GAP * (weeks.length - 1)) / Math.max(1, weeks.length))))
+    : MIN_CELL;
   useEffect(() => {
     const el = strip.current;
     if (el) el.scrollLeft = el.scrollWidth;
-  }, [weeks.length]);
+  }, [weeks.length, cell]);
+
+  // How often each weekday is an active one: which days carry you.
+  const byWeekday = useMemo(() => {
+    const active = Array(7).fill(0) as number[];
+    const seen = Array(7).fill(0) as number[];
+    for (const col of weeks)
+      col.forEach((d, row) => {
+        if (!d) return;
+        seen[row] += 1;
+        if (d.total > 0) active[row] += 1;
+      });
+    return active.map((a, i) => (seen[i] ? a / seen[i] : 0));
+  }, [weeks]);
+  const bestRow = byWeekday.indexOf(Math.max(...byWeekday));
 
   return (
-    <div>
-      {/*
-        Scrolled rather than squeezed. Fifty-three columns will not fit a phone
-        at a legible square size, and the alternative — shrinking the squares
-        until they do — produces a grey smear that answers no question at all.
-        It opens scrolled to the right, because the end of the strip is the
-        part anyone is here to read.
-      */}
-      <div className="flex gap-2">
-        {/* Outside the scroller on purpose. Inside it, the labels slide off the
-            left edge the moment the grid is scrolled — which on a phone it
-            always is, because it opens at the most recent week. */}
-        <div className="shrink-0 pt-[19px]">
+    <div className="relative" data-heatmap>
+      <div className="flex gap-2.5">
+        {/* All seven days, outside the scroller so they never slide away. */}
+        <div className="shrink-0" style={{ paddingTop: 20 }}>
           {WEEKDAYS.map((day, row) => (
-            <div
-              key={day}
-              style={{ height: CELL, marginBottom: GAP }}
-              className="flex items-center"
-            >
-              {/* Every other label: seven stacked at this size is a column of
-                  grey noise beside the thing you are meant to look at. */}
-              <span className="w-7 pr-1 text-right text-[9px] leading-none text-ink-3">
-                {row % 2 === 1 ? day : ""}
+            <div key={day} style={{ height: cell, marginBottom: GAP }} className="flex items-center">
+              <span
+                className={`w-8 text-right text-[10.5px] leading-none ${
+                  row === bestRow && byWeekday[row] > 0 ? "font-semibold text-accent-text" : "text-ink-3"
+                }`}
+              >
+                {day}
               </span>
             </div>
           ))}
@@ -92,12 +106,12 @@ export function Heatmap({
 
         <div ref={strip} className="min-w-0 flex-1 overflow-x-auto pb-1 [scrollbar-width:thin]">
           <div className="inline-block">
-            <div className="relative mb-1 h-[14px]">
+            <div className="relative mb-1.5 h-[14px]">
               {months.map((month) => (
                 <span
                   key={`${month.label}-${month.column}`}
-                  style={{ left: month.column * (CELL + GAP) }}
-                  className="absolute top-0 text-[10px] leading-none text-ink-3"
+                  style={{ left: month.column * (cell + GAP) }}
+                  className="absolute top-0 border-l border-line pl-1 text-[10.5px] font-medium leading-none text-ink-3"
                 >
                   {month.label}
                 </span>
@@ -106,20 +120,34 @@ export function Heatmap({
 
             <div className="flex" style={{ gap: GAP }}>
               {weeks.map((column, w) => (
-                <div key={w} className="flex flex-col" style={{ gap: GAP }}>
+                <div
+                  key={w}
+                  className="dot-in flex flex-col"
+                  style={{ gap: GAP, ["--d" as string]: `${Math.min(w * 12, 600)}ms` }}
+                >
                   {column.map((day, row) =>
                     day == null ? (
-                      /* A day still ahead. An outline rather than a gap, so
-                         the grid keeps its shape and the days to come read as
-                         waiting rather than as missing. */
                       <span
                         key={row}
                         aria-hidden
-                        style={{ width: CELL, height: CELL }}
-                        className="rounded-[2px] border border-dashed border-line"
+                        style={{ width: cell, height: cell }}
+                        className="rounded-[3px] border border-dashed border-line opacity-60"
                       />
                     ) : (
-                      <Square key={day.date} day={day} onHover={setHover} onPick={onPick} />
+                      <Square
+                        key={day.date}
+                        day={day}
+                        size={cell}
+                        isToday={day.date === today}
+                        onHover={(d, el) => {
+                          if (!d || !el) return setHover(null);
+                          const box = el.getBoundingClientRect();
+                          const host = el.closest("[data-heatmap]")?.getBoundingClientRect();
+                          const x = box.left - (host?.left ?? 0) + box.width / 2;
+                          setHover({ day: d, x: Math.max(90, Math.min(x, (host?.width ?? 0) - 90)), y: box.top - (host?.top ?? 0) });
+                        }}
+                        onPick={onPick}
+                      />
                     ),
                   )}
                 </div>
@@ -127,41 +155,60 @@ export function Heatmap({
             </div>
           </div>
         </div>
+
+        {/* Per-weekday rhythm: share of each weekday you were active. */}
+        <div className="hidden shrink-0 sm:block" style={{ paddingTop: 20 }}>
+          {byWeekday.map((share, row) => (
+            <div key={row} style={{ height: cell, marginBottom: GAP }} className="flex items-center gap-1.5">
+              <span className="h-1.5 w-14 overflow-hidden rounded-full bg-panel-2">
+                <span
+                  className="grow-x block h-full rounded-full"
+                  style={{
+                    width: `${Math.max(share * 100, share > 0 ? 6 : 0)}%`,
+                    background: row === bestRow ? "var(--accent)" : "color-mix(in srgb, var(--accent) 55%, var(--panel-2))",
+                  }}
+                />
+              </span>
+              <span className="nums w-7 text-[10.5px] text-ink-3">{Math.round(share * 100)}%</span>
+            </div>
+          ))}
+        </div>
       </div>
 
+      {/* Floating readout over the hovered square. */}
+      {hover && (
+        <div
+          className="pointer-events-none absolute z-10 -translate-x-1/2 -translate-y-full whitespace-nowrap rounded-lg border border-line bg-panel px-2.5 py-1.5 text-[12px] shadow-lg"
+          style={{ left: hover.x, top: hover.y - 6 }}
+        >
+          <span className="font-semibold">
+            {hover.day.total === 0 ? "Nothing logged" : `${hover.day.total} ${hover.day.total === 1 ? "thing" : "things"}`}
+          </span>{" "}
+          <span className="text-ink-3">· {formatDate(hover.day.date)}</span>
+          {hover.day.total > 0 && <div className="mt-0.5 text-[11px] text-ink-2">{breakdown(hover.day)}</div>}
+        </div>
+      )}
+
       <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
-        {/*
-          The readout is a fixed line under the grid rather than a tooltip that
-          follows the cursor. A floating bubble over a grid this dense covers
-          the squares either side of the one being read, and on a touch screen
-          there is no hover to show it with at all.
-        */}
-        <p className="min-h-[16px] text-xs text-ink-2">
-          {hover ? (
+        <p className="text-[12px] text-ink-3">
+          {byWeekday[bestRow] > 0 ? (
             <>
-              <span className="font-medium text-ink">
-                {hover.total === 0
-                  ? "Nothing logged"
-                  : `${hover.total} ${hover.total === 1 ? "thing" : "things"}`}
-              </span>{" "}
-              on {formatDate(hover.date)}
-              {hover.total > 0 && <span className="text-ink-3"> · {breakdown(hover)}</span>}
+              Strongest on <span className="font-semibold text-ink-2">{WEEKDAY_FULL[bestRow]}s</span> — active{" "}
+              {Math.round(byWeekday[bestRow] * 100)}% of them. Tap a square to open the day.
             </>
           ) : (
-            <span className="text-ink-3">
-              Hover a square for the day it stands for. Dashed squares have not happened yet.
-            </span>
+            "Tap a square to open the day."
           )}
         </p>
 
-        <div className="flex items-center gap-1.5 text-[10px] text-ink-3">
+        <div className="flex items-center gap-1.5 text-[10.5px] text-ink-3">
           <span>Less</span>
           {[0, 1, 2, 3, 4].map((level) => (
             <span
               key={level}
               aria-hidden
-              style={{ width: CELL, height: CELL, background: fill(level) }}
-              className="rounded-[2px] ring-1 ring-inset ring-line/60"
+              style={{ width: 11, height: 11, background: fill(level) }}
+              className="rounded-[3px] ring-1 ring-inset ring-line/60"
             />
           ))}
           <span>More</span>
@@ -173,27 +220,30 @@ export function Heatmap({
 
 function Square({
   day,
+  size,
+  isToday,
   onHover,
   onPick,
 }: {
   day: DayActivity;
-  onHover: (day: DayActivity | null) => void;
+  size: number;
+  isToday: boolean;
+  onHover: (day: DayActivity | null, el: HTMLElement | null) => void;
   onPick?: (date: string) => void;
 }) {
   return (
     <button
       type="button"
-      // The native tooltip as well as the readout: it is the only version that
-      // survives the page being printed to PDF or read with the mouse alone.
-      title={`${formatDate(day.date)} — ${day.total === 0 ? "nothing logged" : breakdown(day)}`}
       aria-label={`${formatDate(day.date)}, ${day.total} logged`}
-      onMouseEnter={() => onHover(day)}
-      onMouseLeave={() => onHover(null)}
-      onFocus={() => onHover(day)}
-      onBlur={() => onHover(null)}
+      onMouseEnter={(e) => onHover(day, e.currentTarget)}
+      onMouseLeave={() => onHover(null, null)}
+      onFocus={(e) => onHover(day, e.currentTarget)}
+      onBlur={() => onHover(null, null)}
       onClick={() => onPick?.(day.date)}
-      style={{ width: CELL, height: CELL, background: fill(day.level) }}
-      className="rounded-[2px] ring-1 ring-inset ring-line/60 transition-[outline] hover:outline hover:outline-1 hover:outline-offset-1 hover:outline-ink-3 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
+      style={{ width: size, height: size, background: fill(day.level) }}
+      className={`rounded-[3px] ring-1 ring-inset ring-line/60 transition-transform hover:z-10 hover:scale-125 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent ${
+        isToday ? "outline outline-2 outline-offset-1 outline-[var(--accent)]" : ""
+      }`}
     />
   );
 }

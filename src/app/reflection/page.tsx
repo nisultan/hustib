@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useStore } from "@/lib/store";
 import { addDays, formatDate, pastLabel, todayISO } from "@/lib/dates";
 import { Block } from "@/lib/types";
@@ -73,24 +73,33 @@ export default function ReflectionPage() {
 
   const words = wordCount(reflection);
 
-  /*
-    Inserting the day's question writes it into the entry as a heading with an
-    empty line beneath, rather than filling a text box. The prompt is a place
-    to start, not a form to complete, and once it is in the page it belongs to
-    the page like anything else written there.
-  */
-  const usePrompt = (question: string | string[]) => {
-    const list = Array.isArray(question) ? question : [question];
-    store.setDay(date, {
-      reflection: [
-        ...reflection.filter((b) => b.text.trim() !== "" || b.type !== "text"),
-        ...list.flatMap((q) => [
-          { id: newId(), type: "h3" as const, text: q, done: false },
-          { id: newId(), type: "text" as const, text: "", done: false },
-        ]),
-      ],
-    });
+  // Answers to the day's questions live in the entry itself, as a heading and
+  // a paragraph with ids starting "q-", so they count as writing everywhere
+  // (word counts, streaks, search, the form model). The free editor below
+  // shows everything else.
+  const answers = reflection.filter((b) => b.id.startsWith("q-"));
+  const free = reflection.filter((b) => !b.id.startsWith("q-"));
+  const save = (qa: Block[], rest: Block[]) => store.setDay(date, { reflection: [...qa, ...rest] });
+
+  const answer = (q: string, text: string) => {
+    const k = qid(q);
+    const has = answers.some((b) => b.id === `${k}-a`);
+    if (text.trim() === "") {
+      save(answers.filter((b) => !b.id.startsWith(`${k}-`)), free);
+    } else if (has) {
+      save(answers.map((b) => (b.id === `${k}-a` ? { ...b, text } : b)), free);
+    } else {
+      save(
+        [
+          ...answers,
+          { id: `${k}-h`, type: "h3" as const, text: q, done: false },
+          { id: `${k}-a`, type: "text" as const, text, done: false },
+        ],
+        free,
+      );
+    }
   };
+  const dropAnswer = (q: string) => save(answers.filter((b) => !b.id.startsWith(`${qid(q)}-`)), free);
 
   return (
     <div className="page-in">
@@ -159,15 +168,15 @@ export default function ReflectionPage() {
             </div>
 
             <div className="px-4 py-5 sm:px-6">
-              {words === 0 && <Prompt date={date} onUse={usePrompt} />}
+              <Questions key={date} date={date} answers={answers} onAnswer={answer} onDrop={dropAnswer} />
 
               <BlockEditor
                 // Remounting per day, so an edit to one morning cannot land in
                 // another when the date changes mid-keystroke.
-                key={date}
-                blocks={reflection}
-                onChange={(blocks) => store.setDay(date, { reflection: blocks })}
-                placeholder="How did it go? Press / for a heading, list, image or link."
+                key={`free-${date}`}
+                blocks={free}
+                onChange={(blocks) => save(answers, blocks)}
+                placeholder="Anything else on your mind? Press / for a heading, list, image or link."
               />
             </div>
 
@@ -300,22 +309,62 @@ const DEEP = [
   "What did you do today purely for your future self?",
   "What's one small win you can build on tomorrow?",
   "Where did you feel close to Allah today, and where far?",
+  "What are you pretending not to know right now?",
+  "If you kept living exactly like today for a year, where would you end up?",
+  "What did you want today that you didn't let yourself ask for?",
+  "Which fear made a decision for you today?",
+  "What would you do this week if you weren't worried about looking stupid?",
+  "Who are you becoming — and is that who you want to be?",
+  "What did you tolerate today that you shouldn't have?",
+  "What's the story you keep telling yourself about why you can't?",
+  "What gave you energy today without costing you anything?",
+  "When did you last feel genuinely proud — what were you doing?",
+  "What part of today would you want to remember in ten years?",
+  "Where are you working hard on the wrong thing?",
 ];
 
-const ALL_PROMPTS = [...PROMPTS, ...DEEP];
-const PROMPT_COUNT = 3;
+const LIGHT_COUNT = 2;
+const DEEP_COUNT = 3;
 const DISMISSED_KEY = "lockedin.prompts.dismissed";
 
+/** A stable short id for a question, so its answer can be found again. */
+function qid(q: string): string {
+  let h = 5381;
+  for (let i = 0; i < q.length; i++) h = ((h << 5) + h + q.charCodeAt(i)) | 0;
+  return `q-${(h >>> 0).toString(36)}`;
+}
+
+/** Walks a list from a per-day start with a stride: each day a different mix. */
+function deal(list: string[], seed: number, count: number, skip: string[]): string[] {
+  const out: string[] = [];
+  const n = list.length;
+  for (let i = 0; out.length < count && i < n * 2; i += 1) {
+    const q = list[(((seed * 7 + i * 5) % n) + n) % n];
+    if (!skip.includes(q) && !out.includes(q)) out.push(q);
+  }
+  return out;
+}
+
 /**
- * Several questions to write from, not one.
+ * The day's questions, already on the page.
  *
- * One question was a door; a few are a conversation — a light one, a deeper
- * one, one about the body or the week. Each can be written about on its own,
- * all at once, or thrown away with × (remembered per day, so a dismissed one
- * does not come back on reload). "More" deals a fresh one in.
+ * Five of them, two light and three deep, waiting under the date like a page
+ * someone prepared for you. Read them, answer the ones that land, ignore the
+ * rest; × takes one away for good (remembered per day). An answer is written
+ * straight into the entry.
  */
-function Prompt({ date, onUse }: { date: string; onUse: (q: string | string[]) => void }) {
-  const base = Math.floor(Date.parse(`${date}T00:00:00Z`) / 86_400_000);
+function Questions({
+  date,
+  answers,
+  onAnswer,
+  onDrop,
+}: {
+  date: string;
+  answers: Block[];
+  onAnswer: (q: string, text: string) => void;
+  onDrop: (q: string) => void;
+}) {
+  const seed = Math.floor(Date.parse(`${date}T00:00:00Z`) / 86_400_000);
   const [dismissed, setDismissed] = useState<string[]>(() => {
     try {
       const all = JSON.parse(localStorage.getItem(DISMISSED_KEY) ?? "{}") as Record<string, string[]>;
@@ -324,34 +373,35 @@ function Prompt({ date, onUse }: { date: string; onUse: (q: string | string[]) =
       return [];
     }
   });
-  const [extra, setExtra] = useState(0);
 
   const remember = (list: string[]) => {
     setDismissed(list);
     try {
       const all = JSON.parse(localStorage.getItem(DISMISSED_KEY) ?? "{}") as Record<string, string[]>;
       all[date] = list;
-      // Only the last few weeks matter; keep the key from growing forever.
       const keys = Object.keys(all).sort().slice(-30);
       localStorage.setItem(DISMISSED_KEY, JSON.stringify(Object.fromEntries(keys.map((k) => [k, all[k]]))));
     } catch {
-      // Private browsing: dismissals hold for this visit only.
+      // Private browsing: holds for this visit only.
     }
   };
 
-  // Walk the list from a per-day starting point with a stride, so each day
-  // gets a different mix and consecutive picks are not neighbours.
-  const questions: string[] = [];
-  const n = ALL_PROMPTS.length;
-  for (let i = 0; questions.length < PROMPT_COUNT + extra && i < n; i += 1) {
-    const q = ALL_PROMPTS[(((base * 7 + i * 5) % n) + n) % n];
-    if (!dismissed.includes(q) && !questions.includes(q)) questions.push(q);
-  }
+  // Answered questions always stay; the day's deal fills in the rest.
+  const answered = answers.filter((b) => b.type === "h3").map((b) => b.text);
+  const dealt = [...deal(DEEP, seed, DEEP_COUNT, dismissed), ...deal(PROMPTS, seed + 3, LIGHT_COUNT, dismissed)];
+  const questions = [...answered, ...dealt.filter((q) => !answered.includes(q))];
+  const textOf = (q: string) => answers.find((b) => b.id === `${qid(q)}-a`)?.text ?? "";
+
+  const remove = (q: string) => {
+    if (textOf(q).trim() !== "" && !window.confirm("Delete this question and your answer?")) return;
+    onDrop(q);
+    remember([...dismissed, q]);
+  };
 
   if (questions.length === 0) {
     return (
-      <div className="mb-4 flex items-center justify-between rounded-xl border border-dashed border-line px-4 py-3 text-[13px] text-ink-3">
-        No questions left for today.
+      <div className="mb-5 flex items-center justify-between rounded-xl border border-dashed border-line px-4 py-3 text-[13px] text-ink-3">
+        No questions today.
         <button type="button" onClick={() => remember([])} className="font-medium text-accent-text hover:underline">
           Bring them back
         </button>
@@ -360,58 +410,103 @@ function Prompt({ date, onUse }: { date: string; onUse: (q: string | string[]) =
   }
 
   return (
-    <div className="mb-5 rounded-xl border border-line bg-panel-2/40 p-4">
-      <div className="flex items-baseline justify-between gap-3">
-        <p className="text-[12.5px] font-semibold text-ink-3">A few questions, if you need somewhere to start</p>
+    <section className="mb-6">
+      <div className="mb-2.5 flex items-baseline justify-between gap-3">
+        <p className="text-[12px] font-semibold uppercase tracking-[0.1em] text-ink-3">Today&apos;s questions</p>
+        <p className="nums text-[12px] text-ink-3">
+          {answered.length}/{questions.length} answered
+        </p>
+      </div>
+      <ol className="grid gap-2">
+        {questions.map((q, i) => (
+          <QuestionCard
+            key={q}
+            n={i + 1}
+            q={q}
+            deep={DEEP.includes(q)}
+            text={textOf(q)}
+            onChange={(t) => onAnswer(q, t)}
+            onRemove={() => remove(q)}
+          />
+        ))}
+      </ol>
+    </section>
+  );
+}
+
+function QuestionCard({
+  n,
+  q,
+  deep,
+  text,
+  onChange,
+  onRemove,
+}: {
+  n: number;
+  q: string;
+  deep: boolean;
+  text: string;
+  onChange: (t: string) => void;
+  onRemove: () => void;
+}) {
+  const [draft, setDraft] = useState(text);
+  const ref = useRef<HTMLTextAreaElement>(null);
+  const answered = text.trim() !== "";
+
+  // Grow with the answer.
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${el.scrollHeight}px`;
+  }, [draft]);
+
+  return (
+    <li
+      className={`group rounded-xl border bg-panel px-4 py-3 transition-colors ${
+        answered ? "border-[color-mix(in_srgb,var(--accent)_45%,var(--border))]" : "border-line hover:border-line-strong"
+      }`}
+    >
+      <div className="flex items-start gap-3">
+        <span
+          className={`nums mt-0.5 grid size-6 shrink-0 place-items-center rounded-full text-[11px] font-bold ${
+            answered ? "bg-accent text-white" : "bg-accent-soft text-accent-text"
+          }`}
+        >
+          {answered ? "✓" : n}
+        </span>
+        <div className="min-w-0 flex-1">
+          <p className="text-[15px] font-semibold leading-snug">
+            {q}
+            {deep && (
+              <span className="ml-2 align-middle text-[10.5px] font-semibold uppercase tracking-wide text-ink-3">deep</span>
+            )}
+          </p>
+          <textarea
+            ref={ref}
+            rows={1}
+            value={draft}
+            onChange={(e) => {
+              setDraft(e.target.value);
+              onChange(e.target.value);
+            }}
+            placeholder="Answer if it lands…"
+            className="bare mt-1.5 w-full resize-none overflow-hidden bg-transparent text-[14.5px] leading-relaxed text-ink-2 placeholder:text-ink-3"
+          />
+        </div>
         <button
           type="button"
-          onClick={() => onUse(questions)}
-          className="shrink-0 rounded-lg bg-accent px-2.5 py-1 text-[12px] font-semibold text-white transition-opacity hover:opacity-90"
+          onClick={onRemove}
+          aria-label={`Delete question: ${q}`}
+          title="Delete this question"
+          className="grid size-7 shrink-0 place-items-center rounded-md text-ink-3 opacity-60 transition-[opacity,color,background-color] hover:bg-panel-2 hover:text-[var(--urgent)] hover:opacity-100 group-hover:opacity-100"
         >
-          Answer all
+          <svg viewBox="0 0 16 16" aria-hidden className="size-3.5">
+            <path d="m4 4 8 8M12 4l-8 8" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+          </svg>
         </button>
       </div>
-      <ul className="mt-3 grid gap-1.5">
-        {questions.map((q, i) => (
-          <li
-            key={q}
-            className="group flex items-center gap-3 rounded-lg border border-line bg-panel px-3 py-2.5 transition-colors hover:border-line-strong"
-          >
-            <span className="nums grid size-6 shrink-0 place-items-center rounded-full bg-accent-soft text-[11px] font-bold text-accent-text">
-              {i + 1}
-            </span>
-            <button type="button" onClick={() => onUse(q)} className="min-w-0 flex-1 text-left text-[14.5px] font-medium leading-snug hover:text-accent-text">
-              {q}
-            </button>
-            <button
-              type="button"
-              onClick={() => onUse(q)}
-              className="hidden shrink-0 text-[12px] font-medium text-accent-text group-hover:block"
-            >
-              Write →
-            </button>
-            <button
-              type="button"
-              onClick={() => remember([...dismissed, q])}
-              aria-label={`Remove question: ${q}`}
-              title="Remove this question"
-              className="grid size-7 shrink-0 place-items-center rounded-md text-ink-3 transition-colors hover:bg-panel-2 hover:text-[var(--urgent)]"
-            >
-              <svg viewBox="0 0 16 16" aria-hidden className="size-3.5">
-                <path d="m4 4 8 8M12 4l-8 8" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
-              </svg>
-            </button>
-          </li>
-        ))}
-      </ul>
-      <button
-        type="button"
-        onClick={() => setExtra((x) => x + 1)}
-        className="mt-2.5 text-[12.5px] font-medium text-ink-3 transition-colors hover:text-ink"
-      >
-        + Another question
-      </button>
-    </div>
+    </li>
   );
 }
 
@@ -661,12 +756,6 @@ function wordCount(blocks: Block[]): number {
 
 function daysApart(a: string, b: string): number {
   return Math.round((Date.parse(`${a}T00:00:00Z`) - Date.parse(`${b}T00:00:00Z`)) / 86_400_000);
-}
-
-function newId(): string {
-  return typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
-    ? crypto.randomUUID()
-    : `b-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
 function Step({ label, onClick, d }: { label: string; onClick: () => void; d: string }) {
