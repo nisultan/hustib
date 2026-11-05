@@ -32,6 +32,7 @@ const SPANS = [
 ];
 
 const EASE = [0.16, 1, 0.3, 1] as const;
+const SEEN_KEY = "lockedin.reports.opened";
 
 function useCount(to: number, delay = 0, duration = 1.3) {
   const [v, setV] = useState(0);
@@ -70,9 +71,32 @@ export default function ReportPage() {
   const report = useMemo(() => buildReport(store, p, span, today), [store, p, span, today]);
   const start = useMemo(() => firstActiveDay(store, today), [store, today]);
   const canBack = start != null && p.from > start;
-  // A period can't be judged before it ends: this week's report unlocks on
-  // Sunday, a month's on its last day.
-  const locked = today < p.to;
+  /*
+    Reports are a ritual, not a dashboard: weekly and two-week reports open
+    only on Sunday, monthly ones only on the last day of the month. A report
+    you opened on its day stays open to you afterwards.
+  */
+  const nextUnlock = period(span, 0, today).to;
+  const unlockDay = today === nextUnlock;
+  const seenKey = `${span}:${p.from}`;
+  const [seen, setSeen] = useState<string[]>(() => {
+    try {
+      return JSON.parse(localStorage.getItem(SEEN_KEY) ?? "[]") as string[];
+    } catch {
+      return [];
+    }
+  });
+  const markSeen = () => {
+    if (seen.includes(seenKey)) return;
+    const next = [...seen, seenKey].slice(-200);
+    setSeen(next);
+    try {
+      localStorage.setItem(SEEN_KEY, JSON.stringify(next));
+    } catch {
+      // Private mode: remembered for this visit only.
+    }
+  };
+  const locked = p.to > today || !(unlockDay || seen.includes(seenKey));
 
   // A new period is a new sealed card. Reset in the same update as the
   // period change, so the card swap is a single transition.
@@ -122,9 +146,12 @@ export default function ReportPage() {
               label={p.label}
               span={span}
               empty={report.total === 0}
-              unlocks={locked ? p.to : null}
+              unlocks={locked ? nextUnlock : null}
               today={today}
-              onOpen={() => setPhase("counting")}
+              onOpen={() => {
+                markSeen();
+                setPhase("counting");
+              }}
             />
           ) : phase === "counting" ? (
             <Countdown
@@ -257,7 +284,9 @@ function Sealed({
         <p className="mt-1 text-[24px] font-bold tracking-tight">{label}</p>
         <p className="mx-auto mt-2 max-w-sm text-[14px] text-ink-2">
           {unlocks
-            ? `Still being written. A ${SPAN_LABEL[span]} can only be judged once it's over — come back when it ends.`
+            ? span === "month"
+              ? "Monthly reports open on the last day of the month. Come back then."
+              : "Reports open on Sundays only. Finish the week, then come back for the verdict."
             : empty
               ? "Nothing was logged in this stretch — there's nothing to judge yet."
               : "Sealed. Your rank, your best and worst, and five things you probably didn't notice."}
