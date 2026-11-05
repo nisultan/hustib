@@ -105,6 +105,16 @@ const SECONDARY: NavItem[] = [
     ),
   },
   {
+    href: "/report",
+    label: "Report",
+    icon: (
+      <Icon>
+        <path d="M5.5 2.8h6l3 3v10.7a.7.7 0 0 1-.7.7H5.5a.7.7 0 0 1-.7-.7V3.5a.7.7 0 0 1 .7-.7z" {...stroke} />
+        <path d="M7.5 14v-2.5M10 14V9.5M12.5 14v-4" {...stroke} />
+      </Icon>
+    ),
+  },
+  {
     href: "/weight",
     label: "Weight",
     icon: (

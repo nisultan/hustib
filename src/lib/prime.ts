@@ -95,7 +95,7 @@ const WINDOW = 14;
 /** How far either side of a boundary yesterday's rank still holds. */
 const STICKY = 2;
 
-type Evaluated = Omit<PrimeReading, "previous">;
+export type Evaluated = Omit<PrimeReading, "previous">;
 
 export function primeReading(data: AppData, today = todayISO()): PrimeReading {
   const now = evaluate(data, addDays(today, -1));
@@ -123,8 +123,29 @@ function stick(now: Evaluated, prev: Evaluated): Evaluated {
 
 function evaluate(data: AppData, end: string): Evaluated {
   const days = Array.from({ length: WINDOW }, (_, i) => addDays(end, -i)); // newest first
-  const recent = days.slice(0, 7);
-  const older = days.slice(7);
+  return evaluateDays(data, days, days.slice(0, 7), days.slice(7), end, 4);
+}
+
+/**
+ * The same model over any stretch of days, for reports: the whole period is
+ * judged, and momentum compares it with the stretch of equal length before it.
+ * A short period asks for less evidence before it will name a rank.
+ */
+export function periodReading(data: AppData, from: string, to: string): Evaluated {
+  const days: string[] = [];
+  for (let d = to; d >= from; d = addDays(d, -1)) days.push(d);
+  const older = days.map((_, i) => addDays(from, -(i + 1)));
+  return evaluateDays(data, days, days, older, to, Math.max(2, Math.round(days.length * 0.3)));
+}
+
+function evaluateDays(
+  data: AppData,
+  days: string[],
+  recent: string[],
+  older: string[],
+  end: string,
+  minActive: number,
+): Evaluated {
 
   const pillars: Pillar[] = [
     execution(data, days, end),
@@ -136,7 +157,7 @@ function evaluate(data: AppData, end: string): Evaluated {
   ];
 
   const used = pillars.filter((p) => p.score != null) as (Pillar & { score: number })[];
-  const enoughData = used.length >= 3 && activeDays(data, days) >= 4;
+  const enoughData = used.length >= 3 && activeDays(data, days) >= minActive;
   if (!enoughData) {
     return { score: null, rank: null, pillars, weakest: null, strongest: null, heldBack: null, enoughData };
   }
@@ -371,7 +392,7 @@ function momentum(data: AppData, recent: string[], older: string[]): Pillar {
   if (actA + actB === 0) {
     return { key: "momentum", label: "Momentum", score: null, why: "Needs two weeks to compare", fix: "" };
   }
-  pairs.push([actA / 7, actB / 7]);
+  pairs.push([actA / recent.length, actB / older.length]);
   const a = pairs.reduce((s, p) => s + p[0], 0) / pairs.length;
   const b = pairs.reduce((s, p) => s + p[1], 0) / pairs.length;
   const diff = a - b; // -1..1
@@ -416,7 +437,7 @@ function hitsWord(word: string, list: string[]) {
 }
 
 /** -1..1, or null when nothing in the text carries tone. Handles "not tired". */
-function tone(text: string): number | null {
+export function tone(text: string): number | null {
   const words = text.toLowerCase().replace(/[’']/g, "").split(/[^\p{L}]+/u).filter(Boolean);
   let g = 0;
   let b = 0;
