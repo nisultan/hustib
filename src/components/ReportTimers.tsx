@@ -71,8 +71,42 @@ function Unit({ value, label, big }: { value: number; label: string; big: boolea
   );
 }
 
-export function TimeLeft({ ms, big = false }: { ms: number; big?: boolean }) {
+/** One small rolling box with its unit letter after it. */
+function Mini({ value, unit }: { value: number; unit: string }) {
+  const text = String(value).padStart(2, "0");
+  return (
+    <span className="flex items-baseline gap-0.5">
+      <span className="nums relative inline-block h-7 w-7 overflow-hidden rounded-md border border-line bg-panel-2 text-[13px] font-bold tabular-nums">
+        <AnimatePresence initial={false}>
+          <motion.span
+            key={text}
+            className="absolute inset-0 grid place-items-center"
+            initial={{ y: "-100%", opacity: 0 }}
+            animate={{ y: "0%", opacity: 1 }}
+            exit={{ y: "100%", opacity: 0 }}
+            transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
+          >
+            {text}
+          </motion.span>
+        </AnimatePresence>
+      </span>
+      <span className="text-[10px] font-semibold text-ink-3">{unit}</span>
+    </span>
+  );
+}
+
+export function TimeLeft({ ms, big = false, compact = false }: { ms: number; big?: boolean; compact?: boolean }) {
   const t = split(ms);
+  if (compact) {
+    return (
+      <div className="flex items-center gap-1.5" role="timer" aria-label={`${t.d} days ${t.h} hours ${t.m} minutes ${t.s} seconds`}>
+        <Mini value={t.d} unit="d" />
+        <Mini value={t.h} unit="h" />
+        <Mini value={t.m} unit="m" />
+        <Mini value={t.s} unit="s" />
+      </div>
+    );
+  }
   const sep = <span className={`pb-4 font-bold text-ink-3 ${big ? "text-[22px]" : "text-[14px]"}`}>:</span>;
   return (
     <div className={`flex items-center ${big ? "gap-2" : "gap-1"}`} role="timer" aria-label={`${t.d} days ${t.h} hours ${t.m} minutes ${t.s} seconds`}>
@@ -243,16 +277,26 @@ export function MixedTimers() {
       {picks.map((c, i) => (
         <motion.div key={c.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.08, duration: 0.4 }}>
           <Link href={c.href} className="block h-full">
-            <div className="relative flex h-full items-center justify-between gap-3 overflow-hidden rounded-xl border border-line bg-panel px-4 py-3 transition-colors hover:border-line-strong">
-              <div className="min-w-0">
-                <p className="truncate text-[11px] font-semibold uppercase tracking-[0.12em]" style={{ color: c.color }}>
-                  {c.kicker}
-                </p>
-                <p className="mt-0.5 truncate text-[13.5px] font-semibold text-ink">{c.title}</p>
-              </div>
+            <div className="relative flex h-full items-center justify-between gap-3 overflow-hidden rounded-xl border border-line bg-panel px-3.5 py-2 transition-colors hover:border-line-strong">
+              <p className="flex min-w-0 items-center gap-2 text-[13px] font-semibold text-ink">
+                <span aria-hidden className="size-1.5 shrink-0 rounded-full" style={{ background: c.color }} />
+                <span className="truncate">
+                  {c.id.startsWith("t-") ? (
+                    c.title
+                  ) : c.id.startsWith("r-") ? (
+                    <>
+                      {c.kicker} <span className="font-normal text-ink-3">· {c.title}</span>
+                    </>
+                  ) : (
+                    <>
+                      {c.title} <span className="font-normal text-ink-3">· {c.kicker}</span>
+                    </>
+                  )}
+                </span>
+              </p>
               {c.live ? (
                 <motion.span
-                  className="grid size-9 shrink-0 place-items-center rounded-full bg-accent text-white"
+                  className="grid size-7 shrink-0 place-items-center rounded-full bg-accent text-white"
                   animate={{ scale: [1, 1.12, 1] }}
                   transition={{ duration: 1.4, repeat: Infinity }}
                 >
@@ -262,7 +306,7 @@ export function MixedTimers() {
                 </motion.span>
               ) : (
                 <div className="shrink-0">
-                  <TimeLeft ms={c.at.getTime() - now} />
+                  <TimeLeft ms={c.at.getTime() - now} compact />
                 </div>
               )}
             </div>

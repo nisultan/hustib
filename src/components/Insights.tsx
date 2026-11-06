@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useStore } from "@/lib/store";
 import { useReflection } from "@/lib/ai/useReflection";
 import { Insight } from "@/lib/types";
@@ -35,6 +35,28 @@ export function Insights({ limit }: { limit?: number }) {
   const shown = all ? live : live.slice(0, cap);
   const untouched = shown.length === 0 && !running && outcome == null && error == null;
 
+  /*
+    Stale readings refresh themselves: when the newest one is more than four
+    days old (or everything has been read), the page looks again on its own —
+    at most once a day, so it never loops or runs up a bill.
+  */
+  const newest = store.insights.reduce((m, i) => (i.createdAt > m ? i.createdAt : m), "");
+  const age = newest ? Math.floor((Date.now() - new Date(newest).getTime()) / 86_400_000) : null;
+  useEffect(() => {
+    if (!ready || running || store.insights.length === 0) return;
+    if (age != null && age < 4 && live.length > 0) return;
+    const key = "lockedin.insights.auto";
+    const today = new Date().toDateString();
+    try {
+      if (localStorage.getItem(key) === today) return;
+      localStorage.setItem(key, today);
+    } catch {
+      return;
+    }
+    void reflect();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ready, age, live.length]);
+
   return (
     <section className="mb-8">
       <SectionTitle
@@ -50,7 +72,14 @@ export function Insights({ limit }: { limit?: number }) {
           ) : undefined
         }
       >
-        What I noticed
+        <span className="flex items-baseline gap-2">
+          What I noticed
+          {age != null && (
+            <span className="text-[11.5px] font-normal text-ink-3">
+              {age === 0 ? "updated today" : `updated ${age}d ago`}
+            </span>
+          )}
+        </span>
       </SectionTitle>
 
       {untouched ? (
@@ -68,7 +97,7 @@ export function Insights({ limit }: { limit?: number }) {
             Tell me about me
           </button>
           <p className="mt-2 text-[11px] text-ink-3">
-            Only when you ask. It never runs on its own.
+            After the first read it refreshes itself every few days.
           </p>
         </div>
       ) : shown.length === 0 ? (
@@ -153,13 +182,14 @@ function Row({ insight, onDismiss }: { insight: Insight; onDismiss: () => void }
         </button>
         <button
           onClick={onDismiss}
-          aria-label={`Dismiss "${insight.title}"`}
-          title="Dismiss"
-          className="grid size-7 shrink-0 place-items-center rounded-md text-ink-3 opacity-0 transition-opacity hover:bg-panel-2 hover:text-ink focus-visible:opacity-100 group-hover:opacity-100 max-md:opacity-60"
+          aria-label={`Mark "${insight.title}" as read`}
+          title="Mark as read — it disappears"
+          className="flex shrink-0 items-center gap-1 rounded-md px-2 py-1 text-[11.5px] font-medium text-ink-3 transition-colors hover:bg-[color-mix(in_srgb,var(--up)_14%,transparent)] hover:text-[var(--up)]"
         >
           <svg viewBox="0 0 16 16" aria-hidden className="size-3.5">
-            <path d="m4 4 8 8M12 4l-8 8" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+            <path d="m3.5 8.5 3 3 6-7" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
+          Read
         </button>
       </div>
 

@@ -293,9 +293,37 @@ const KIND: Record<RecKind, { label: string; tone: string; glyph: string }> = {
  * its sentence cut to fit, an arrow — and "Show all" opens the rest. Hovering
  * a cut line shows the whole sentence; opening it goes where it points.
  */
-function Suggestions({ recs }: { recs: { id: string; kind: RecKind; text: string; href: string }[] }) {
+const READ_KEY = "lockedin.recs.read";
+/** A read suggestion stays hidden this long, then returns if it still applies. */
+const READ_DAYS = 7;
+
+function Suggestions({ recs: all0 }: { recs: { id: string; kind: RecKind; text: string; href: string }[] }) {
   const [all, setAll] = useState(false);
+  const [read, setRead] = useState<Record<string, number>>(() => {
+    try {
+      return JSON.parse(localStorage.getItem(READ_KEY) ?? "{}") as Record<string, number>;
+    } catch {
+      return {};
+    }
+  });
+  const markRead = (id: string) => {
+    const next = { ...read, [id]: Date.now() };
+    setRead(next);
+    try {
+      localStorage.setItem(READ_KEY, JSON.stringify(next));
+    } catch {
+      // Private mode: hidden for this visit only.
+    }
+  };
+  const recs = all0.filter((r) => !(read[r.id] && Date.now() - read[r.id] < READ_DAYS * 86_400_000));
   const shown = all ? recs : recs.slice(0, 3);
+  if (recs.length === 0) {
+    return (
+      <p className="rounded-xl border border-dashed border-line px-3.5 py-5 text-center text-[13px] text-ink-3">
+        All read. New ones show up as things change.
+      </p>
+    );
+  }
   return (
     <div className="overflow-hidden rounded-xl border border-line bg-panel">
       {shown.map((r) => {
@@ -315,6 +343,21 @@ function Suggestions({ recs }: { recs: { id: string; kind: RecKind; text: string
               {k.glyph}
             </span>
             <span className={`min-w-0 flex-1 text-[13.5px] text-ink ${all ? "" : "truncate"}`}>{r.text}</span>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                markRead(r.id);
+              }}
+              title="Mark as read — hides it for a week"
+              className="flex shrink-0 items-center gap-1 rounded-md px-2 py-1 text-[11.5px] font-medium text-ink-3 transition-colors hover:bg-[color-mix(in_srgb,var(--up)_14%,transparent)] hover:text-[var(--up)]"
+            >
+              <svg viewBox="0 0 16 16" aria-hidden className="size-3.5">
+                <path d="m3.5 8.5 3 3 6-7" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+              Read
+            </button>
             <span aria-hidden className="shrink-0 text-ink-3 transition-transform group-hover:translate-x-0.5">
               →
             </span>

@@ -417,7 +417,7 @@ function Questions({
           {answered.length}/{questions.length} answered
         </p>
       </div>
-      <ol className="grid gap-2">
+      <ol className="divide-y divide-[var(--border)] overflow-hidden rounded-xl border border-line bg-panel">
         {questions.map((q, i) => (
           <QuestionCard
             key={q}
@@ -462,24 +462,22 @@ function QuestionCard({
   }, [draft]);
 
   return (
-    <li
-      className={`group rounded-xl border bg-panel px-4 py-3 transition-colors ${
-        answered ? "border-[color-mix(in_srgb,var(--accent)_45%,var(--border))]" : "border-line hover:border-line-strong"
-      }`}
-    >
-      <div className="flex items-start gap-3">
+    <li className="group relative px-3.5 py-2.5 transition-colors focus-within:bg-panel-2/40 hover:bg-panel-2/30">
+      <div className="flex items-start gap-2.5">
         <span
-          className={`nums mt-0.5 grid size-6 shrink-0 place-items-center rounded-full text-[11px] font-bold ${
-            answered ? "bg-accent text-white" : "bg-accent-soft text-accent-text"
+          className={`nums mt-[3px] grid size-[18px] shrink-0 place-items-center rounded-full text-[10px] font-bold transition-colors ${
+            answered ? "bg-[var(--up)] text-white" : "bg-panel-2 text-ink-3"
           }`}
         >
           {answered ? "✓" : n}
         </span>
         <div className="min-w-0 flex-1">
-          <p className="text-[15px] font-semibold leading-snug">
+          <p className="text-[13.5px] font-semibold leading-snug">
             {q}
             {deep && (
-              <span className="ml-2 align-middle text-[10.5px] font-semibold uppercase tracking-wide text-ink-3">deep</span>
+              <span className="ml-1.5 rounded bg-accent-soft px-1 py-px align-[1px] text-[9px] font-bold uppercase tracking-wider text-accent-text">
+                deep
+              </span>
             )}
           </p>
           <textarea
@@ -491,7 +489,7 @@ function QuestionCard({
               onChange(e.target.value);
             }}
             placeholder="Answer if it lands…"
-            className="bare mt-1.5 w-full resize-none overflow-hidden bg-transparent text-[14.5px] leading-relaxed text-ink-2 placeholder:text-ink-3"
+            className="bare mt-0.5 w-full resize-none overflow-hidden bg-transparent text-[13px] leading-relaxed text-ink-2 placeholder:text-ink-3/70"
           />
         </div>
         <button
@@ -499,9 +497,9 @@ function QuestionCard({
           onClick={onRemove}
           aria-label={`Delete question: ${q}`}
           title="Delete this question"
-          className="grid size-7 shrink-0 place-items-center rounded-md text-ink-3 opacity-60 transition-[opacity,color,background-color] hover:bg-panel-2 hover:text-[var(--urgent)] hover:opacity-100 group-hover:opacity-100"
+          className="grid size-6 shrink-0 place-items-center rounded-md text-ink-3 opacity-0 transition-[opacity,color,background-color] hover:bg-panel-2 hover:text-[var(--urgent)] focus:opacity-100 group-hover:opacity-100"
         >
-          <svg viewBox="0 0 16 16" aria-hidden className="size-3.5">
+          <svg viewBox="0 0 16 16" aria-hidden className="size-3">
             <path d="m4 4 8 8M12 4l-8 8" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
           </svg>
         </button>
