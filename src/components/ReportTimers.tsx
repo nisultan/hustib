@@ -277,26 +277,25 @@ export function MixedTimers() {
       {picks.map((c, i) => (
         <motion.div key={c.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.08, duration: 0.4 }}>
           <Link href={c.href} className="block h-full">
-            <div className="relative flex h-full items-center justify-between gap-3 overflow-hidden rounded-xl border border-line bg-panel px-3.5 py-2 transition-colors hover:border-line-strong">
-              <p className="flex min-w-0 items-center gap-2 text-[13px] font-semibold text-ink">
-                <span aria-hidden className="size-1.5 shrink-0 rounded-full" style={{ background: c.color }} />
-                <span className="truncate">
-                  {c.id.startsWith("t-") ? (
-                    c.title
-                  ) : c.id.startsWith("r-") ? (
-                    <>
-                      {c.kicker} <span className="font-normal text-ink-3">· {c.title}</span>
-                    </>
-                  ) : (
-                    <>
-                      {c.title} <span className="font-normal text-ink-3">· {c.kicker}</span>
-                    </>
-                  )}
-                </span>
-              </p>
+            <div className="relative flex h-full items-center justify-between gap-4 overflow-hidden rounded-xl border border-line bg-panel px-4 py-3.5 transition-colors hover:border-line-strong">
+              <div className="min-w-0">
+                <p className="flex min-w-0 items-center gap-2 text-[15px] font-semibold text-ink">
+                  <span aria-hidden className="size-2 shrink-0 rounded-full" style={{ background: c.color }} />
+                  <span className="truncate">{c.id.startsWith("r-") ? c.kicker : c.title}</span>
+                </p>
+                <p className="mt-1 truncate pl-4 text-[12px] text-ink-3">
+                  {c.id.startsWith("r-")
+                    ? c.title
+                    : c.id.startsWith("t-")
+                      ? `Due ${c.at.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}${
+                          c.at.getHours() === 23 && c.at.getMinutes() === 59 ? "" : `, ${c.at.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}`
+                        }`
+                      : `${c.kicker} · ${c.at.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}`}
+                </p>
+              </div>
               {c.live ? (
                 <motion.span
-                  className="grid size-7 shrink-0 place-items-center rounded-full bg-accent text-white"
+                  className="grid size-9 shrink-0 place-items-center rounded-full bg-accent text-white"
                   animate={{ scale: [1, 1.12, 1] }}
                   transition={{ duration: 1.4, repeat: Infinity }}
                 >
@@ -306,7 +305,7 @@ export function MixedTimers() {
                 </motion.span>
               ) : (
                 <div className="shrink-0">
-                  <TimeLeft ms={c.at.getTime() - now} compact />
+                  <TimeLeft ms={c.at.getTime() - now} />
                 </div>
               )}
             </div>

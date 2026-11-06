@@ -3,7 +3,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useStore } from "@/lib/store";
 import { PlanItem } from "@/lib/types";
-import { courseColor } from "@/lib/appearance";
 import { PlanItemMenu } from "./PlanItemMenu";
 
 /**
@@ -95,12 +94,6 @@ export function DayGrid({
   const [dropAt, setDropAt] = useState<number | null>(null);
   const [menu, setMenu] = useState<{ id: string; x: number; y: number } | null>(null);
   const [renaming, setRenaming] = useState<string | null>(null);
-  // Re-render each minute so the now line and the running block keep up.
-  const [clock, setClock] = useState(() => Date.now());
-  useEffect(() => {
-    const t = setInterval(() => setClock(Date.now()), 30_000);
-    return () => clearInterval(t);
-  }, []);
 
   /*
     The drag lives in a ref as well as in state. Window listeners and the
@@ -260,7 +253,7 @@ export function DayGrid({
     );
   };
 
-  const now = new Date(clock);
+  const now = new Date();
   const nowMin = now.getHours() * 60 + now.getMinutes();
   const showNow = dates.includes(today) && nowMin >= GRID_START && nowMin <= GRID_START + GRID_MIN;
 
@@ -448,17 +441,6 @@ export function DayGrid({
               const dayLeft = dayIndex * dayWidth;
               const width = dayWidth / columns;
 
-          // Colour comes from the category, else from the priority. A soft
-          // wash and a matching hairline, not a stripe.
-          const tone = category ? courseColor(category.color) : `var(--${item.priority === "low" ? "accent" : item.priority})`;
-          const endMin = startMin + minutes;
-          const isToday = (active ? drag.previewDate : item.date) === today;
-          const running = isToday && !item.done && nowMin >= startMin && nowMin < endMin;
-          const past = !item.done && ((isToday && nowMin >= endMin) || (active ? drag.previewDate : item.date) < today);
-          const elapsed = running ? (nowMin - startMin) / Math.max(1, minutes) : 0;
-          const tiny = height < 34;
-          const roomy = height >= 64;
-
           return (
             <div
               key={item.id}
@@ -477,11 +459,6 @@ export function DayGrid({
                 height,
                 left: `calc(${dayLeft + column * width}% + 3px)`,
                 width: `calc(${width}% - 6px)`,
-                background: item.done
-                  ? "color-mix(in srgb, var(--panel-2) 70%, transparent)"
-                  : `linear-gradient(180deg, color-mix(in srgb, ${tone} 20%, var(--panel)), color-mix(in srgb, ${tone} 11%, var(--panel)))`,
-                borderColor: active ? undefined : item.done ? "var(--border)" : `color-mix(in srgb, ${tone} 38%, transparent)`,
-                boxShadow: running ? `0 0 0 2px color-mix(in srgb, ${tone} 55%, transparent), 0 8px 24px -10px ${tone}` : undefined,
                 /*
                   Two motions, and they must not be the same one. While held,
                   top and height follow the pointer with no easing at all — any
@@ -491,114 +468,71 @@ export function DayGrid({
                 */
                 transition: active
                   ? "left 140ms ease-out, width 140ms ease-out, box-shadow 160ms, transform 160ms"
-                  : "top 220ms cubic-bezier(.2,.8,.2,1), height 220ms cubic-bezier(.2,.8,.2,1), left 220ms cubic-bezier(.2,.8,.2,1), width 220ms cubic-bezier(.2,.8,.2,1), box-shadow 160ms, transform 160ms, filter 160ms",
+                  : "top 220ms cubic-bezier(.2,.8,.2,1), height 220ms cubic-bezier(.2,.8,.2,1), left 220ms cubic-bezier(.2,.8,.2,1), width 220ms cubic-bezier(.2,.8,.2,1), box-shadow 160ms, transform 160ms",
                 // Lifted off the page while held, so it reads as picked up.
                 transform: active ? "scale(1.02)" : undefined,
-                zIndex: active ? 30 : running ? 15 : undefined,
+                zIndex: active ? 30 : undefined,
               }}
-              className={`group absolute z-10 cursor-grab overflow-hidden rounded-lg border hover:brightness-110 active:cursor-grabbing ${
-                active ? "shadow-[var(--shadow-md)] ring-1 ring-accent" : ""
-              } ${past ? "opacity-70" : ""}`}
+              className={`group absolute z-10 cursor-grab overflow-hidden rounded-md border bg-panel-2 px-1.5 py-1 active:cursor-grabbing ${
+                active ? "shadow-[var(--shadow-md)] ring-1 ring-accent" : "border-line"
+              } ${item.done ? "opacity-60" : ""}`}
             >
-              {/* Time already spent, filling from the top while it runs. */}
-              {running && (
+              <div className="flex items-start gap-1">
                 <span
                   aria-hidden
-                  className="pointer-events-none absolute inset-x-0 top-0"
-                  style={{ height: `${elapsed * 100}%`, background: `color-mix(in srgb, ${tone} 16%, transparent)` }}
+                  className="mt-[3px] size-1.5 shrink-0 rounded-full"
+                  style={{ background: `var(--${item.priority})` }}
                 />
-              )}
-
-              <div className={`relative flex h-full gap-2 ${tiny ? "items-center px-2" : "items-start px-2.5 py-1.5"}`}>
-                <div className={`min-w-0 flex-1 ${tiny ? "flex items-baseline gap-2" : ""}`}>
-                  {renaming === item.id ? (
-                    <input
-                      autoFocus
-                      defaultValue={item.title}
-                      onPointerDown={(e) => e.stopPropagation()}
-                      onBlur={(e) => {
-                        store.updatePlanItem(item.id, { title: e.target.value });
+                {renaming === item.id ? (
+                  <input
+                    autoFocus
+                    defaultValue={item.title}
+                    onPointerDown={(e) => e.stopPropagation()}
+                    onBlur={(e) => {
+                      store.updatePlanItem(item.id, { title: e.target.value });
+                      setRenaming(null);
+                    }}
+                    onKeyDown={(e) => {
+                      // Saves outright rather than by blurring: losing a rename
+                      // because focus moved somewhere unexpected is the kind of
+                      // thing that only shows up once someone has typed a
+                      // sentence they did not want to type twice.
+                      if (e.key === "Enter") {
+                        store.updatePlanItem(item.id, { title: e.currentTarget.value });
                         setRenaming(null);
-                      }}
-                      onKeyDown={(e) => {
-                        // Saves outright rather than by blurring: losing a rename
-                        // because focus moved somewhere unexpected is the kind of
-                        // thing that only shows up once someone has typed a
-                        // sentence they did not want to type twice.
-                        if (e.key === "Enter") {
-                          store.updatePlanItem(item.id, { title: e.currentTarget.value });
-                          setRenaming(null);
-                        }
-                        if (e.key === "Escape") setRenaming(null);
-                      }}
-                      className="w-full min-w-0 rounded border border-accent bg-bg px-1 text-[12px] font-medium outline-none"
-                    />
-                  ) : (
-                    <p
-                      className={`truncate font-semibold leading-tight ${tiny ? "text-[11.5px]" : "text-[12.5px]"} ${
-                        item.done ? "text-ink-3 line-through" : "text-ink"
-                      }`}
-                    >
-                      {item.title || "Untitled"}
-                    </p>
-                  )}
-                  {/* Always while held: the outline says where, this says when. */}
+                      }
+                      if (e.key === "Escape") setRenaming(null);
+                    }}
+                    className="min-w-0 flex-1 rounded border border-accent bg-bg px-1 text-[11px] font-medium outline-none"
+                  />
+                ) : (
                   <p
-                    className={`nums shrink-0 truncate ${tiny ? "text-[10.5px]" : "mt-0.5 text-[11px]"} ${
-                      active ? "font-semibold text-accent-text" : "text-ink-3"
+                    className={`min-w-0 flex-1 truncate text-[11px] font-medium leading-tight ${
+                      item.done ? "text-ink-3 line-through" : ""
                     }`}
                   >
-                    {toClock(startMin)}–{toClock(endMin)}
-                    {!tiny && <span className="ml-1.5 opacity-80">· {span(minutes)}</span>}
+                    {item.title || "Untitled"}
                   </p>
-                  {roomy && !active && (category || running) && (
-                    <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
-                      {running && (
-                        <span
-                          className="rounded-full px-1.5 py-px text-[9.5px] font-bold uppercase tracking-wider text-white"
-                          style={{ background: tone }}
-                        >
-                          Now · {span(endMin - nowMin)} left
-                        </span>
-                      )}
-                      {category && (
-                        <span className="flex items-center gap-1 text-[10.5px] text-ink-2">
-                          <span className="size-1.5 rounded-full" style={{ background: tone }} />
-                          {category.name}
-                        </span>
-                      )}
-                    </div>
-                  )}
-                </div>
-
-                {/* Done, right on the block. */}
-                <button
-                  type="button"
-                  onPointerDown={(e) => e.stopPropagation()}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    store.togglePlanItem(item.id);
-                  }}
-                  aria-label={item.done ? "Mark not done" : "Mark done"}
-                  className={`grid shrink-0 place-items-center rounded-full border-[1.5px] transition-all ${tiny ? "size-4" : "size-[18px]"} ${
-                    item.done
-                      ? "border-[var(--up)] bg-[var(--up)] text-white"
-                      : "border-[color-mix(in_srgb,var(--text)_30%,transparent)] text-transparent opacity-70 hover:border-[var(--up)] hover:text-[var(--up)] hover:opacity-100 group-hover:opacity-100"
-                  }`}
-                >
-                  <svg viewBox="0 0 20 20" className="size-2.5">
-                    <path d="m4.5 10.5 3.5 3.5 7.5-8" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
-                </button>
+                )}
               </div>
+              {/* Always while held: the outline says where, this says when,
+                  and on a short block the time is otherwise hidden. */}
+              {(minutes >= 40 || active) && (
+                <p
+                  className={`nums mt-0.5 text-[10px] ${active ? "font-semibold text-accent-text" : "text-ink-3"}`}
+                >
+                  {toClock(startMin)}–{toClock(startMin + minutes)}
+                </p>
+              )}
 
-              {/* The grab strip for length, only on hover. */}
+              {/* The grab strip for length. Kept thin and only visible on
+                  hover, so it never competes with the block itself. */}
               <span
                 onPointerDown={(e) => begin(e, item, "resize")}
                 aria-hidden
-                className="absolute inset-x-0 bottom-0 h-2 cursor-ns-resize opacity-0 transition-opacity group-hover:opacity-100"
+                className="absolute inset-x-0 bottom-0 h-1.5 cursor-ns-resize opacity-0 transition-opacity group-hover:opacity-100"
               >
-                <span className="mx-auto block h-1 w-8 translate-y-0.5 rounded-full bg-[color-mix(in_srgb,var(--text)_35%,transparent)]" />
+                <span className="mx-auto block h-0.5 w-6 translate-y-0.5 rounded-full bg-ink-3" />
               </span>
             </div>
               );
@@ -632,14 +566,6 @@ function hours(): number[] {
 function toMinutes(clock: string): number {
   const [h, m] = clock.split(":").map(Number);
   return h * 60 + (m || 0);
-}
-
-/** "45m", "1h", "1h 30m". */
-function span(minutes: number): string {
-  const m = Math.max(0, Math.round(minutes));
-  const h = Math.floor(m / 60);
-  const r = m % 60;
-  return h === 0 ? `${r}m` : r === 0 ? `${h}h` : `${h}h ${r}m`;
 }
 
 export function toClock(minutes: number): string {
