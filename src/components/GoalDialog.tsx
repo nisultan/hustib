@@ -12,6 +12,7 @@ import {
   PRIORITY_LABEL,
 } from "@/lib/types";
 import { prepareImage } from "@/lib/image";
+import { ImageAdder } from "./goals/parts";
 import { GoalTracker } from "@/lib/types";
 import { describe as describeTracker, sourceLabel } from "@/lib/goals/tracker";
 import { suggestTracker } from "@/lib/goals/suggest";
@@ -611,6 +612,11 @@ function Picture({
           <span className="text-[13px] font-medium">{busy ? "Adding…" : "Add a picture"}</span>
           <span className="text-[11px]">Click, drop or paste — optional</span>
         </button>
+      )}
+      {!value && (
+        <div className="mt-2">
+          <ImageAdder compact onAdd={onChange} />
+        </div>
       )}
 
       <input

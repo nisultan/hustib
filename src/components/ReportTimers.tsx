@@ -244,7 +244,6 @@ export function MixedTimers() {
         <motion.div key={c.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.08, duration: 0.4 }}>
           <Link href={c.href} className="block h-full">
             <div className="relative flex h-full items-center justify-between gap-3 overflow-hidden rounded-xl border border-line bg-panel px-4 py-3 transition-colors hover:border-line-strong">
-              <span aria-hidden className="absolute inset-y-3 left-0 w-[3px] rounded-r-full" style={{ background: c.color }} />
               <div className="min-w-0">
                 <p className="truncate text-[11px] font-semibold uppercase tracking-[0.12em]" style={{ color: c.color }}>
                   {c.kicker}

@@ -315,6 +315,62 @@ export interface GoalTracker {
   judged?: GoalJudgement | null;
 }
 
+export interface Milestone {
+  id: ID;
+  text: string;
+  done: boolean;
+  doneAt: string | null;
+}
+
+/** Everything a goal page holds beyond the core fields. */
+export interface GoalExtras {
+  /** More pictures: data URLs or http(s) links. The cover is `Goal.image`. */
+  gallery: string[];
+  /** Cover focus, 0 (top) – 100 (bottom). */
+  coverY: number;
+  /** Card tint, an id from COURSE_COLORS, or null for none. */
+  color: string | null;
+  /** What you get when you get there. */
+  reward: string;
+  /** What it costs if you let it go. */
+  cost: string;
+  /** A line to read when it gets hard. */
+  mantra: string;
+  milestones: Milestone[];
+  /** Days you said you did something for it, "YYYY-MM-DD". */
+  pushes: string[];
+}
+
+export const EMPTY_EXTRAS: GoalExtras = {
+  gallery: [],
+  coverY: 50,
+  color: null,
+  reward: "",
+  cost: "",
+  mantra: "",
+  milestones: [],
+  pushes: [],
+};
+
+/** A goal's extras with every field present, whatever shape was stored. */
+export function extrasOf(goal: { extras?: Partial<GoalExtras> | null }): GoalExtras {
+  const e = goal.extras ?? {};
+  return {
+    gallery: Array.isArray(e.gallery) ? e.gallery.filter((x) => typeof x === "string") : [],
+    coverY: typeof e.coverY === "number" ? Math.min(100, Math.max(0, e.coverY)) : 50,
+    color: typeof e.color === "string" ? e.color : null,
+    reward: typeof e.reward === "string" ? e.reward : "",
+    cost: typeof e.cost === "string" ? e.cost : "",
+    mantra: typeof e.mantra === "string" ? e.mantra : "",
+    milestones: Array.isArray(e.milestones)
+      ? e.milestones
+          .filter((m) => m && typeof m.text === "string")
+          .map((m) => ({ id: String(m.id ?? Math.random()), text: m.text, done: !!m.done, doneAt: m.doneAt ?? null }))
+      : [],
+    pushes: Array.isArray(e.pushes) ? e.pushes.filter((x) => typeof x === "string") : [],
+  };
+}
+
 export interface Goal {
   id: ID;
   title: string;
@@ -340,6 +396,8 @@ export interface Goal {
   achievedAt: string | null;
   /** Keeps a hand-arranged order stable. */
   position: number;
+  /** Page content: gallery, reasons, milestones, pushes. See `extrasOf`. */
+  extras?: GoalExtras;
 }
 
 export type ImportantKind = "exam" | "birthday" | "holiday" | "trip" | "other";

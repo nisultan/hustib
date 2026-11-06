@@ -8,6 +8,8 @@ import {
   Course,
   Day,
   Goal,
+  GoalExtras,
+  extrasOf,
   GoalTracker,
   GoalStatus,
   ImportantDay,
@@ -611,6 +613,7 @@ export async function createGoal(g: Omit<Goal, "id">): Promise<Goal | null> {
       status: g.status,
       progress: g.progress,
       tracker: g.tracker,
+      ...(g.extras ? { extras: g.extras } : {}),
       category_id: ref(g.categoryId),
       position: g.position,
     })
@@ -661,6 +664,7 @@ export async function updateGoal(id: string, patch: Partial<Goal>): Promise<void
   if (patch.status !== undefined) row.status = patch.status;
   if (patch.progress !== undefined) row.progress = patch.progress;
   if (patch.tracker !== undefined) row.tracker = patch.tracker;
+  if (patch.extras !== undefined) row.extras = patch.extras;
   if (patch.categoryId !== undefined) row.category_id = ref(patch.categoryId);
   if (patch.position !== undefined) row.position = patch.position;
   if (patch.achievedAt !== undefined) row.achieved_at = patch.achievedAt;
@@ -670,10 +674,11 @@ export async function updateGoal(id: string, patch: Partial<Goal>): Promise<void
   if (!error) return;
   if (!isMissingSchema(error)) throw error;
 
-  // Same as the insert: drop the column this database has not got and save the
-  // rest, rather than losing a rename because the spec had nowhere to go.
-  if (row.tracker === undefined) return;
+  // Same as the insert: drop the columns this database has not got and save
+  // the rest, rather than losing a rename because the spec had nowhere to go.
+  if (row.tracker === undefined && row.extras === undefined) return;
   delete row.tracker;
+  delete row.extras;
   if (Object.keys(row).length === 0) return;
   const retry = await client().from("goals").update(row).eq("id", id);
   if (retry.error && !isMissingSchema(retry.error)) throw retry.error;
@@ -1083,6 +1088,7 @@ function toGoal(row: GoalRow): Goal {
     status: (GOAL_STATUSES.includes(row.status) ? row.status : "active") as GoalStatus,
     progress: row.progress,
     tracker: toTracker(row.tracker),
+    extras: extrasOf({ extras: (row.extras ?? null) as Partial<GoalExtras> | null }),
     categoryId: row.category_id,
     createdAt: row.created_at.slice(0, 10),
     achievedAt: row.achieved_at ? row.achieved_at.slice(0, 10) : null,

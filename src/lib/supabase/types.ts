@@ -168,6 +168,8 @@ export type GoalRow = {
   progress: number | null;
   /** The measurement spec, as written by the goal-link pass. jsonb. */
   tracker: unknown | null;
+  /** Gallery, reasons, milestones, pushes. jsonb, migration 013. */
+  extras?: unknown | null;
   category_id: string | null;
   position: number;
   created_at: string;

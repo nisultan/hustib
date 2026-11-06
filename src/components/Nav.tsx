@@ -253,7 +253,7 @@ export function Sidebar() {
           className={`grid shrink-0 place-items-center transition-colors duration-150 ${
             active ? "text-accent" : hovered ? "text-ink-2" : "text-ink-3"
           }`}
-          animate={{ scale: hovered ? 1.14 : 1, rotate: hovered ? -7 : 0 }}
+          animate={{ scale: hovered ? 1.12 : 1 }}
           transition={springSnappy}
         >
           {item.icon}

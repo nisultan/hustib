@@ -1,12 +1,17 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { motion } from "motion/react";
 import { useStore } from "@/lib/store";
-import { Goal, GOAL_STATUS_LABEL, GoalStatus, needsVerdict, PRIORITY_LABEL } from "@/lib/types";
-import { countdownLabel, daysUntil, formatDate, todayISO } from "@/lib/dates";
+import { extrasOf, Goal, needsVerdict, PRIORITY_LABEL } from "@/lib/types";
+import { daysUntil, formatDate, todayISO } from "@/lib/dates";
 import { courseColor } from "@/lib/appearance";
-import { progressOf, TrackedProgress } from "@/lib/goals/tracker";
+import { progressOf } from "@/lib/goals/tracker";
+import { daysSince, lastTouched, paceOf, picturesOf, pushStreak, remindersOf, spotlight } from "@/lib/goals/pulse";
+import { ClockText, Cover, Flame, PaceBars, ReminderTicker, Tint } from "@/components/goals/parts";
+import { TimeLeft, useNow } from "@/components/ReportTimers";
 import { PageHeader, Panel, SectionTitle } from "@/components/ui";
 import { GoalDialog } from "@/components/GoalDialog";
 import { Celebration } from "@/components/Celebration";
@@ -99,12 +104,16 @@ export default function GoalsPage() {
         <Empty onAdd={() => setEditing("new")} />
       ) : (
         <>
-          <Grid goals={active} onOpen={setEditing} onAchieved={setCelebrating} />
+          <TodaysPush goals={active} />
+          {active.length > 0 && (
+            <SectionTitle right={<span className="text-xs text-ink-3">{active.length}</span>}>Working on it</SectionTitle>
+          )}
+          <Grid goals={active} onAchieved={setCelebrating} />
 
           {paused.length > 0 && (
             <section className="mt-10">
               <SectionTitle>On hold</SectionTitle>
-              <Grid goals={paused} onOpen={setEditing} onAchieved={setCelebrating} muted />
+              <Grid goals={paused} onAchieved={setCelebrating} muted />
             </section>
           )}
 
@@ -115,7 +124,7 @@ export default function GoalsPage() {
               >
                 Achieved
               </SectionTitle>
-              <Grid goals={achieved} onOpen={setEditing} onAchieved={setCelebrating} muted />
+              <Grid goals={achieved} onAchieved={setCelebrating} muted />
             </section>
           )}
         </>
@@ -191,12 +200,10 @@ function Verdict({ goal, onAchieved }: { goal: Goal; onAchieved: (title: string)
 
 function Grid({
   goals,
-  onOpen,
   onAchieved,
   muted = false,
 }: {
   goals: Goal[];
-  onOpen: (goal: Goal) => void;
   onAchieved: (title: string) => void;
   muted?: boolean;
 }) {
@@ -204,217 +211,322 @@ function Grid({
 
   return (
     <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-      {goals.map((goal) => (
-        <Card
+      {goals.map((goal, i) => (
+        <motion.div
           key={goal.id}
-          goal={goal}
-          onOpen={() => onOpen(goal)}
-          onAchieved={onAchieved}
-          muted={muted}
-        />
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: Math.min(i, 8) * 0.05, duration: 0.45, ease: [0.16, 1, 0.3, 1] }}
+        >
+          <Card goal={goal} onAchieved={onAchieved} muted={muted} />
+        </motion.div>
       ))}
     </div>
   );
 }
 
-function Card({
-  goal,
-  onOpen,
-  onAchieved,
-  muted,
-}: {
-  goal: Goal;
-  onOpen: () => void;
-  onAchieved: (title: string) => void;
-  muted: boolean;
-}) {
+/**
+ * Today's push: one goal, full width, a different one each day — leaning
+ * towards the one you've neglected or whose deadline is closing in. Its
+ * pictures drift, your own reasons rotate over them, and the clock runs.
+ */
+function TodaysPush({ goals }: { goals: Goal[] }) {
   const store = useStore();
+  const router = useRouter();
+  const now = useNow();
+  const today = todayISO();
+  const order = useMemo(() => spotlight(goals, today), [goals, today]);
+  const [skip, setSkip] = useState(0);
+  if (order.length === 0) return null;
+  const goal = order[skip % order.length];
+  const ex = extrasOf(goal);
+  const pics = picturesOf(goal, ex);
+  const reminders = remindersOf(goal, ex);
+  const { value } = progressOf(goal, store);
+  const pace = paceOf(goal, value, now);
+  const pushed = ex.pushes.includes(today);
+  const streak = pushStreak(ex.pushes, today);
+  const quiet = daysSince(lastTouched(goal, ex), today);
+  const next = ex.milestones.find((m) => !m.done);
 
-  /*
-    Marking something achieved asks once first.
-
-    The three status buttons sit a few pixels apart on a card you also click to
-    open, and "achieved" is the one of the three that is a claim about the
-    world rather than a filing decision. It is undoable — but undoing it after
-    a mis-tap means watching a celebration for something you have not done,
-    which is worse than the extra click.
-  */
-  const [armed, setArmed] = useState(false);
-  const disarm = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  useEffect(() => {
-    if (!armed) return;
-    disarm.current = setTimeout(() => setArmed(false), 4000);
-    return () => {
-      if (disarm.current) clearTimeout(disarm.current);
-    };
-  }, [armed]);
-  const category = store.categories.find((c) => c.id === goal.categoryId);
-  const { value: progress, tracked } = progressOf(goal, store);
-  const due = goal.deadline ? daysUntil(goal.deadline) : null;
-  const overdue = due != null && due < 0 && goal.status === "active";
+  const togglePush = () => {
+    const pushes = pushed ? ex.pushes.filter((d) => d !== today) : [...ex.pushes, today].slice(-400);
+    store.updateGoal(goal.id, { extras: { ...ex, pushes } });
+  };
 
   return (
-    <article
-      className={`group relative flex flex-col overflow-hidden rounded-2xl border bg-panel shadow-[var(--shadow),var(--edge)] transition-[transform,box-shadow,border-color] duration-200 hover:-translate-y-0.5 hover:shadow-[var(--shadow-md),var(--edge)] ${
-        overdue ? "border-[var(--urgent)]/40" : "border-line hover:border-line-strong"
-      } ${muted ? "opacity-75 hover:opacity-100" : ""}`}
-    >
-      <button onClick={onOpen} className="flex flex-1 flex-col text-left">
-        {goal.image ? (
-          <div className="relative aspect-[16/9] w-full overflow-hidden bg-panel-2">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={goal.image}
-              alt=""
-              className="size-full object-cover transition-transform duration-500 group-hover:scale-[1.03]"
-            />
-            {/* A wash rather than a hard overlay: it has to sit on any photo
-                without turning a bright one grey or a dark one black. */}
-            <div className="absolute inset-0 bg-gradient-to-t from-black/45 via-black/5 to-transparent" />
-            <h3 className="absolute inset-x-0 bottom-0 p-3.5 text-[15px] font-semibold leading-snug tracking-tight text-white drop-shadow-sm">
-              {goal.title}
-            </h3>
-          </div>
-        ) : (
-          <div className="px-4 pt-4">
-            <h3 className="text-[15px] font-semibold leading-snug tracking-tight">
-              {goal.title}
-            </h3>
-          </div>
-        )}
+    <section className="relative mb-8 min-h-[340px] overflow-hidden rounded-3xl border border-line shadow-[var(--shadow-md)]">
+      {pics.length > 0 ? (
+        <Cover key={goal.id} pictures={pics} y={ex.coverY} className="absolute inset-0" interval={7000} />
+      ) : (
+        <Tint color={ex.color} className="absolute inset-0" />
+      )}
+      <div
+        className={`absolute inset-0 bg-gradient-to-t ${
+          pics.length > 0 ? "from-black/85 via-black/45 to-black/25" : "from-black/60 via-black/20 to-transparent"
+        }`}
+      />
 
-        <div className="flex flex-1 flex-col gap-3 p-4">
-          {goal.note.trim() !== "" && (
-            <p className="line-clamp-3 text-[13px] leading-relaxed text-ink-2">{goal.note}</p>
-          )}
-
-          {progress != null && <Progress value={progress} tracked={tracked} />}
-
-          <div className="mt-auto flex flex-wrap items-center gap-x-2.5 gap-y-1.5 pt-0.5">
-            <span
-              className="inline-flex items-center gap-1.5 text-[11px] font-medium"
-              style={{ color: `var(--${goal.priority})` }}
-            >
-              <span
-                aria-hidden
-                className="size-1.5 rounded-full"
-                style={{ background: `var(--${goal.priority})` }}
-              />
-              {PRIORITY_LABEL[goal.priority]}
+      <div className="relative z-[1] flex min-h-[340px] flex-col justify-between gap-6 p-6 sm:p-8">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="rounded-full bg-white/15 px-2.5 py-1 text-[11px] font-bold uppercase tracking-[0.14em] text-white backdrop-blur-md">
+            Today&apos;s push
+          </span>
+          {quiet >= 5 && (
+            <span className="rounded-full bg-[var(--urgent)]/80 px-2.5 py-1 text-[11px] font-semibold text-white backdrop-blur-md">
+              untouched for {quiet} days
             </span>
+          )}
+          {streak > 0 && (
+            <span className="flex items-center gap-1 rounded-full bg-white/15 px-2.5 py-1 text-[11px] font-semibold text-[#fbbf24] backdrop-blur-md">
+              <Flame /> {streak}-day push streak
+            </span>
+          )}
+          {order.length > 1 && (
+            <button
+              type="button"
+              onClick={() => setSkip((x) => x + 1)}
+              className="ml-auto rounded-full bg-white/10 px-2.5 py-1 text-[11px] font-semibold text-white/80 backdrop-blur-md transition-colors hover:bg-white/20 hover:text-white"
+            >
+              Another goal →
+            </button>
+          )}
+        </div>
 
-            {category && (
-              <span className="inline-flex items-center gap-1.5 text-[11px] text-ink-3">
-                <span
-                  aria-hidden
-                  className="size-1.5 rounded-full"
-                  style={{ background: courseColor(category.color) }}
-                />
-                {category.name}
-              </span>
+        <div className="grid items-end gap-6 lg:grid-cols-[1fr_auto]">
+          <div className="min-w-0 max-w-2xl">
+            <motion.h2
+              key={goal.id}
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="text-[30px] font-extrabold leading-[1.1] tracking-tight text-white drop-shadow sm:text-[38px]"
+            >
+              {goal.title}
+            </motion.h2>
+            <div className="mt-4 min-h-[64px]">
+              {reminders.length > 0 ? (
+                <ReminderTicker key={goal.id} reminders={reminders} big />
+              ) : (
+                <p className="text-[14px] text-white/70">
+                  Write down why this matters — open the goal and fill in your reasons. They&apos;ll rotate here.
+                </p>
+              )}
+            </div>
+            {next && (
+              <p className="mt-3 text-[13px] text-white/80">
+                <span className="font-semibold text-white">Next step:</span> {next.text}
+              </p>
             )}
+          </div>
 
-            {goal.status === "achieved" ? (
-              <span className="ml-auto text-[11px] font-medium text-[var(--up)]">
-                {goal.achievedAt ? `Done ${formatDate(goal.achievedAt)}` : "Achieved"}
-              </span>
-            ) : (
-              goal.deadline && (
-                <span
-                  className="nums ml-auto text-[11px]"
-                  style={overdue ? { color: "var(--urgent)" } : undefined}
-                  title={formatDate(goal.deadline)}
-                >
-                  {overdue ? `${-(due as number)}d over` : countdownLabel(goal.deadline)}
-                </span>
-              )
+          <div className="flex flex-col items-start gap-3 lg:items-end">
+            {goal.deadline && (
+              <div className="rounded-xl bg-black/35 p-3 backdrop-blur-md">
+                <p className="mb-1.5 text-[10.5px] font-bold uppercase tracking-[0.14em] text-white/70">Time left</p>
+                <TimeLeft ms={new Date(`${goal.deadline}T23:59:59`).getTime() - now} />
+              </div>
             )}
+            {pace?.verdict && (
+              <p className="text-[12px] font-semibold text-white/85">
+                {Math.round(pace.time * 100)}% of the time gone · {Math.round((pace.done ?? 0) * 100)}% done
+              </p>
+            )}
+            <div className="flex gap-2">
+              <motion.button
+                type="button"
+                onClick={togglePush}
+                whileTap={{ scale: 0.94 }}
+                className={`flex items-center gap-1.5 rounded-xl px-4 py-2.5 text-[13.5px] font-bold shadow-lg transition-colors ${
+                  pushed ? "bg-[var(--up)] text-white" : "bg-white text-black hover:bg-white/90"
+                }`}
+              >
+                <Flame />
+                {pushed ? "Pushed today" : "I pushed today"}
+              </motion.button>
+              <button
+                type="button"
+                onClick={() => router.push(`/goals/${goal.id}`)}
+                className="rounded-xl bg-white/15 px-4 py-2.5 text-[13.5px] font-semibold text-white backdrop-blur-md transition-colors hover:bg-white/25"
+              >
+                Open
+              </button>
+            </div>
           </div>
         </div>
-      </button>
-
-      {/* Status lives on the card, because moving a goal to achieved is the
-          one thing you come to this page to do and it should not need a
-          dialog. */}
-      <div className="flex items-center gap-1 border-t border-line px-2 py-1.5">
-        {armed ? (
-          <>
-            <span className="px-1 text-[11px] text-ink-2">Really done?</span>
-            <button
-              onClick={() => {
-                setArmed(false);
-                store.setGoalStatus(goal.id, "achieved");
-                onAchieved(goal.title);
-              }}
-              autoFocus
-              className="ml-auto rounded-md px-2 py-1 text-[11px] font-medium text-white"
-              style={{ background: "var(--up)" }}
-            >
-              Yes, achieved
-            </button>
-            <button
-              onClick={() => setArmed(false)}
-              className="rounded-md px-2 py-1 text-[11px] font-medium text-ink-3 hover:bg-panel-2 hover:text-ink"
-            >
-              Not yet
-            </button>
-          </>
-        ) : (
-          (["active", "achieved", "paused"] as GoalStatus[]).map((status) => (
-            <button
-              key={status}
-              onClick={() => {
-                // Already achieved: the button is just the current state, and
-                // re-confirming it would replay the confetti for nothing.
-                if (status === "achieved" && goal.status !== "achieved") {
-                  setArmed(true);
-                  return;
-                }
-                store.setGoalStatus(goal.id, status);
-              }}
-              aria-pressed={goal.status === status}
-              className={`rounded-md px-2 py-1 text-[11px] font-medium transition-colors ${
-                goal.status === status
-                  ? "bg-accent-soft text-accent-text"
-                  : "text-ink-3 hover:bg-panel-2 hover:text-ink"
-              }`}
-            >
-              {GOAL_STATUS_LABEL[status]}
-            </button>
-          ))
-        )}
       </div>
-    </article>
+    </section>
   );
 }
 
-/**
- * A bar, the number beside it, and — when the hub worked the number out — what
- * it counted to get there.
- *
- * A computed bar has to show its working or it is just a more confident version
- * of the one someone dragged. The count under it is the difference between
- * "62%" and "18 of 28 habit ticks, last 28 days", and only the second one tells
- * you what to do this evening.
- */
-function Progress({ value, tracked }: { value: number; tracked: TrackedProgress | null }) {
+function Card({ goal, onAchieved, muted }: { goal: Goal; onAchieved: (title: string) => void; muted: boolean }) {
+  const store = useStore();
+  const router = useRouter();
+  const now = useNow();
+  const today = todayISO();
+  const ex = extrasOf(goal);
+  const pics = picturesOf(goal, ex);
+  const reminders = remindersOf(goal, ex);
+  const category = store.categories.find((c) => c.id === goal.categoryId);
+  const { value: progress, tracked } = progressOf(goal, store);
+  const pace = paceOf(goal, progress, now);
+  const due = goal.deadline ? daysUntil(goal.deadline) : null;
+  const overdue = due != null && due < 0 && goal.status === "active";
+  const quiet = goal.status === "active" ? daysSince(lastTouched(goal, ex), today) : 0;
+  const dusty = quiet >= 7;
+  const pushed = ex.pushes.includes(today);
+  const streak = pushStreak(ex.pushes, today);
+  const doneMs = ex.milestones.filter((m) => m.done).length;
+  const tint = ex.color ? courseColor(ex.color) : null;
+
+  const [armed, setArmed] = useState(false);
+  useEffect(() => {
+    if (!armed) return;
+    const t = setTimeout(() => setArmed(false), 4000);
+    return () => clearTimeout(t);
+  }, [armed]);
+
+  const togglePush = () => {
+    const pushes = pushed ? ex.pushes.filter((d) => d !== today) : [...ex.pushes, today].slice(-400);
+    store.updateGoal(goal.id, { extras: { ...ex, pushes } });
+  };
+
+  const header = (
+    <>
+      <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/15 to-transparent" />
+      <div className="absolute left-3 top-3 z-[2] flex gap-1.5">
+        <span className="flex items-center gap-1 rounded-full bg-black/45 px-2 py-0.5 text-[10.5px] font-semibold text-white backdrop-blur-md">
+          <span className="size-1.5 rounded-full" style={{ background: `var(--${goal.priority})` }} />
+          {PRIORITY_LABEL[goal.priority]}
+        </span>
+        {streak > 0 && (
+          <span className="flex items-center gap-0.5 rounded-full bg-black/45 px-2 py-0.5 text-[10.5px] font-bold text-[#fbbf24] backdrop-blur-md">
+            <Flame className="size-3" /> {streak}
+          </span>
+        )}
+      </div>
+      <div className="absolute inset-x-0 bottom-0 z-[2] p-4">
+        {dusty && (
+          <p className="mb-1.5 inline-block rounded-md bg-[var(--urgent)]/85 px-1.5 py-0.5 text-[10.5px] font-semibold text-white">
+            Untouched for {quiet} days
+          </p>
+        )}
+        <h3 className="text-[18px] font-bold leading-snug tracking-tight text-white drop-shadow">{goal.title}</h3>
+      </div>
+    </>
+  );
+
   return (
-    <div className="grid gap-1.5">
-      <div className="flex items-center gap-2.5">
-        <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-panel-2">
-          <div
-            className="h-full rounded-full bg-accent transition-[width] duration-500"
-            style={{ width: `${Math.min(100, Math.max(0, value))}%` }}
-          />
+    <article
+      onClick={() => router.push(`/goals/${goal.id}`)}
+      className={`group relative flex h-full cursor-pointer flex-col overflow-hidden rounded-2xl border bg-panel shadow-[var(--shadow),var(--edge)] transition-[transform,box-shadow,border-color] duration-300 hover:-translate-y-1 hover:shadow-[var(--shadow-md),var(--edge)] ${
+        overdue ? "border-[var(--urgent)]/50" : "border-line hover:border-line-strong"
+      } ${muted ? "opacity-75 hover:opacity-100" : ""}`}
+    >
+      {tint && <span aria-hidden className="absolute inset-x-0 top-0 z-[3] h-1" style={{ background: tint }} />}
+      {pics.length > 0 ? (
+        <Cover pictures={pics} y={ex.coverY} dim={dusty} className="aspect-[16/10] w-full">
+          {header}
+        </Cover>
+      ) : (
+        <Tint color={ex.color} className="aspect-[16/10] w-full">
+          {header}
+        </Tint>
+      )}
+
+      <div className="flex flex-1 flex-col gap-3.5 p-4">
+        {reminders.length > 0 && <ReminderTicker reminders={reminders} interval={6500} />}
+
+        {pace ? (
+          <PaceBars time={pace.time} done={pace.done} verdict={pace.verdict} />
+        ) : (
+          progress != null && <PaceBars time={0} done={progress / 100} verdict={null} hideTime />
+        )}
+        {tracked && <p className="-mt-2 text-[10.5px] leading-relaxed text-ink-3">{tracked.summary}</p>}
+
+        {ex.milestones.length > 0 && (
+          <div>
+            <div className="mb-1 flex justify-between text-[10.5px] text-ink-3">
+              <span>Milestones</span>
+              <span className="nums font-semibold text-ink-2">
+                {doneMs}/{ex.milestones.length}
+              </span>
+            </div>
+            <div className="flex gap-1">
+              {ex.milestones.map((m) => (
+                <span key={m.id} className="h-1.5 flex-1 rounded-full" style={{ background: m.done ? "var(--up)" : "var(--panel-2)" }} />
+              ))}
+            </div>
+          </div>
+        )}
+
+        <div className="mt-auto flex flex-wrap items-center gap-x-2.5 gap-y-1.5 pt-0.5 text-[11px]">
+          {category && (
+            <span className="inline-flex items-center gap-1.5 text-ink-3">
+              <span aria-hidden className="size-1.5 rounded-full" style={{ background: courseColor(category.color) }} />
+              {category.name}
+            </span>
+          )}
+          {goal.status === "achieved" ? (
+            <span className="ml-auto font-medium text-[var(--up)]">
+              {goal.achievedAt ? `Done ${formatDate(goal.achievedAt)}` : "Achieved"}
+            </span>
+          ) : goal.deadline ? (
+            <span className="ml-auto text-ink-2" style={overdue ? { color: "var(--urgent)" } : undefined} title={formatDate(goal.deadline)}>
+              {overdue ? `${-(due as number)}d over` : <ClockText ms={new Date(`${goal.deadline}T23:59:59`).getTime() - now} />}
+            </span>
+          ) : (
+            <span className="ml-auto text-ink-3">no deadline</span>
+          )}
         </div>
-        <span className="nums w-8 shrink-0 text-right text-[11px] text-ink-3">{value}%</span>
       </div>
 
-      {tracked && (
-        <p className="text-[10.5px] leading-relaxed text-ink-3">{tracked.summary}</p>
+      {goal.status !== "achieved" && (
+        <div className="flex items-center gap-1 border-t border-line px-2 py-1.5" onClick={(e) => e.stopPropagation()}>
+          {armed ? (
+            <>
+              <span className="px-1 text-[11px] text-ink-2">Really done?</span>
+              <button
+                onClick={() => {
+                  setArmed(false);
+                  store.setGoalStatus(goal.id, "achieved");
+                  onAchieved(goal.title);
+                }}
+                autoFocus
+                className="ml-auto rounded-md px-2 py-1 text-[11px] font-medium text-white"
+                style={{ background: "var(--up)" }}
+              >
+                Yes, achieved
+              </button>
+              <button onClick={() => setArmed(false)} className="rounded-md px-2 py-1 text-[11px] font-medium text-ink-3 hover:bg-panel-2 hover:text-ink">
+                Not yet
+              </button>
+            </>
+          ) : (
+            <>
+              <motion.button
+                whileTap={{ scale: 0.92 }}
+                onClick={togglePush}
+                className={`flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-semibold transition-colors ${
+                  pushed ? "bg-[color-mix(in_srgb,var(--up)_16%,transparent)] text-[var(--up)]" : "text-ink-2 hover:bg-panel-2 hover:text-ink"
+                }`}
+              >
+                <Flame className="size-3" />
+                {pushed ? "Pushed today" : "Push today"}
+              </motion.button>
+              <button onClick={() => setArmed(true)} className="ml-auto rounded-md px-2 py-1 text-[11px] font-medium text-ink-3 hover:bg-panel-2 hover:text-ink">
+                Achieved?
+              </button>
+              <button
+                onClick={() => store.setGoalStatus(goal.id, goal.status === "paused" ? "active" : "paused")}
+                className="rounded-md px-2 py-1 text-[11px] font-medium text-ink-3 hover:bg-panel-2 hover:text-ink"
+              >
+                {goal.status === "paused" ? "Resume" : "Hold"}
+              </button>
+            </>
+          )}
+        </div>
       )}
-    </div>
+    </article>
   );
 }
 
