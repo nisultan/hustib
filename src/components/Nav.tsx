@@ -280,9 +280,9 @@ export function Sidebar() {
       <div
         className={`mb-3 flex items-center ${collapsed ? "flex-col gap-2" : "justify-between pl-1.5"}`}
       >
-        <Link href="/" className="flex min-w-0 items-center gap-2" title="Locked In">
+        <Link href="/" className="flex min-w-0 items-center gap-2" title="Lock In">
           <Logo size="sm" />
-          <span className={`text-[14px] font-bold tracking-tight ${label}`}>Locked In</span>
+          <span className={`text-[14px] font-bold tracking-tight ${label}`}>Lock In</span>
         </Link>
         <NavToggle />
       </div>

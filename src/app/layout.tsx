@@ -16,7 +16,7 @@ import { Logo } from "@/components/Logo";
 import { MotionProvider } from "@/lib/motion";
 
 export const metadata: Metadata = {
-  title: "Locked In",
+  title: "Lock In",
   description:
     "One place for your tasks, your plan for the day, your habits and your goals — and a clear answer to what to work on next.",
 };

@@ -16,7 +16,7 @@ interface Update {
 }
 
 const HELP = [
-  "<b>Locked In bot</b>",
+  "<b>Lock In bot</b>",
   "",
   "/today — the brief for today",
   "/next — next block and most pressing task",
@@ -73,7 +73,7 @@ async function onText(chatId: number, text: string, username?: string) {
       .eq("link_code", arg)
       .maybeSingle();
     if (!data || !data.code_expires_at || Date.parse(data.code_expires_at) < Date.now()) {
-      await send(chatId, "That link has expired. Open Locked In → Settings → Telegram and press Connect again.");
+      await send(chatId, "That link has expired. Open Lock In → Settings → Telegram and press Connect again.");
       return;
     }
     // A chat belongs to one account: free it from any previous one first.
@@ -88,7 +88,7 @@ async function onText(chatId: number, text: string, username?: string) {
 
   const link = await linkFor(chatId);
   if (!link) {
-    await send(chatId, "This chat isn't connected yet. Open Locked In → Settings → Telegram and press <b>Connect</b>.");
+    await send(chatId, "This chat isn't connected yet. Open Lock In → Settings → Telegram and press <b>Connect</b>.");
     return;
   }
 

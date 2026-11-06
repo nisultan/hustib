@@ -1,17 +1,9 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
-  <!-- The tab icon, drawn to match components/Logo.tsx. The accent is fixed
-       here because a favicon renders outside the page and cannot read the
-       student's chosen accent variable.
-
-       The brackets are weighted heavier than the component's and pulled a
-       little further out: at sixteen pixels a 2.1 stroke closes up against the
-       centre dot and the whole thing silts into a blob. -->
-  <rect width="32" height="32" rx="7" fill="#dc4c3e" />
-  <g fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
-    <path d="M6.6 12V9a2.4 2.4 0 0 1 2.4-2.4H12" />
-    <path d="M20 6.6h3a2.4 2.4 0 0 1 2.4 2.4V12" />
-    <path d="M25.4 20v3a2.4 2.4 0 0 1-2.4 2.4H20" />
-    <path d="M12 25.4H9A2.4 2.4 0 0 1 6.6 23V20" />
-  </g>
-  <circle cx="16" cy="16" r="3.8" fill="#fff" />
+  <!-- The tab icon, drawn to match components/Logo.tsx: a padlock whose
+       keyhole is an arrow pointing in. The accent is fixed here because a
+       favicon cannot read the student's chosen accent variable. -->
+  <rect width="32" height="32" rx="7.5" fill="#dc4c3e" />
+  <path d="M11 14V10.6a5 5 0 0 1 10 0v1.2" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" />
+  <rect x="7.4" y="13.6" width="17.2" height="12.6" rx="3.6" fill="#fff" />
+  <path d="M16 16.6v5M13.2 19.2 16 22l2.8-2.8" fill="none" stroke="#dc4c3e" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" />
 </svg>
