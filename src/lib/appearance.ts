@@ -151,6 +151,11 @@ function read<T extends string>(key: string, allowed: T[], fallback: T): T {
  */
 /** Whether the sidebar is collapsed to icons. Read before first paint. */
 export const NAV_KEY = "iblearner.navCollapsed";
+/** The expanded sidebar's width in px, set by dragging its edge. */
+export const NAV_WIDTH_KEY = "iblearner.navWidth";
+export const NAV_MIN = 200;
+export const NAV_MAX = 420;
+export const NAV_DEFAULT = 260;
 
 export const APPEARANCE_INIT_SCRIPT = `
 (function () {
@@ -166,6 +171,8 @@ export const APPEARANCE_INIT_SCRIPT = `
     var s = localStorage.getItem("${DENSITY_KEY}");
     if (s) d.setAttribute("data-density", s);
     if (localStorage.getItem("${NAV_KEY}") === "1") d.setAttribute("data-nav", "collapsed");
+    var w = parseInt(localStorage.getItem("${NAV_WIDTH_KEY}") || "", 10);
+    if (w >= ${NAV_MIN} && w <= ${NAV_MAX}) d.style.setProperty("--nav-open", w + "px");
   } catch (e) {}
 })();
 `;

@@ -10,7 +10,7 @@ import { productivity } from "@/lib/productivity";
 import { Button, Panel } from "@/components/ui";
 import { Spark } from "@/components/Spark";
 import { Flame } from "@/components/Flame";
-import { ReportTimers } from "@/components/ReportTimers";
+import { MixedTimers } from "@/components/ReportTimers";
 import { CheckIn } from "@/components/CheckIn";
 import { openTour } from "@/components/Tour";
 import { TodayList } from "@/components/home/TodayList";
@@ -121,7 +121,7 @@ export default function HomePage() {
       <Spark />
 
       <div className="mt-4">
-        <ReportTimers />
+        <MixedTimers />
       </div>
 
       <div className="mt-6">

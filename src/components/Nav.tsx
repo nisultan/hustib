@@ -8,7 +8,7 @@ import { Logo } from "./Logo";
 import { useNavCollapsed } from "@/lib/use-nav";
 import { springNav, springSnappy } from "@/lib/motion";
 import { useStore } from "@/lib/store";
-import { courseColor } from "@/lib/appearance";
+import { courseColor, NAV_DEFAULT, NAV_MAX, NAV_MIN, NAV_WIDTH_KEY } from "@/lib/appearance";
 import { openSearch } from "./Search";
 import { TaskDialog } from "./TaskDialog";
 
@@ -26,9 +26,13 @@ const stroke = {
   strokeLinejoin: "round" as const,
 };
 
+/** The soft, tinted fill under each outline — what makes the set duotone. */
+const soft = { fill: "currentColor", fillOpacity: 0.22, stroke: "none" };
+const dot = { fill: "currentColor", stroke: "none" };
+
 function Icon({ children }: { children: ReactNode }) {
   return (
-    <svg width="17" height="17" viewBox="0 0 20 20" aria-hidden className="shrink-0">
+    <svg width="18" height="18" viewBox="0 0 20 20" aria-hidden className="shrink-0 overflow-visible">
       {children}
     </svg>
   );
@@ -40,10 +44,9 @@ const PRIMARY: NavItem[] = [
     label: "Home",
     icon: (
       <Icon>
-        <path
-          d="M3 8.5 10 3l7 5.5V16a1 1 0 0 1-1 1h-3.5v-5h-5v5H4a1 1 0 0 1-1-1z"
-          {...stroke}
-        />
+        <path d="M3.5 9 10 3.8 16.5 9v6.5a1.5 1.5 0 0 1-1.5 1.5H5a1.5 1.5 0 0 1-1.5-1.5z" {...soft} />
+        <path d="M3.5 9 10 3.8 16.5 9v6.5a1.5 1.5 0 0 1-1.5 1.5H5a1.5 1.5 0 0 1-1.5-1.5z" {...stroke} />
+        <path d="M8 17v-3.5a2 2 0 0 1 4 0V17" {...stroke} />
       </Icon>
     ),
   },
@@ -52,9 +55,14 @@ const PRIMARY: NavItem[] = [
     label: "Plan",
     icon: (
       <Icon>
-        <rect x="3" y="4.5" width="14" height="12.5" rx="2" {...stroke} />
-        <path d="M3 8h14M7 2.5v3M13 2.5v3" {...stroke} />
-        <path d="M6.5 11.5h3M6.5 14h5" {...stroke} />
+        <path d="M3 7.5V6a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v1.5z" {...soft} />
+        <rect x="3" y="4" width="14" height="13" rx="2.5" {...stroke} />
+        <path d="M3 7.5h14M7 2.5v3M13 2.5v3" {...stroke} />
+        <circle cx="7" cy="11" r="1" {...dot} />
+        <circle cx="10" cy="11" r="1" {...dot} />
+        <circle cx="13" cy="11" r="1" {...dot} opacity="0.45" />
+        <circle cx="7" cy="14" r="1" {...dot} opacity="0.45" />
+        <circle cx="10" cy="14" r="1" {...dot} opacity="0.45" />
       </Icon>
     ),
   },
@@ -63,8 +71,11 @@ const PRIMARY: NavItem[] = [
     label: "Tasks",
     icon: (
       <Icon>
-        <path d="M7 5h10M7 10h10M7 15h10" {...stroke} />
-        <path d="M3 5h.01M3 10h.01M3 15h.01" {...stroke} />
+        <rect x="2.8" y="3.2" width="6" height="6" rx="2" {...soft} />
+        <rect x="2.8" y="3.2" width="6" height="6" rx="2" {...stroke} />
+        <path d="m4.4 6.3 1.2 1.2 2-2.3" {...stroke} />
+        <rect x="2.8" y="10.8" width="6" height="6" rx="2" {...stroke} />
+        <path d="M11.5 5h5.5M11.5 7.6h3.2M11.5 12.6h5.5M11.5 15.2h3.2" {...stroke} />
       </Icon>
     ),
   },
@@ -73,8 +84,9 @@ const PRIMARY: NavItem[] = [
     label: "Courses",
     icon: (
       <Icon>
-        <path d="M4 4h5a2 2 0 0 1 2 2v10a1.5 1.5 0 0 0-1.5-1.5H4z" {...stroke} />
-        <path d="M16 4h-5a2 2 0 0 0-2 2v10a1.5 1.5 0 0 1 1.5-1.5H16z" {...stroke} />
+        <path d="M10 3.5 2.5 7.5 10 11.5l7.5-4z" {...soft} />
+        <path d="M10 3.5 2.5 7.5 10 11.5l7.5-4z" {...stroke} />
+        <path d="M5.5 9.2V13c0 1.4 2 2.7 4.5 2.7s4.5-1.3 4.5-2.7V9.2M17.5 7.5v4.2" {...stroke} />
       </Icon>
     ),
   },
@@ -83,9 +95,10 @@ const PRIMARY: NavItem[] = [
     label: "Goals",
     icon: (
       <Icon>
-        <circle cx="10" cy="10" r="7" {...stroke} />
-        <circle cx="10" cy="10" r="3.4" {...stroke} />
-        <circle cx="10" cy="10" r="0.9" fill="currentColor" stroke="none" />
+        <circle cx="9.5" cy="10.5" r="7" {...soft} />
+        <circle cx="9.5" cy="10.5" r="7" {...stroke} />
+        <circle cx="9.5" cy="10.5" r="3.3" {...stroke} />
+        <path d="m9.5 10.5 6.3-6.3M13.6 3.6l2.3.1.1 2.3" {...stroke} />
       </Icon>
     ),
   },
@@ -97,10 +110,10 @@ const SECONDARY: NavItem[] = [
     label: "Progress",
     icon: (
       <Icon>
+        <path d="M3 16.5V12l4-3.5 3 2.5 6.5-6v11.5z" {...soft} />
+        <path d="m3 12 4-3.5 3 2.5 6.5-6" {...stroke} />
         <path d="M3 16.5h14" {...stroke} />
-        <rect x="4" y="10" width="3.2" height="5" rx="1" {...stroke} />
-        <rect x="8.4" y="6.5" width="3.2" height="8.5" rx="1" {...stroke} />
-        <rect x="12.8" y="3.5" width="3.2" height="11.5" rx="1" {...stroke} />
+        <circle cx="16.5" cy="5" r="1.6" {...dot} />
       </Icon>
     ),
   },
@@ -109,8 +122,10 @@ const SECONDARY: NavItem[] = [
     label: "Report",
     icon: (
       <Icon>
-        <path d="M5.5 2.8h6l3 3v10.7a.7.7 0 0 1-.7.7H5.5a.7.7 0 0 1-.7-.7V3.5a.7.7 0 0 1 .7-.7z" {...stroke} />
-        <path d="M7.5 14v-2.5M10 14V9.5M12.5 14v-4" {...stroke} />
+        <path d="M6 2.8h5.5l3.7 3.7v9.5a1.2 1.2 0 0 1-1.2 1.2H6A1.2 1.2 0 0 1 4.8 16V4A1.2 1.2 0 0 1 6 2.8z" {...soft} />
+        <path d="M6 2.8h5.5l3.7 3.7v9.5a1.2 1.2 0 0 1-1.2 1.2H6A1.2 1.2 0 0 1 4.8 16V4A1.2 1.2 0 0 1 6 2.8z" {...stroke} />
+        <path d="M11.5 2.8v3.7h3.7" {...stroke} />
+        <path d="m10 9 .9 1.9 1.9.9-1.9.9-.9 1.9-.9-1.9-1.9-.9 1.9-.9z" {...dot} />
       </Icon>
     ),
   },
@@ -119,12 +134,11 @@ const SECONDARY: NavItem[] = [
     label: "Weight",
     icon: (
       <Icon>
-        <path d="M4.5 6.5h11l1.2 9a1 1 0 0 1-1 1.1H4.3a1 1 0 0 1-1-1.1z" {...stroke} />
-        <path
-          d="M10 3.2a2.2 2.2 0 0 0-2.2 2.2c0 .4.1.8.3 1.1h3.8c.2-.3.3-.7.3-1.1A2.2 2.2 0 0 0 10 3.2z"
-          {...stroke}
-        />
-        <path d="M10 9.5v2.2M10 11.7l1.8-1.4" {...stroke} />
+        <rect x="3" y="3" width="14" height="14" rx="4.5" {...soft} />
+        <rect x="3" y="3" width="14" height="14" rx="4.5" {...stroke} />
+        <path d="M6.3 9.6a3.7 3.7 0 0 1 7.4 0" {...stroke} />
+        <path d="m10 9.6 1.7-2" {...stroke} />
+        <circle cx="10" cy="9.6" r="0.9" {...dot} />
       </Icon>
     ),
   },
@@ -133,9 +147,9 @@ const SECONDARY: NavItem[] = [
     label: "Reflection",
     icon: (
       <Icon>
-        <path d="M5 3.5h9a1 1 0 0 1 1 1v11a1 1 0 0 1-1 1H5z" {...stroke} />
-        <path d="M5 3.5a1.5 1.5 0 0 0 0 3h1.5v-3z" {...stroke} />
-        <path d="M8.5 8h3.5M8.5 11h3.5" {...stroke} />
+        <path d="M15.8 12.6A6.6 6.6 0 0 1 7.4 4.2a6.6 6.6 0 1 0 8.4 8.4z" {...soft} />
+        <path d="M15.8 12.6A6.6 6.6 0 0 1 7.4 4.2a6.6 6.6 0 1 0 8.4 8.4z" {...stroke} />
+        <path d="m14.5 2.8.5 1.2 1.2.5-1.2.5-.5 1.2-.5-1.2-1.2-.5 1.2-.5z" {...dot} />
       </Icon>
     ),
   },
@@ -144,8 +158,10 @@ const SECONDARY: NavItem[] = [
     label: "Recommendations",
     icon: (
       <Icon>
-        <path d="M10 2.5a5 5 0 0 0-3 9v1.5h6V11.5a5 5 0 0 0-3-9z" {...stroke} />
-        <path d="M8.5 16.5h3" {...stroke} />
+        <circle cx="10" cy="10" r="7" {...soft} />
+        <circle cx="10" cy="10" r="7" {...stroke} />
+        <path d="m13.2 6.8-1.8 4.6-4.6 1.8 1.8-4.6z" {...stroke} />
+        <circle cx="10" cy="10" r="0.9" {...dot} />
       </Icon>
     ),
   },
@@ -157,11 +173,11 @@ const TERTIARY: NavItem[] = [
     label: "Settings",
     icon: (
       <Icon>
-        <circle cx="10" cy="10" r="2.5" {...stroke} />
-        <path
-          d="M10 2.5v2M10 15.5v2M17.5 10h-2M4.5 10h-2M15.3 4.7l-1.4 1.4M6.1 13.9l-1.4 1.4M15.3 15.3l-1.4-1.4M6.1 6.1 4.7 4.7"
-          {...stroke}
-        />
+        <path d="M3.5 6.5h6.5M15 6.5h1.5M3.5 13.5h1.5M10 13.5h6.5" {...stroke} />
+        <circle cx="12.5" cy="6.5" r="2.4" {...soft} />
+        <circle cx="12.5" cy="6.5" r="2.4" {...stroke} />
+        <circle cx="7.5" cy="13.5" r="2.4" {...soft} />
+        <circle cx="7.5" cy="13.5" r="2.4" {...stroke} />
       </Icon>
     ),
   },
@@ -183,7 +199,7 @@ export function Sidebar() {
 
   /** Labels fold away when collapsed; one class string so every row agrees. */
   const label = `overflow-hidden whitespace-nowrap transition-[max-width,opacity] duration-[var(--nav-dur)] ease-[var(--nav-ease)] ${
-    collapsed ? "max-w-0 opacity-0 duration-150" : "max-w-[170px] opacity-100"
+    collapsed ? "max-w-0 opacity-0 duration-150" : "max-w-[340px] opacity-100"
   }`;
   const row = `relative isolate flex w-full items-center rounded-[7px] py-[6px] text-[14px] transition-[color,padding,gap] duration-[var(--nav-dur)] ease-[var(--nav-ease)] ${
     collapsed ? "justify-center gap-0 px-0" : "gap-2.5 px-2"
@@ -233,11 +249,15 @@ export function Sidebar() {
 
         {/* Grey icons, dark words — the icon is a landmark, the word is what
             you read. On the current page both take the accent. */}
-        <span
-          className={`grid shrink-0 place-items-center ${active ? "text-accent" : "text-ink-3"}`}
+        <motion.span
+          className={`grid shrink-0 place-items-center transition-colors duration-150 ${
+            active ? "text-accent" : hovered ? "text-ink-2" : "text-ink-3"
+          }`}
+          animate={{ scale: hovered ? 1.14 : 1, rotate: hovered ? -7 : 0 }}
+          transition={springSnappy}
         >
           {item.icon}
-        </span>
+        </motion.span>
 
         <span className={label}>{item.label}</span>
       </Link>
@@ -368,6 +388,7 @@ export function Sidebar() {
       </Link>
 
       <TaskDialog open={adding} onClose={() => setAdding(false)} />
+      {!collapsed && <ResizeHandle />}
     </aside>
   );
 }
@@ -508,6 +529,70 @@ export function MobileHeaderLinks() {
           </Link>
         );
       })}
+    </div>
+  );
+}
+
+/**
+ * The sidebar's right edge: drag to resize, double-click to reset. Dropping
+ * it narrower than the minimum folds the sidebar to icons instead.
+ */
+function ResizeHandle() {
+  const [, toggle] = useNavCollapsed();
+  const [active, setActive] = useState(false);
+
+  const start = (e: React.PointerEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    const root = document.documentElement;
+    root.setAttribute("data-nav-drag", "");
+    setActive(true);
+    let width = Math.round(e.currentTarget.parentElement?.getBoundingClientRect().width ?? NAV_DEFAULT);
+
+    const move = (ev: PointerEvent) => {
+      width = Math.round(ev.clientX);
+      root.style.setProperty("--nav-open", `${Math.min(NAV_MAX, Math.max(NAV_MIN, width))}px`);
+    };
+    const end = () => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", end);
+      root.removeAttribute("data-nav-drag");
+      setActive(false);
+      const kept = Math.min(NAV_MAX, Math.max(NAV_MIN, width));
+      try {
+        localStorage.setItem(NAV_WIDTH_KEY, String(kept));
+      } catch {
+        // Storage blocked: the width holds for this session.
+      }
+      if (width < NAV_MIN - 60) toggle();
+    };
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", end);
+  };
+
+  const reset = () => {
+    document.documentElement.style.setProperty("--nav-open", `${NAV_DEFAULT}px`);
+    try {
+      localStorage.setItem(NAV_WIDTH_KEY, String(NAV_DEFAULT));
+    } catch {
+      // ignore
+    }
+  };
+
+  return (
+    <div
+      role="separator"
+      aria-orientation="vertical"
+      aria-label="Resize sidebar"
+      title="Drag to resize · double-click to reset"
+      onPointerDown={start}
+      onDoubleClick={reset}
+      className="group absolute inset-y-0 right-0 z-10 w-2 cursor-col-resize"
+    >
+      <span
+        className={`absolute inset-y-0 right-0 w-[2px] transition-colors duration-150 ${
+          active ? "bg-accent" : "bg-transparent group-hover:bg-[var(--border-strong)]"
+        }`}
+      />
     </div>
   );
 }

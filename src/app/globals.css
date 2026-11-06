@@ -61,7 +61,7 @@
    * Sidebar width, read by both the sidebar and the content beside it so the
    * two can never disagree. Set before first paint from the saved choice.
    */
-  --nav-w: 260px;
+  --nav-w: var(--nav-open, 260px);
 
   /*
    * One duration and one curve for the collapse, shared by the sidebar, the
@@ -102,6 +102,13 @@
 
 :root[data-nav="collapsed"] {
   --nav-w: 60px;
+}
+
+/* Dragging the sidebar edge: follow the pointer, no easing lag. */
+:root[data-nav-drag] {
+  transition: none;
+  cursor: col-resize;
+  user-select: none;
 }
 
 @media (prefers-reduced-motion: reduce) {
