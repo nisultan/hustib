@@ -87,7 +87,7 @@ export async function POST(request: Request) {
       },
       contents: (contents as Content[]).slice(-MAX_CONTENTS),
       tools: [{ functionDeclarations: TOOL_DECLARATIONS }],
-      generationConfig: { temperature: 0.7, maxOutputTokens: 2048 },
+      generationConfig: { temperature: 0.7, maxOutputTokens: 8192 },
     });
   } catch (e) {
     // Logged with the cause: "could not reach" covers DNS, TLS, a proxy and a
@@ -131,8 +131,15 @@ export async function POST(request: Request) {
   if (text === "" && calls.length === 0) {
     // Usually a safety block or a hit token ceiling; either way there is
     // nothing to render, and an empty bubble looks like a bug.
+    const reason = data?.candidates?.[0]?.finishReason ?? data?.promptFeedback?.blockReason ?? "unknown";
+    console.error("Gemini returned nothing:", reason);
     return NextResponse.json(
-      { error: "The assistant had nothing to say. Try rephrasing." },
+      {
+        error:
+          reason === "MAX_TOKENS"
+            ? "That was too much to do in one go. Try asking in smaller steps."
+            : "The assistant had nothing to say. Try rephrasing.",
+      },
       { status: 502 },
     );
   }

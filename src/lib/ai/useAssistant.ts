@@ -12,6 +12,7 @@ import {
   ASSESSMENT_TYPES,
   AssessmentType,
   Block,
+  PlanItem,
   Priority,
   PRIORITIES,
   Status,
@@ -397,6 +398,66 @@ function runTool(call: ToolCall, store: Store, router: Router): ToolResult {
           taskId: task?.id ?? null,
         });
         return ok(`Planned "${title}"${start ? ` at ${start}` : ""} on ${when}`, "/plan");
+      }
+
+      case "update_plan_block": {
+        const id = str(a.id);
+        const block = id ? store.plan.find((p) => p.id === id) : null;
+        if (!block) return fail("No plan block with that id.");
+        const patch: Partial<PlanItem> = {};
+        const title = str(a.title);
+        if (title) patch.title = title;
+        const d = date(a.date);
+        if (d) patch.date = d;
+        const s = time(a.start);
+        if (s) patch.start = s;
+        const m = num(a.minutes);
+        if (m != null) patch.minutes = Math.min(24 * 60, Math.max(5, m));
+        if (typeof a.done === "boolean" && a.done !== block.done) store.togglePlanItem(block.id);
+        if (Object.keys(patch).length > 0) store.updatePlanItem(block.id, patch);
+        return ok(`Updated "${patch.title ?? block.title}"`, "/plan");
+      }
+
+      case "replace_plan_window": {
+        const when = date(a.date) ?? todayISO();
+        const from = time(a.from);
+        const to = time(a.to);
+        if (!from || !to) return fail("Give the window as HH:MM from and to.");
+        const mins = (hm: string) => Number(hm.slice(0, 2)) * 60 + Number(hm.slice(3, 5));
+        const lo = mins(from);
+        const hi = mins(to);
+        if (hi <= lo) return fail("The window ends before it starts.");
+        const raw = Array.isArray(a.blocks) ? (a.blocks as Record<string, unknown>[]) : [];
+        const blocks = raw
+          .map((b) => ({
+            title: str(b.title),
+            start: time(b.start),
+            minutes: Math.min(24 * 60, Math.max(5, num(b.minutes) ?? 45)),
+            categoryId: optionalCategory(b.categoryId, store),
+          }))
+          .filter((b) => b.title && b.start);
+        const removed = store.plan.filter((p) => {
+          if (p.date !== when || p.done || !p.start) return false;
+          const s = mins(p.start);
+          return s < hi && s + p.minutes > lo;
+        });
+        for (const p of removed) store.deletePlanItem(p.id);
+        for (const b of blocks) {
+          store.addPlanItem({
+            date: when,
+            title: b.title as string,
+            start: b.start,
+            minutes: b.minutes,
+            done: false,
+            priority: "medium",
+            categoryId: typeof b.categoryId === "string" ? b.categoryId : null,
+            taskId: null,
+          });
+        }
+        return ok(
+          `Rewrote ${from}–${to} on ${when}: removed ${removed.length}, added ${blocks.length}`,
+          "/plan",
+        );
       }
 
       case "remember": {

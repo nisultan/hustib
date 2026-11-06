@@ -225,6 +225,55 @@ export const TOOL_DECLARATIONS = [
     },
   },
   {
+    name: "update_plan_block",
+    description:
+      "Change one block already on the plan: rename it, move it to another time or day, change " +
+      "its length, or tick it done. Use the block id from the plan in the context.",
+    parameters: {
+      type: "OBJECT",
+      properties: {
+        id: { ...STR, description: "Block id from the context." },
+        title: { ...STR, description: "New title." },
+        date: { ...STR, description: "YYYY-MM-DD, to move it to another day." },
+        start: { ...STR, description: "HH:MM, 24-hour." },
+        minutes: { type: "NUMBER", description: "New length in minutes." },
+        done: { type: "BOOLEAN", description: "Tick or untick it." },
+      },
+      required: ["id"],
+    },
+  },
+  {
+    name: "replace_plan_window",
+    description:
+      "Rewrite a stretch of a day's plan in one go: every unfinished block that overlaps from–to " +
+      "on that date is removed, then the given blocks are added. Use when they ask to change, " +
+      "redo or replace part of their plan (\"make 9 to 2 SAT prep\"). Blocks already ticked done " +
+      "are kept. To keep an existing block (e.g. lunch already there), include it again in blocks.",
+    parameters: {
+      type: "OBJECT",
+      properties: {
+        date: { ...STR, description: "YYYY-MM-DD. Defaults to today." },
+        from: { ...STR, description: "HH:MM, start of the window." },
+        to: { ...STR, description: "HH:MM, end of the window." },
+        blocks: {
+          type: "ARRAY",
+          description: "The new blocks for that window, in order.",
+          items: {
+            type: "OBJECT",
+            properties: {
+              title: { ...STR },
+              start: { ...STR, description: "HH:MM" },
+              minutes: { type: "NUMBER" },
+              categoryId: { ...STR, description: "Category id from the context." },
+            },
+            required: ["title", "start", "minutes"],
+          },
+        },
+      },
+      required: ["from", "to", "blocks"],
+    },
+  },
+  {
     name: "remember",
     description:
       "Record something durable you have learned about the student that is not already " +

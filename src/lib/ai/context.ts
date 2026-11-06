@@ -219,14 +219,21 @@ function universities(data: AppData): string {
 
 /** What the student actually set aside time for today, and whether it happened. */
 function plan(data: AppData, today: string): string {
-  return data.plan
-    .filter((p) => p.date === today)
-    .sort((a, b) => (a.start ?? "99:99").localeCompare(b.start ?? "99:99"))
-    .map((p) => {
-      const when = p.start ? p.start : "no time set";
-      return `- ${p.done ? "[done]" : "[ ]"} ${p.title} (${when}, ${p.minutes}min)`;
-    })
-    .join("\n");
+  const tomorrow = new Date(`${today}T12:00:00`);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  const next = `${tomorrow.getFullYear()}-${String(tomorrow.getMonth() + 1).padStart(2, "0")}-${String(tomorrow.getDate()).padStart(2, "0")}`;
+  const day = (d: string) =>
+    data.plan
+      .filter((p) => p.date === d)
+      .sort((a, b) => (a.start ?? "99:99").localeCompare(b.start ?? "99:99"))
+      .map((p) => {
+        const when = p.start ? p.start : "no time set";
+        return `- ${p.done ? "[done]" : "[ ]"} ${p.title} (${when}, ${p.minutes}min) id:${p.id}`;
+      })
+      .join("\n");
+  const a = day(today);
+  const b = day(next);
+  return [a, b ? `Tomorrow (${next}):\n${b}` : ""].filter(Boolean).join("\n");
 }
 
 function habits(data: AppData, today: string): string {
