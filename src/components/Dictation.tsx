@@ -4,6 +4,7 @@ import { RefObject, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "motion/react";
 import { useMounted } from "@/lib/useMounted";
+import { VOCAB_KEY, fixVocab, parseVocab, readVocab } from "@/lib/vocab";
 
 /**
  * Speak instead of type.
@@ -98,6 +99,9 @@ export function Dictation({
   const [listening, setListening] = useState(false);
   const [interim, setInterim] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [vocab, setVocab] = useState("");
+  const [editing, setEditing] = useState(false);
+  const terms = useRef(parseVocab(""));
 
   const rec = useRef<Recognizer | null>(null);
   const want = useRef(false);
@@ -108,7 +112,18 @@ export function Dictation({
   useEffect(() => {
     setSupported(recognizerCtor() != null);
     setLang(initialLang());
+    const v = readVocab();
+    setVocab(v);
+    terms.current = parseVocab(v);
   }, []);
+
+  const saveVocab = (v: string) => {
+    setVocab(v);
+    terms.current = parseVocab(v);
+    try {
+      localStorage.setItem(VOCAB_KEY, v);
+    } catch {}
+  };
 
   // Remember the last field written in, so the words go back there.
   useEffect(() => {
@@ -127,7 +142,8 @@ export function Dictation({
     rec.current?.abort();
   }, []);
 
-  const commit = (text: string) => {
+  const commit = (raw: string) => {
+    const text = fixVocab(raw, terms.current);
     const el = target.current;
     if (el && el.isConnected && scope.current?.contains(el)) {
       insertAtCaret(el, text);
@@ -152,7 +168,7 @@ export function Dictation({
         if (res.isFinal) commit(res[0].transcript);
         else live += res[0].transcript;
       }
-      setInterim(live);
+      setInterim(fixVocab(live, terms.current));
     };
     r.onerror = (e) => {
       if (e.error === "no-speech" || e.error === "aborted") return;
@@ -222,7 +238,54 @@ export function Dictation({
 
   return (
     <>
-      <div className="flex items-center gap-1">
+      <div className="relative flex items-center gap-1">
+        <button
+          type="button"
+          onMouseDown={keepFocus}
+          onClick={() => setEditing((v) => !v)}
+          aria-expanded={editing}
+          title="Your words: names and terms dictation should spell your way"
+          className={`h-7 rounded-md px-1.5 text-[11px] font-bold tracking-wide transition-colors hover:bg-panel-2 hover:text-ink ${
+            editing ? "bg-panel-2 text-ink" : "text-ink-3"
+          }`}
+        >
+          Aa
+        </button>
+        <AnimatePresence>
+          {editing && (
+            <motion.div
+              initial={{ opacity: 0, y: -6, scale: 0.98 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -6, scale: 0.98 }}
+              transition={{ type: "spring", stiffness: 480, damping: 34 }}
+              className="absolute right-0 top-[calc(100%+8px)] z-[70] w-[min(340px,calc(100vw-32px))] rounded-xl border border-line bg-panel p-3 text-left shadow-[var(--shadow-lg),var(--edge)]"
+            >
+              <p className="text-[13px] font-semibold text-ink">Your words</p>
+              <p className="mt-0.5 text-[11.5px] leading-snug text-ink-3">
+                Names and terms to spell your way, one per line. If one keeps coming out wrong, add what it was heard as
+                after a colon.
+              </p>
+              <textarea
+                value={vocab}
+                onChange={(e) => saveVocab(e.target.value)}
+                rows={6}
+                spellCheck={false}
+                placeholder={"IELTS: yelts, aisles
+Nazarbayev University"}
+                className="mt-2 w-full resize-y rounded-lg border border-line bg-panel-2 px-2.5 py-2 font-mono text-[12px] leading-relaxed text-ink outline-none focus:border-[var(--accent)]"
+              />
+              <div className="mt-2 flex justify-end">
+                <button
+                  type="button"
+                  onClick={() => setEditing(false)}
+                  className="rounded-lg bg-panel-2 px-3 py-1.5 text-xs font-semibold text-ink hover:bg-[var(--border)]"
+                >
+                  Done
+                </button>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
         <button
           type="button"
           onMouseDown={keepFocus}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { useStore } from "@/lib/store";
 import { addDays, formatDate, pastLabel, todayISO } from "@/lib/dates";
 import { Block } from "@/lib/types";
@@ -63,22 +63,6 @@ export default function ReflectionPage() {
   const today = todayISO();
   const reflection = byDate.get(date)?.reflection ?? [];
 
-  if (focus) {
-    return (
-      <FocusMode
-        date={date}
-        today={today}
-        blocks={reflection}
-        streak={streak(store.days, today)}
-        onChange={(blocks) => store.setDay(date, { reflection: blocks })}
-        onDate={setDate}
-        onClose={() => setFocus(false)}
-      />
-    );
-  }
-
-  const words = wordCount(reflection);
-
   // Answers to the day's questions live in the entry itself, as a heading and
   // a paragraph with ids starting "q-", so they count as writing everywhere
   // (word counts, streaks, search, the form model). The free editor below
@@ -115,6 +99,24 @@ export default function ReflectionPage() {
     }
   };
   const dropAnswer = (q: string) => save(answers.filter((b) => !b.id.startsWith(`${qid(q)}-`)), free);
+
+  if (focus) {
+    return (
+      <FocusMode
+        date={date}
+        today={today}
+        blocks={free}
+        all={reflection}
+        questions={<Questions key={date} date={date} answers={answers} onAnswer={answer} onDrop={dropAnswer} />}
+        streak={streak(store.days, today)}
+        onChange={(blocks) => save(answers, blocks)}
+        onDate={setDate}
+        onClose={() => setFocus(false)}
+      />
+    );
+  }
+
+  const words = wordCount(reflection);
 
   return (
     <div className="page-in">
@@ -834,6 +836,8 @@ function FocusMode({
   date,
   today,
   blocks,
+  all,
+  questions,
   streak,
   onChange,
   onDate,
@@ -841,7 +845,11 @@ function FocusMode({
 }: {
   date: string;
   today: string;
+  /** The free writing; the day's answered questions come in `questions`. */
   blocks: Block[];
+  /** Everything written that day, answers included, for the counts. */
+  all: Block[];
+  questions: ReactNode;
   /** Consecutive days written, ending today. Shown at the foot. */
   streak: number;
   onChange: (blocks: Block[]) => void;
@@ -923,8 +931,8 @@ function FocusMode({
     }
   };
 
-  const written = blocks.filter((b) => b.text.trim() !== "").length;
-  const words = blocks
+  const written = all.filter((b) => b.text.trim() !== "").length;
+  const words = all
     .map((b) => b.text)
     .join(" ")
     .trim()
@@ -1054,11 +1062,12 @@ function FocusMode({
               className={`h-1 w-12 rounded-full bg-[var(--border)] transition-opacity group-hover/sheet:opacity-100 ${resizing ? "opacity-100" : "opacity-0"}`}
             />
           </div>
+          {questions}
           <BlockEditor
-            key={date}
+            key={`free-${date}`}
             blocks={blocks}
             onChange={onChange}
-            placeholder="How did it go? Press / for a heading, list, image or link."
+            placeholder="Anything else on your mind? Press / for a heading, list, image or link."
           />
         </motion.div>
 
