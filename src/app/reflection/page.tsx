@@ -14,6 +14,10 @@ import { spring } from "@/lib/motion";
 
 /** Where the wide-column preference is kept. */
 const WIDE_KEY = "iblearner.reflectionWide";
+const SIZE_KEY = "lockin.reflection.size";
+const MIN_W = 480;
+const MAX_W = 1600;
+const NARROW_W = 880;
 
 export default function ReflectionPage() {
   const store = useStore();
@@ -844,27 +848,69 @@ function FocusMode({
   onDate: (date: string) => void;
   onClose: () => void;
 }) {
-  // Remembered per device: whether someone writes in a column or across the
-  // whole screen is a standing preference, not a per-session decision.
-  const [wide, setWide] = useState(() => {
+  // Remembered per device: how big someone likes the page is a standing
+  // preference, not a per-session decision. Drag the edges to change it.
+  const [size, setSize] = useState<{ w: number; h: number | null }>(() => {
     try {
-      return localStorage.getItem(WIDE_KEY) === "1";
-    } catch {
-      return false;
-    }
+      const saved = JSON.parse(localStorage.getItem(SIZE_KEY) ?? "null");
+      if (saved && typeof saved.w === "number") return { w: saved.w, h: typeof saved.h === "number" ? saved.h : null };
+      if (localStorage.getItem(WIDE_KEY) === "1") return { w: 1400, h: null };
+    } catch {}
+    return { w: NARROW_W, h: null };
   });
-
-  // The write stays outside the updater. React invokes updaters twice in
-  // development to surface exactly this kind of side effect, which toggled the
-  // value twice and left it unchanged — the button appeared dead.
-  const toggleWide = () => {
-    const next = !wide;
-    setWide(next);
+  const [resizing, setResizing] = useState(false);
+  const save = (next: { w: number; h: number | null }) => {
     try {
-      localStorage.setItem(WIDE_KEY, next ? "1" : "0");
+      localStorage.setItem(SIZE_KEY, JSON.stringify(next));
     } catch {
-      // Private browsing. The choice still holds for this session.
+      // Private browsing. The size still holds for this session.
     }
+  };
+  const wide = size.w > 1100;
+  const toggleWide = () => {
+    const next = { ...size, w: wide ? NARROW_W : 1400 };
+    setSize(next);
+    save(next);
+  };
+
+  /** Drag an edge. Sides move symmetrically because the page stays centred. */
+  const startResize = (axis: "x" | "y", side: 1 | -1) => (e: React.PointerEvent) => {
+    const el = sheet.current;
+    if (!el) return;
+    e.preventDefault();
+    const x0 = e.clientX;
+    const y0 = e.clientY;
+    const w0 = el.offsetWidth;
+    const h0 = el.offsetHeight;
+    let latest = size;
+    setResizing(true);
+    const move = (ev: PointerEvent) => {
+      if (axis === "x") {
+        const w = Math.round(Math.min(MAX_W, window.innerWidth - 32, Math.max(MIN_W, w0 + side * 2 * (ev.clientX - x0))));
+        latest = { ...latest, w };
+      } else {
+        const h = Math.round(Math.max(260, h0 + (ev.clientY - y0)));
+        latest = { ...latest, h };
+      }
+      setSize(latest);
+    };
+    const up = () => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+      setResizing(false);
+      save(latest);
+    };
+    document.body.style.cursor = axis === "x" ? "ew-resize" : "ns-resize";
+    document.body.style.userSelect = "none";
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up);
+  };
+  const resetAxis = (axis: "x" | "y") => {
+    const next = axis === "x" ? { ...size, w: NARROW_W } : { ...size, h: null };
+    setSize(next);
+    save(next);
   };
 
   const sheet = useRef<HTMLDivElement>(null);
@@ -887,27 +933,12 @@ function FocusMode({
 
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto bg-bg">
-      {/* One wash of colour, thrown from above the page.
-
-          Not decoration for its own sake: a full-bleed flat background gives
-          the eye no depth cue at all, so the sheet below had nothing to sit
-          against. At this strength it is barely nameable as a colour — it just
-          stops the screen reading as switched off. */}
-      <div
-        aria-hidden
-        className="pointer-events-none fixed inset-x-0 top-0 h-[42vh] opacity-[0.55]"
-        style={{
-          background:
-            "radial-gradient(90% 100% at 50% 0%, color-mix(in srgb, var(--accent) 16%, transparent), transparent 70%)",
-        }}
-      />
-
       {/* The width is a computed value rather than a utility class: Tailwind
           does not generate an arbitrary `min()` with a comma in it, so the
           class was applied and silently did nothing. */}
       <div
-        className="relative mx-auto w-full px-5 py-10 transition-[max-width] duration-300 sm:px-8 sm:py-16"
-        style={{ maxWidth: wide ? "min(1400px, 92vw)" : "42rem" }}
+        className={`relative mx-auto w-full px-4 py-8 sm:px-8 sm:py-12 ${resizing ? "" : "transition-[max-width] duration-300"}`}
+        style={{ maxWidth: size.w + 64 }}
       >
         <div className="mb-5 flex items-center justify-between gap-3">
           <div className="flex items-center gap-1">
@@ -996,8 +1027,33 @@ function FocusMode({
           transition={spring}
           // A minimum height, so a day with one line on it still looks like a
           // page you have started rather than a box that failed to fill.
-          className="min-h-[46vh] rounded-2xl border border-line bg-panel px-4 py-6 shadow-[var(--shadow-lg),var(--edge)] sm:px-8 sm:py-9"
+          className="group/sheet relative rounded-2xl border border-line bg-panel px-4 py-6 shadow-[var(--shadow-lg),var(--edge)] sm:px-10 sm:py-10"
+          style={{ minHeight: size.h ?? "72vh" }}
         >
+          {/* Grips on the edges: drag to resize, double-click to reset. */}
+          {([-1, 1] as const).map((side) => (
+            <div
+              key={side}
+              onPointerDown={startResize("x", side)}
+              onDoubleClick={() => resetAxis("x")}
+              title="Drag to resize · double-click to reset"
+              className={`absolute inset-y-0 hidden w-4 cursor-ew-resize items-center justify-center sm:flex ${side < 0 ? "-left-2" : "-right-2"}`}
+            >
+              <span
+                className={`h-12 w-1 rounded-full bg-[var(--border)] transition-opacity group-hover/sheet:opacity-100 ${resizing ? "opacity-100" : "opacity-0"}`}
+              />
+            </div>
+          ))}
+          <div
+            onPointerDown={startResize("y", 1)}
+            onDoubleClick={() => resetAxis("y")}
+            title="Drag to resize · double-click to reset"
+            className="absolute inset-x-0 -bottom-2 hidden h-4 cursor-ns-resize items-center justify-center sm:flex"
+          >
+            <span
+              className={`h-1 w-12 rounded-full bg-[var(--border)] transition-opacity group-hover/sheet:opacity-100 ${resizing ? "opacity-100" : "opacity-0"}`}
+            />
+          </div>
           <BlockEditor
             key={date}
             blocks={blocks}
