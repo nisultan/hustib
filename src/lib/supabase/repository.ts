@@ -585,9 +585,19 @@ export async function upsertDay(
   if (patch.weight !== undefined) row.weight = patch.weight;
   if (patch.reflection !== undefined) row.reflection = patch.reflection;
   if (patch.habitsDone !== undefined) row.habits_done = patch.habitsDone;
+  if (patch.gym !== undefined) row.gym = patch.gym;
 
   const { error } = await supabase.from("days").upsert(row, { onConflict: "user_id,date" });
-  if (error) throw error;
+  if (!error) return;
+  if (!isMissingSchema(error) || row.gym === undefined) throw error;
+  // The gym column is newer than the rest: save everything else, then say why
+  // the square will not survive a reload.
+  delete row.gym;
+  if (Object.keys(row).length > 3) {
+    const retry = await supabase.from("days").upsert(row, { onConflict: "user_id,date" });
+    if (retry.error) throw retry.error;
+  }
+  throw new Error("Gym days need migration 014_gym.sql in Supabase.");
 }
 
 export async function deleteDay(date: string): Promise<void> {
@@ -1195,6 +1205,7 @@ function toDay(row: DayRow): Day {
     // written a type this build does not know. Falling back to plain text
     // keeps the words rather than dropping the block.
     habitsDone: Array.isArray(row.habits_done) ? row.habits_done : [],
+    ...(row.gym ? { gym: true } : {}),
     reflection: (Array.isArray(row.reflection) ? row.reflection : []).map((b): Block => ({
       id: String(b?.id ?? Math.random().toString(36).slice(2)),
       type: (BLOCK_TYPES.includes(b?.type) ? b.type : "text") as BlockType,

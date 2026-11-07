@@ -184,7 +184,7 @@ const PAGES = [
   "/courses",
   "/goals",
   "/progress",
-  "/weight",
+  "/gym",
   "/reflection",
   "/recommendations",
   "/settings",
@@ -349,7 +349,7 @@ function runTool(call: ToolCall, store: Store, router: Router): ToolResult {
         }
         const when = date(a.date) ?? todayISO();
         store.setDay(when, { weight });
-        return ok(`Logged ${weight}kg for ${when}`, "/weight");
+        return ok(`Logged ${weight}kg for ${when}`, "/gym");
       }
 
       case "append_reflection": {

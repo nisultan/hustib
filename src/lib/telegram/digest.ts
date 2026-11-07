@@ -101,6 +101,8 @@ export interface Snapshot {
   habits: HabitRow[];
   habitsDone: string[];
   journaled: boolean;
+  /** Marked as a gym day (migration 014). */
+  gym: boolean;
 }
 
 export async function snapshot(db: SupabaseClient, link: Link, at = new Date()): Promise<Snapshot> {
@@ -113,7 +115,8 @@ export async function snapshot(db: SupabaseClient, link: Link, at = new Date()):
     loadGoals(db, uid),
     db.from("important_days").select("id,title,date,kind,repeats_yearly").eq("user_id", uid),
     db.from("habits").select("id,name,weekdays,created_at,archived_at").eq("user_id", uid).is("archived_at", null),
-    db.from("days").select("habits_done,reflection").eq("user_id", uid).eq("date", now.date).maybeSingle(),
+    // "*" so a database without the gym column (014) still answers.
+    db.from("days").select("*").eq("user_id", uid).eq("date", now.date).maybeSingle(),
   ]);
   const reflection = (day.data?.reflection ?? []) as { type?: string; text?: string }[];
   return {
@@ -124,6 +127,7 @@ export async function snapshot(db: SupabaseClient, link: Link, at = new Date()):
     important: ((important.data ?? []) as DayRow[]).map((d) => ({ ...d, date: nextOccurrence(d, now.date) })).filter((d) => d.date >= now.date && d.date <= week),
     habits: (habits.data ?? []) as HabitRow[],
     habitsDone: (day.data?.habits_done ?? []) as string[],
+    gym: day.data?.gym === true,
     journaled: Array.isArray(reflection) && reflection.some((b) => b.type !== "image" && (b.text ?? "").trim() !== ""),
   };
 }
@@ -339,6 +343,7 @@ export function evening(s: Snapshot): Message | null {
     lines.push("", `🔁 Habits left: ${habits.map((h) => esc(h.name)).slice(0, 6).join(", ")} — tap the ones you did.`);
     buttons.push(...habitButtons(habits));
   }
+  if (!s.gym) buttons.push([{ text: "🏋️ Went to the gym today", callback_data: `gym:${s.now.date}` }]);
 
   const due = s.tasks.filter((t) => t.due_date === tomorrow).sort(byUrgency);
   const goalsTomorrow = s.goals.filter((g) => g.deadline === tomorrow);

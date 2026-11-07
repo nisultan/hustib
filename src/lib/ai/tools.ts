@@ -315,7 +315,7 @@ export const TOOL_DECLARATIONS = [
   "/progress",
             "/goals",
             "/progress",
-            "/weight",
+            "/gym",
             "/reflection",
             "/recommendations",
             "/settings",

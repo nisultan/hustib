@@ -89,7 +89,7 @@ const PAGES: { title: string; detail: string; href: string; icon: string }[] = [
   { title: "Courses", detail: "Subjects and topics", href: "/courses", icon: ICON.courses },
   { title: "Goals", detail: "What it is all for", href: "/goals", icon: ICON.goals },
   { title: "Progress", detail: "The year, day by day", href: "/progress", icon: ICON.progress },
-  { title: "Weight", detail: "The daily log", href: "/weight", icon: ICON.weight },
+  { title: "Gym", detail: "Gym days and weight", href: "/gym", icon: ICON.weight },
   { title: "Reflection", detail: "The journal", href: "/reflection", icon: ICON.journal },
   { title: "Recommendations", detail: "What your week says", href: "/recommendations", icon: ICON.recs },
   { title: "Settings", detail: "Appearance, data, account", href: "/settings", icon: ICON.settings },
@@ -202,7 +202,7 @@ export function GlobalSearch({ triggerClassName = "" }: { triggerClassName?: str
       out.push(
         { key: "a-task", kind: "action", section: "Actions", title: "New task", detail: "Or just type it here — “essay draft friday important”", icon: ICON.plus, run: () => inputRef.current?.focus(), stay: true, rank: 0 },
         { key: "a-journal", kind: "action", section: "Actions", title: "Write in today’s journal", icon: ICON.journal, href: "/reflection", rank: 0 },
-        { key: "a-weight", kind: "action", section: "Actions", title: "Log weight", detail: "Or type the number, e.g. 72.4", icon: ICON.weight, href: "/weight", rank: 0 },
+        { key: "a-weight", kind: "action", section: "Actions", title: "Log weight", detail: "Or type the number, e.g. 72.4", icon: ICON.weight, href: "/gym", rank: 0 },
         { key: "a-goal", kind: "action", section: "Actions", title: "New goal", icon: ICON.goals, href: "/goals", rank: 0 },
       );
       for (const p of PAGES.slice(0, 6)) {

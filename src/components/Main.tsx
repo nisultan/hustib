@@ -18,7 +18,7 @@ import { ReactNode } from "react";
  */
 const WIDE = ["/plan", "/", "/recommendations"];
 /** Pages with a chart or an editor beside a sidebar: wider than reading width, not full. */
-const ROOMY = ["/reflection", "/weight", "/progress"];
+const ROOMY = ["/reflection", "/gym", "/progress"];
 
 export function Main({ children }: { children: ReactNode }) {
   const pathname = usePathname();

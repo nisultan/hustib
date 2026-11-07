@@ -259,7 +259,7 @@ export function recommend(data: AppData, limit = 4): Recommendation[] {
       id: "weight-trend",
       kind: "weight",
       weight: 26,
-      href: "/weight",
+      href: "/gym",
       text: `Your weight is ${shift.direction} ${Math.abs(shift.delta).toFixed(1)} kg over the last fortnight, measured week against week rather than day to day.`,
     });
   }

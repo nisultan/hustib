@@ -331,7 +331,8 @@ function journal(data: AppData): string {
 
   for (const day of days) {
     const text = blocksToText(day.reflection);
-    const weight = day.weight != null ? `weight ${day.weight}kg` : null;
+    const weight =
+      [day.weight != null ? `weight ${day.weight}kg` : null, day.gym ? "gym" : null].filter(Boolean).join(", ") || null;
     if (!text && !weight) continue;
 
     if (spent >= JOURNAL_BUDGET_CHARS) {

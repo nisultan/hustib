@@ -106,6 +106,8 @@ export type DayRow = {
   reflection: BlockJson[];
   /** Ids of habits ticked on this day. Absent before the habits migration. */
   habits_done?: string[] | null;
+  /** Absent before migration 014. */
+  gym?: boolean | null;
   created_at: string;
   updated_at: string;
 };

@@ -32,6 +32,8 @@ export async function POST(request: Request) {
       { command: "goals", description: "Goals and push streaks" },
       { command: "habits", description: "Tick today's habits" },
       { command: "block", description: "Add a plan block: /block gym 18:00 60" },
+      { command: "gym", description: "Mark today as a gym day" },
+      { command: "weight", description: "Log weight: /weight 72.4" },
       { command: "add", description: "Add a task" },
       { command: "pause", description: "Pause reminders" },
       { command: "resume", description: "Resume reminders" },

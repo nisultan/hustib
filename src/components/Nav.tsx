@@ -130,15 +130,15 @@ const SECONDARY: NavItem[] = [
     ),
   },
   {
-    href: "/weight",
-    label: "Weight",
+    href: "/gym",
+    label: "Gym",
     icon: (
       <Icon>
-        <rect x="3" y="3" width="14" height="14" rx="4.5" {...soft} />
-        <rect x="3" y="3" width="14" height="14" rx="4.5" {...stroke} />
-        <path d="M6.3 9.6a3.7 3.7 0 0 1 7.4 0" {...stroke} />
-        <path d="m10 9.6 1.7-2" {...stroke} />
-        <circle cx="10" cy="9.6" r="0.9" {...dot} />
+        <rect x="2.4" y="6.5" width="3" height="7" rx="1" {...soft} />
+        <rect x="14.6" y="6.5" width="3" height="7" rx="1" {...soft} />
+        <rect x="2.4" y="6.5" width="3" height="7" rx="1" {...stroke} />
+        <rect x="14.6" y="6.5" width="3" height="7" rx="1" {...stroke} />
+        <path d="M5.4 8.2v3.6M14.6 8.2v3.6M5.4 10h9.2" {...stroke} />
       </Icon>
     ),
   },

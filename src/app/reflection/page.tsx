@@ -8,6 +8,7 @@ import { BlockEditor } from "@/components/BlockEditor";
 import { DateField } from "@/components/DateField";
 import { Button, Panel } from "@/components/ui";
 import { Flame } from "@/components/Flame";
+import { Dictation, shape } from "@/components/Dictation";
 import { motion } from "motion/react";
 import { spring } from "@/lib/motion";
 
@@ -24,6 +25,7 @@ export default function ReflectionPage() {
     return d && /^\d{4}-\d{2}-\d{2}$/.test(d) ? d : todayISO();
   });
   const [focus, setFocus] = useState(false);
+  const writing = useRef<HTMLDivElement>(null);
 
   // Escape leaves focus mode. It is the only way out that does not require
   // finding a button on a page deliberately stripped of them.
@@ -99,6 +101,15 @@ export default function ReflectionPage() {
       );
     }
   };
+  // Dictation with no field focused: carry on the last paragraph.
+  const appendSpoken = (text: string) => {
+    const last = free.at(-1);
+    if (last && last.type === "text") {
+      save(answers, free.map((b) => (b === last ? { ...b, text: b.text + shape(b.text, text) } : b)));
+    } else {
+      save(answers, [...free, { id: `v${Date.now().toString(36)}`, type: "text", text: shape("", text), done: false }]);
+    }
+  };
   const dropAnswer = (q: string) => save(answers.filter((b) => !b.id.startsWith(`${qid(q)}-`)), free);
 
   return (
@@ -144,6 +155,7 @@ export default function ReflectionPage() {
                     Today
                   </Button>
                 )}
+                <Dictation scope={writing} onAppend={appendSpoken} />
                 <button
                   onClick={() => setFocus(true)}
                   aria-label="Focus mode"
@@ -167,7 +179,7 @@ export default function ReflectionPage() {
               </div>
             </div>
 
-            <div className="px-4 py-5 sm:px-6">
+            <div ref={writing} className="px-4 py-5 sm:px-6">
               <Questions key={date} date={date} answers={answers} onAnswer={answer} onDrop={dropAnswer} />
 
               <BlockEditor
@@ -855,6 +867,16 @@ function FocusMode({
     }
   };
 
+  const sheet = useRef<HTMLDivElement>(null);
+  const appendSpoken = (text: string) => {
+    const last = blocks.at(-1);
+    if (last && last.type === "text") {
+      onChange(blocks.map((b) => (b === last ? { ...b, text: b.text + shape(b.text, text) } : b)));
+    } else {
+      onChange([...blocks, { id: `v${Date.now().toString(36)}`, type: "text", text: shape("", text), done: false }]);
+    }
+  };
+
   const written = blocks.filter((b) => b.text.trim() !== "").length;
   const words = blocks
     .map((b) => b.text)
@@ -911,6 +933,7 @@ function FocusMode({
           </div>
 
           <div className="flex shrink-0 items-center gap-1">
+            <Dictation scope={sheet} onAppend={appendSpoken} compact />
             <button
               onClick={toggleWide}
               aria-pressed={wide}
@@ -967,6 +990,7 @@ function FocusMode({
           left margin was wherever the longest line happened to end.
         */}
         <motion.div
+          ref={sheet}
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={spring}

@@ -12,6 +12,7 @@ import {
   week,
 } from "@/lib/telegram/digest";
 import { addDays } from "@/lib/dates";
+import { startOfWeek } from "@/lib/calendar";
 import { parseQuickAdd } from "@/lib/quickparse";
 import type { Course } from "@/lib/types";
 
@@ -48,6 +49,8 @@ const HELP = [
   "<code>physics IA draft friday 17:00 important</code>",
   "/block <i>title time [length]</i> — add a plan block:",
   "<code>/block gym 18:00 60</code> · <code>/block read tomorrow 21:30</code>",
+  "/gym — mark today as a gym day",
+  "/weight <i>72.4</i> — log this morning's weight",
   "",
   "<b>Reminders</b> — morning brief, afternoon check, evening check, deadlines (3h · 1h · 15m), blocks as they start and end, one goal a day.",
   "/pause · /resume — stop or restart them",
@@ -152,6 +155,49 @@ async function onText(chatId: number, text: string, username?: string) {
     case "block":
       await addBlock(link, chatId, arg);
       return;
+    case "gym": {
+      const today = localNow(link.timezone).date;
+      const { error } = await db.from("days").upsert({ user_id: link.user_id, date: today, gym: true }, { onConflict: "user_id,date" });
+      if (error) {
+        console.error("[telegram] gym failed:", error.message);
+        await send(chatId, "Couldn't save it — gym days need migration 014_gym.sql in Supabase.");
+        return;
+      }
+      await send(chatId, `🏋️ <b>Gym day logged.</b> ${await gymWeek(link.user_id, today)}`, [
+        [{ text: "↩️ Undo", callback_data: `gymx:${today}` }],
+      ]);
+      return;
+    }
+    case "weight":
+    case "w": {
+      const kg = Number(arg.replace(",", ".").replace(/[^\d.]/g, ""));
+      if (!(kg > 20 && kg < 400)) {
+        await send(chatId, "Send it like <code>/weight 72.4</code>.");
+        return;
+      }
+      const today = localNow(link.timezone).date;
+      const { data: prev } = await db
+        .from("days")
+        .select("weight,date")
+        .eq("user_id", link.user_id)
+        .lt("date", today)
+        .not("weight", "is", null)
+        .order("date", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      const { error } = await db.from("days").upsert({ user_id: link.user_id, date: today, weight: kg }, { onConflict: "user_id,date" });
+      if (error) {
+        console.error("[telegram] weight failed:", error.message);
+        await send(chatId, "Couldn't save that. Try again in a moment.");
+        return;
+      }
+      const delta = prev?.weight != null ? kg - Number(prev.weight) : null;
+      await send(
+        chatId,
+        `⚖️ <b>${kg.toFixed(1)} kg</b> logged${delta != null ? ` (${delta > 0 ? "+" : ""}${delta.toFixed(1)} since ${prev!.date})` : ""}.`,
+      );
+      return;
+    }
     case "pause":
       await db.from("telegram_links").update({ paused: true }).eq("user_id", link.user_id);
       await send(chatId, "⏸ Reminders paused. /resume when you want them back. Commands still work.");
@@ -284,6 +330,19 @@ async function addBlock(link: Link, chatId: number, arg: string) {
   ]);
 }
 
+/** "3 this week." — sessions from Monday to the given day. */
+async function gymWeek(uid: string, date: string): Promise<string> {
+  const db = adminDb()!;
+  const { count } = await db
+    .from("days")
+    .select("date", { count: "exact", head: true })
+    .eq("user_id", uid)
+    .eq("gym", true)
+    .gte("date", startOfWeek(date))
+    .lte("date", date);
+  return count != null ? `${count} this week.` : "";
+}
+
 /* --------------------------------- Buttons -------------------------------- */
 
 async function onButton(q: NonNullable<Update["callback_query"]>) {
@@ -376,6 +435,14 @@ async function onButton(q: NonNullable<Update["callback_query"]>) {
       const { error } = await db.from("days").upsert({ user_id: uid, date: today, habits_done: [...done, id] }, { onConflict: "user_id,date" });
       const { data: habit } = await db.from("habits").select("name").eq("id", id).maybeSingle();
       label = error ? "Couldn't save that." : `🔁 Kept: ${habit?.name ?? "habit"}`;
+      break;
+    }
+    case "gym":
+    case "gymx": {
+      const on = kind === "gym";
+      const { error } = await db.from("days").upsert({ user_id: uid, date: id, gym: on }, { onConflict: "user_id,date" });
+      label = error ? "Run migration 014 to track gym days." : on ? `🏋️ Gym day logged. ${await gymWeek(uid, id)}` : "↩️ Gym day removed.";
+      consume = "all";
       break;
     }
     case "push": {

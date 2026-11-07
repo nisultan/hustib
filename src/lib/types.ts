@@ -522,6 +522,8 @@ export interface Day {
   reflection: Block[];
   /** Ids of the habits ticked off on this day. */
   habitsDone: ID[];
+  /** Trained that day. Optional: absent on rows from before the gym page. */
+  gym?: boolean;
 }
 
 /**
