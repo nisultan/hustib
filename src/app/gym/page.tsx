@@ -3,7 +3,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { useStore } from "@/lib/store";
-import { formatDate, pastLabel, todayISO } from "@/lib/dates";
+import { addDays, formatDate, pastLabel, todayISO } from "@/lib/dates";
+import { startOfWeek } from "@/lib/calendar";
 import { Day } from "@/lib/types";
 import { DEFAULT_TARGET, GYM_TARGET_KEY, GymCell, gymStats, gymWall, readTarget } from "@/lib/gym";
 import { WeighIn, WeightSummary, trendColor } from "@/components/WeightPanel";
@@ -40,7 +41,15 @@ export default function GymPage() {
       <PageHeader title="Gym" subtitle="Show up, tap the button. Weeks that hit your target light up." />
 
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)]">
-        <TrainCard trained={trainedOn(today)} onToggle={() => toggle(today)} stats={stats} target={target} />
+        <TrainCard
+          today={today}
+          trained={trainedOn(today)}
+          trainedYesterday={trainedOn(addDays(today, -1))}
+          onToggle={() => toggle(today)}
+          onToggleDay={toggle}
+          stats={stats}
+          target={target}
+        />
         <div className="grid grid-cols-2 gap-3">
           <Stat value={stats.weekStreak} unit={stats.weekStreak === 1 ? "week" : "weeks"} label="Streak" hint={`weeks in a row at ${target}+`} hot={stats.weekStreak > 0} />
           <Stat value={stats.bestWeekStreak} unit={stats.bestWeekStreak === 1 ? "week" : "weeks"} label="Best streak" hint="your record so far" />
@@ -58,7 +67,11 @@ export default function GymPage() {
         <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
           <div>
             <h2 className="text-[15px] font-bold tracking-tight">Consistency</h2>
-            <p className="text-xs text-ink-3">Tap any past square to fix it.</p>
+            <p className="text-xs text-ink-3">
+              {stats.first
+                ? `${stats.total} ${stats.total === 1 ? "session" : "sessions"} since ${formatDate(stats.first)} · tap any past square to fix it`
+                : "Tap any past square to fix it."}
+            </p>
           </div>
           <div className="flex items-center gap-2 text-xs text-ink-3">
             <span>Target</span>
@@ -78,14 +91,10 @@ export default function GymPage() {
             <span>/ week</span>
           </div>
         </div>
-        <GymGrid weeks={wall.weeks} months={wall.months} today={today} onToggle={toggle} />
-        <div className="mt-3 flex flex-wrap items-center justify-between gap-3 text-[11px] text-ink-3">
+        <GymGrid weeks={wall.weeks} months={wall.months} today={today} target={target} onToggle={toggle} />
+        <div className="mt-5 grid gap-5 border-t border-line pt-4 md:grid-cols-[minmax(0,1fr)_auto] md:items-end">
           <WeekdayBars counts={stats.byWeekday} />
-          <div className="flex items-center gap-3">
-            <Legend swatch={<span className="size-2.5 rounded-[3px] bg-panel-2" />} label="Rest" />
-            <Legend swatch={<span className="size-2.5 rounded-[3px]" style={{ background: `color-mix(in srgb, ${GREEN} 45%, transparent)` }} />} label="Trained" />
-            <Legend swatch={<span className="size-2.5 rounded-[3px]" style={{ background: GREEN }} />} label="Target week" />
-          </div>
+          <Summary weeks={wall.weeks} today={today} total={stats.total} first={stats.first} />
         </div>
       </Panel>
 
@@ -113,13 +122,19 @@ export default function GymPage() {
 /* ------------------------------- Today's card ------------------------------ */
 
 function TrainCard({
+  today,
   trained,
+  trainedYesterday,
   onToggle,
+  onToggleDay,
   stats,
   target,
 }: {
+  today: string;
   trained: boolean;
+  trainedYesterday: boolean;
   onToggle: () => void;
+  onToggleDay: (date: string) => void;
   stats: ReturnType<typeof gymStats>;
   target: number;
 }) {
@@ -214,7 +229,16 @@ function TrainCard({
             {trained ? "Trained ✓" : "Went to the gym?"}
           </p>
           <p className="mt-1 text-[13px] text-ink-2">{message}</p>
-          <p className="mt-1 text-[11px] text-ink-3">{trained ? "Tap again to undo." : "Tap the button when you're done."}</p>
+          <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px] text-ink-3">
+            <span>{trained ? "Tap again to undo." : "Tap the button when you're done."}</span>
+            <button
+              onClick={() => onToggleDay(addDays(today, -1))}
+              className="rounded-md border border-line px-2 py-0.5 font-medium transition-colors hover:bg-panel-2 hover:text-ink"
+              style={trainedYesterday ? { color: GREEN, borderColor: GREEN } : undefined}
+            >
+              {trainedYesterday ? "✓ Yesterday" : "+ Yesterday"}
+            </button>
+          </div>
         </div>
       </div>
 
@@ -226,20 +250,29 @@ function TrainCard({
           </span>
         </div>
         <div className="grid grid-cols-7 gap-1.5">
-          {stats.weekDays.map((d, i) => (
+          {stats.weekDays.map((d, i) => {
+            const date = addDays(startOfWeek(today), i);
+            return (
             <div key={i} className="text-center">
-              <motion.div
+              <motion.button
+                disabled={d === null}
+                onClick={() => onToggleDay(date)}
+                whileHover={d === null ? undefined : { scale: 1.06 }}
+                whileTap={d === null ? undefined : { scale: 0.92 }}
                 animate={{ scale: d ? [0.85, 1.08, 1] : 1 }}
                 transition={{ duration: 0.35 }}
-                className="h-7 rounded-md"
+                title={d === null ? "Still ahead" : `${formatDate(date)} — ${d ? "tap to undo" : "tap if you trained"}`}
+                className="block h-7 w-full rounded-md disabled:cursor-default"
                 style={{
                   background: d ? GREEN : d === null ? "transparent" : "var(--panel-2)",
                   border: d === null ? "1.5px dashed var(--border)" : "none",
+                  boxShadow: date === today ? "0 0 0 2px var(--panel), 0 0 0 3.5px var(--accent)" : undefined,
                 }}
               />
               <span className="mt-1 block text-[10px] font-medium text-ink-3">{WEEK[i]}</span>
             </div>
-          ))}
+            );
+          })}
         </div>
       </div>
     </Panel>
@@ -279,51 +312,84 @@ function Stat({
   );
 }
 
-function Legend({ swatch, label }: { swatch: React.ReactNode; label: string }) {
-  return (
-    <span className="flex items-center gap-1.5">
-      {swatch}
-      {label}
-    </span>
-  );
-}
+const WEEKDAY_FULL = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 
 function WeekdayBars({ counts }: { counts: number[] }) {
   const max = Math.max(1, ...counts);
-  if (counts.every((c) => c === 0)) return <span>Your gym days will show up here.</span>;
+  const total = counts.reduce((a, b) => a + b, 0);
+  const best = total ? counts.indexOf(Math.max(...counts)) : -1;
   return (
-    <div className="flex items-end gap-1.5" title="Sessions per weekday">
-      {counts.map((c, i) => (
-        <div key={i} className="flex flex-col items-center gap-0.5">
-          <div className="flex h-6 w-3 items-end overflow-hidden rounded-[3px] bg-panel-2">
-            <motion.div
-              initial={{ height: 0 }}
-              animate={{ height: `${(c / max) * 100}%` }}
-              transition={{ duration: 0.5, delay: i * 0.03 }}
-              className="w-full rounded-[3px]"
-              style={{ background: GREEN }}
-            />
+    <div>
+      <p className="mb-2 text-[12px] font-semibold text-ink-2">
+        Your gym days
+        {best >= 0 && <span className="ml-2 font-normal text-ink-3">most often on {WEEKDAY_FULL[best]}s</span>}
+      </p>
+      <div className="flex gap-3">
+        {counts.map((c, i) => (
+          <div key={i} className="flex w-9 flex-col items-center gap-1" title={`${WEEKDAY_FULL[i]}: ${c} ${c === 1 ? "session" : "sessions"}`}>
+            <span className={`nums text-[11px] font-semibold ${c ? "text-ink" : "text-ink-3"}`}>{c}</span>
+            <div className="flex h-14 w-3.5 items-end overflow-hidden rounded-full bg-panel-2">
+              <motion.div
+                initial={{ height: 0 }}
+                animate={{ height: `${(c / max) * 100}%` }}
+                transition={{ duration: 0.5, delay: i * 0.04 }}
+                className="w-full rounded-full"
+                style={{ background: i === best ? GREEN : `color-mix(in srgb, ${GREEN} 55%, transparent)` }}
+              />
+            </div>
+            <span className={`text-[11px] ${i === best ? "font-semibold text-ink" : "text-ink-3"}`}>{WEEKDAY[i]}</span>
           </div>
-          <span className="text-[9px]">{WEEK[i]}</span>
-        </div>
-      ))}
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function Summary({ weeks, today, total, first }: { weeks: GymCell[][]; today: string; total: number; first: string | null }) {
+  const past = weeks.filter((w) => w[0].date <= today);
+  const hit = past.filter((w) => w[0].fullWeek).length;
+  const avg = past.length ? total / past.length : 0;
+  const tracked = first ? Math.round((Date.parse(`${today}T12:00:00`) - Date.parse(`${first}T12:00:00`)) / 86_400_000) + 1 : 0;
+  return (
+    <div className="flex flex-wrap items-end gap-6">
+      <Figure value={`${hit}/${past.length}`} label="target weeks" />
+      <Figure value={avg.toFixed(1)} label="avg / week" />
+      <Figure value={String(tracked)} label="days tracked" />
+      <div className="flex items-center gap-1.5 text-[11px] text-ink-3">
+        <span>Rest</span>
+        <span className="size-3 rounded-[3px] bg-panel-2" />
+        <span className="size-3 rounded-[3px]" style={{ background: `color-mix(in srgb, ${GREEN} 45%, transparent)` }} />
+        <span className="size-3 rounded-[3px]" style={{ background: GREEN }} />
+        <span>Target week</span>
+      </div>
+    </div>
+  );
+}
+
+function Figure({ value, label }: { value: string; label: string }) {
+  return (
+    <div>
+      <p className="nums text-[18px] font-bold leading-none tracking-tight">{value}</p>
+      <p className="mt-1 text-[11px] text-ink-3">{label}</p>
     </div>
   );
 }
 
 /* ---------------------------------- The wall -------------------------------- */
 
-const GAP = 3;
+const GAP = 4;
 
 function GymGrid({
   weeks,
   months,
   today,
+  target,
   onToggle,
 }: {
   weeks: GymCell[][];
   months: { label: string; column: number }[];
   today: string;
+  target: number;
   onToggle: (date: string) => void;
 }) {
   const strip = useRef<HTMLDivElement>(null);
@@ -336,76 +402,113 @@ function GymGrid({
     setWidth(el.clientWidth);
     return () => ro.disconnect();
   }, []);
-  const cell = width ? Math.max(11, Math.min(20, Math.floor((width - GAP * (weeks.length - 1)) / weeks.length))) : 12;
+  const cell = width ? Math.max(width < 520 ? 20 : 12, Math.min(22, Math.floor((width - GAP * (weeks.length - 1)) / weeks.length))) : 14;
+  const step = cell + GAP;
   useEffect(() => {
     const el = strip.current;
     const now = el?.querySelector<HTMLElement>("[data-today]");
     if (el && now && el.scrollWidth > el.clientWidth) {
-      el.scrollLeft += now.getBoundingClientRect().left - el.getBoundingClientRect().left - el.clientWidth / 2;
+      el.scrollLeft += now.getBoundingClientRect().left - el.getBoundingClientRect().left - el.clientWidth / 3;
     }
   }, [cell, weeks.length]);
+  const todayCol = weeks.findIndex((w) => w.some((c) => c.date === today));
+  const dayLabel = (d: string) =>
+    new Date(`${d}T12:00:00`).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
 
   return (
-    <div className="flex gap-2">
-      <div className="flex shrink-0 flex-col pt-[18px] text-[10px] text-ink-3" style={{ gap: GAP }}>
+    <div className="flex gap-2.5">
+      {/* Every weekday named, aligned to its row. */}
+      <div className="flex shrink-0 flex-col text-[11px] text-ink-3" style={{ gap: GAP, paddingTop: 22 }}>
         {WEEKDAY.map((d, i) => (
-          <span key={d} className="flex items-center" style={{ height: cell, visibility: i % 2 === 0 ? "visible" : "hidden" }}>
+          <span key={d} className={`flex items-center ${i >= 5 ? "text-ink-2" : ""}`} style={{ height: cell }}>
             {d}
           </span>
         ))}
+        <span className="mt-1 flex items-center text-[10px]" style={{ height: 16 }}>
+          Week
+        </span>
       </div>
+
       <div ref={strip} className="min-w-0 flex-1 overflow-x-auto pb-1">
-        <div className="relative" style={{ width: weeks.length * (cell + GAP) - GAP }}>
-          <div className="relative h-[18px] text-[10px] text-ink-3">
+        <div className="relative" style={{ width: weeks.length * step - GAP }}>
+          {/* Months, each with a tick where it starts. */}
+          <div className="relative h-[22px] text-[11px] text-ink-3">
             {months.map((m) => (
-              <span key={`${m.label}-${m.column}`} className="absolute top-0" style={{ left: m.column * (cell + GAP) }}>
+              <span key={`${m.label}-${m.column}`} className="absolute top-0 flex items-center gap-1" style={{ left: m.column * step }}>
+                <span className="h-2.5 w-px bg-[var(--border)]" />
                 {m.label}
               </span>
             ))}
           </div>
+
           <div className="flex" style={{ gap: GAP }}>
-            {weeks.map((week, w) => (
-              <div key={w} className="flex flex-col" style={{ gap: GAP }}>
-                {week.map((c) => {
-                  const isToday = c.date === today;
-                  const bg = c.future
-                    ? "transparent"
-                    : c.trained
-                      ? c.fullWeek
-                        ? GREEN
-                        : `color-mix(in srgb, ${GREEN} 45%, transparent)`
-                      : "var(--panel-2)";
-                  const label = `${new Date(`${c.date}T12:00:00`).toLocaleDateString("en-US", {
-                    weekday: "short",
-                    month: "short",
-                    day: "numeric",
-                  })} · ${c.future ? "ahead" : c.trained ? "trained — tap to undo" : "rest — tap if you trained"}`;
-                  return (
-                    <motion.button
-                      key={c.date}
-                      data-today={isToday ? "" : undefined}
-                      disabled={c.future}
-                      onClick={() => onToggle(c.date)}
-                      title={label}
-                      aria-label={label}
-                      whileHover={c.future ? undefined : { scale: 1.25 }}
-                      animate={{ scale: c.trained ? [0.6, 1.15, 1] : 1 }}
-                      transition={{ duration: 0.3 }}
-                      className="rounded-[3px] disabled:cursor-default"
-                      style={{
-                        width: cell,
-                        height: cell,
-                        background: bg,
-                        border: c.future ? "1px dashed var(--border)" : "none",
-                        outline: isToday ? "2px solid var(--ink)" : "none",
-                        outlineOffset: 1,
-                      }}
-                    />
-                  );
-                })}
-              </div>
-            ))}
+            {weeks.map((week, w) => {
+              const started = week[0].date <= today;
+              const n = week.filter((c) => c.trained).length;
+              return (
+                <div key={w} className="flex flex-col" style={{ gap: GAP }}>
+                  {week.map((c) => {
+                    const isToday = c.date === today;
+                    const bg = c.future
+                      ? "color-mix(in srgb, var(--panel-2) 45%, transparent)"
+                      : c.trained
+                        ? c.fullWeek
+                          ? GREEN
+                          : `color-mix(in srgb, ${GREEN} 45%, transparent)`
+                        : "var(--panel-2)";
+                    const label = `${dayLabel(c.date)} · ${c.future ? "ahead" : c.trained ? "trained — tap to undo" : "rest — tap if you trained"}`;
+                    return (
+                      <motion.button
+                        key={c.date}
+                        data-today={isToday ? "" : undefined}
+                        disabled={c.future}
+                        onClick={() => onToggle(c.date)}
+                        title={label}
+                        aria-label={label}
+                        whileHover={c.future ? undefined : { scale: 1.2 }}
+                        animate={{ scale: c.trained ? [0.6, 1.15, 1] : 1 }}
+                        transition={{ duration: 0.3 }}
+                        className="rounded-[4px] disabled:cursor-default"
+                        style={{
+                          width: cell,
+                          height: cell,
+                          background: bg,
+                          boxShadow: isToday ? "0 0 0 2px var(--panel), 0 0 0 3.5px var(--accent)" : undefined,
+                        }}
+                      />
+                    );
+                  })}
+
+                  {/* The week's sessions against the target. */}
+                  <div
+                    className="mt-1 flex items-end overflow-hidden rounded-[3px]"
+                    style={{ width: cell, height: 16, background: started ? "var(--panel-2)" : "transparent" }}
+                    title={started ? `Week of ${dayLabel(week[0].date)}: ${n}/${target}` : undefined}
+                  >
+                    {started && n > 0 && (
+                      <div
+                        className="w-full"
+                        style={{
+                          height: `${Math.min(1, n / target) * 100}%`,
+                          background: n >= target ? GREEN : `color-mix(in srgb, ${GREEN} 45%, transparent)`,
+                        }}
+                      />
+                    )}
+                  </div>
+                </div>
+              );
+            })}
           </div>
+          {todayCol >= 0 && (
+            <div className="relative mt-1 h-4">
+              <span
+                className="absolute top-0 text-[10px] font-bold uppercase tracking-wider text-accent-text"
+                style={{ left: todayCol * step + cell / 2, transform: "translateX(-50%)" }}
+              >
+                ▲ today
+              </span>
+            </div>
+          )}
         </div>
       </div>
     </div>

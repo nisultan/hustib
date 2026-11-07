@@ -268,7 +268,7 @@ export function Dictation({
                 animate={{ opacity: 1, y: 0, scale: 1 }}
                 exit={{ opacity: 0, y: 16, scale: 0.97 }}
                 transition={{ type: "spring", stiffness: 420, damping: 32 }}
-                className="fixed inset-x-0 bottom-6 z-[60] mx-auto flex w-[min(560px,calc(100vw-32px))] items-center gap-3 rounded-2xl border border-line bg-panel px-4 py-3 shadow-[var(--shadow-lg),var(--edge)]"
+                className="fixed inset-x-0 bottom-[calc(env(safe-area-inset-bottom)+76px)] z-[60] md:bottom-6 mx-auto flex w-[min(560px,calc(100vw-32px))] items-center gap-3 rounded-2xl border border-line bg-panel px-4 py-3 shadow-[var(--shadow-lg),var(--edge)]"
               >
                 {error ? (
                   <>

@@ -244,7 +244,7 @@ function Month({
   const run = Array.from({ length: 30 }, (_, i) => addDays(today, i - 29));
 
   return (
-    <div className="flex items-center gap-[5px]" aria-label="Last 30 days">
+    <div className="flex max-w-full flex-wrap items-center gap-[3px] sm:gap-[5px]" aria-label="Last 30 days">
       {run.map((d) => {
         const on = written.has(d);
         const isToday = d === today;

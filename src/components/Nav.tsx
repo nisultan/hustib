@@ -2,8 +2,8 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ReactNode, useState } from "react";
-import { motion } from "motion/react";
+import { ReactNode, useEffect, useState } from "react";
+import { AnimatePresence, motion } from "motion/react";
 import { Logo } from "./Logo";
 import { useNavCollapsed } from "@/lib/use-nav";
 import { springNav, springSnappy } from "@/lib/motion";
@@ -454,83 +454,141 @@ export function NavToggle() {
  * during a day rather than during a planning session — the rest stay one tap
  * away in the header.
  */
-const MOBILE_PRIMARY = ["/", "/plan", "/tasks", "/goals", "/reflection"];
+const MOBILE_PRIMARY = ["/", "/plan", "/tasks", "/gym", "/reflection"];
+
+const ALL_ITEMS = (): NavItem[] => [...PRIMARY, ...SECONDARY, ...TERTIARY];
 
 export function MobileNav() {
   const pathname = usePathname();
-  const items = MOBILE_PRIMARY.map((href) => PRIMARY.find((p) => p.href === href)).filter(
+  const [more, setMore] = useState(false);
+  const all = ALL_ITEMS();
+  const items = MOBILE_PRIMARY.map((href) => all.find((p) => p.href === href)).filter(
     (item): item is NavItem => item != null,
   );
+  const rest = all.filter((p) => !MOBILE_PRIMARY.includes(p.href));
+  const inMore = rest.some((p) => isActive(pathname, p.href));
+
+  // Navigating closes the sheet.
+  useEffect(() => setMore(false), [pathname]);
+  useEffect(() => {
+    if (!more) return;
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setMore(false);
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [more]);
+
+  const tab = "relative flex flex-col items-center justify-center gap-1 pb-1.5 pt-2 text-[10px] font-medium transition-colors";
 
   return (
-    <nav
-      className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-5 border-t border-line bg-panel/95 pb-[env(safe-area-inset-bottom)] shadow-[0_-4px_16px_-8px_rgba(0,0,0,0.18)] backdrop-blur-md md:hidden"
-      aria-label="Main"
-    >
-      {items.map((item) => {
-        const active = isActive(pathname, item.href);
-        return (
-          <Link
-            key={item.href}
-            href={item.href}
-            aria-current={active ? "page" : undefined}
-            className={`relative flex flex-col items-center gap-1 py-2 text-[10px] font-medium transition-colors ${
-              active ? "text-accent-text" : "text-ink-3"
-            }`}
-          >
-            {/* The same travelling highlight as the sidebar, reduced to the
-                one line a 10px-tall bar has room for. */}
-            {active && (
-              <motion.span
-                layoutId="mobile-nav-active"
-                transition={springSnappy}
-                aria-hidden
-                className="absolute inset-x-5 top-0 h-[2px] rounded-full bg-accent"
-              />
-            )}
-            <motion.span whileTap={{ scale: 0.88 }} transition={springSnappy}>
-              {item.icon}
-            </motion.span>
-            {item.label === "Universities" ? "Unis" : item.label}
-          </Link>
-        );
-      })}
-    </nav>
+    <>
+      <AnimatePresence>
+        {more && (
+          <>
+            <motion.div
+              key="scrim"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setMore(false)}
+              className="fixed inset-0 z-40 bg-black/45 backdrop-blur-[2px] md:hidden"
+            />
+            <motion.div
+              key="sheet"
+              initial={{ y: "100%" }}
+              animate={{ y: 0 }}
+              exit={{ y: "100%" }}
+              transition={{ type: "spring", stiffness: 420, damping: 38 }}
+              drag="y"
+              dragConstraints={{ top: 0, bottom: 0 }}
+              dragElastic={{ top: 0, bottom: 0.6 }}
+              onDragEnd={(_, info) => {
+                if (info.offset.y > 80 || info.velocity.y > 500) setMore(false);
+              }}
+              className="fixed inset-x-0 bottom-0 z-50 rounded-t-3xl border-t border-line bg-panel px-4 pb-[calc(env(safe-area-inset-bottom)+76px)] pt-2.5 shadow-[0_-12px_40px_-12px_rgba(0,0,0,0.4)] md:hidden"
+              role="dialog"
+              aria-label="More pages"
+            >
+              <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-[var(--border)]" />
+              <div className="grid grid-cols-4 gap-2">
+                {rest.map((item) => {
+                  const active = isActive(pathname, item.href);
+                  return (
+                    <Link
+                      key={item.href}
+                      href={item.href}
+                      onClick={() => setMore(false)}
+                      className={`flex flex-col items-center gap-1.5 rounded-2xl px-1 py-3 text-[11.5px] font-medium transition-colors active:scale-95 ${
+                        active ? "bg-accent-soft text-accent-text" : "bg-panel-2 text-ink-2"
+                      }`}
+                    >
+                      {item.icon}
+                      <span className="truncate">{item.label === "Recommendations" ? "Advice" : item.label}</span>
+                    </Link>
+                  );
+                })}
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+
+      <nav
+        className="fixed inset-x-0 bottom-0 z-[55] grid grid-cols-6 border-t border-line bg-panel/95 pb-[env(safe-area-inset-bottom)] shadow-[0_-4px_16px_-8px_rgba(0,0,0,0.18)] backdrop-blur-md md:hidden"
+        aria-label="Main"
+      >
+        {items.map((item) => {
+          const active = isActive(pathname, item.href) && !more;
+          return (
+            <Link
+              key={item.href}
+              href={item.href}
+              aria-current={active ? "page" : undefined}
+              className={`${tab} ${active ? "text-accent-text" : "text-ink-3"}`}
+            >
+              {active && (
+                <motion.span
+                  layoutId="mobile-nav-active"
+                  transition={springSnappy}
+                  aria-hidden
+                  className="absolute inset-x-3 top-0 h-[2px] rounded-full bg-accent"
+                />
+              )}
+              <motion.span whileTap={{ scale: 0.85 }} transition={springSnappy}>
+                {item.icon}
+              </motion.span>
+              {item.label === "Reflection" ? "Journal" : item.label}
+            </Link>
+          );
+        })}
+        <button
+          type="button"
+          onClick={() => setMore((v) => !v)}
+          aria-expanded={more}
+          className={`${tab} ${more || inMore ? "text-accent-text" : "text-ink-3"}`}
+        >
+          {(more || inMore) && (
+            <motion.span
+              layoutId="mobile-nav-active"
+              transition={springSnappy}
+              aria-hidden
+              className="absolute inset-x-3 top-0 h-[2px] rounded-full bg-accent"
+            />
+          )}
+          <motion.span whileTap={{ scale: 0.85 }} animate={{ rotate: more ? 45 : 0 }} transition={springSnappy}>
+            <svg viewBox="0 0 20 20" className="size-5" aria-hidden>
+              <path d="M10 4.5v11M4.5 10h11" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+            </svg>
+          </motion.span>
+          More
+        </button>
+      </nav>
+    </>
   );
 }
 
-/**
- * Recommendations and Settings do not fit in a five-slot bottom bar, so on
- * mobile they live in the header instead. Hidden on desktop, where the
- * sidebar already carries them.
- */
+/** Kept for the layout's import; the pages it used to list live in More now. */
 export function MobileHeaderLinks() {
-  const pathname = usePathname();
-
-  return (
-    <div className="flex items-center gap-0.5 md:hidden">
-      {[
-        ...PRIMARY.filter((p) => !MOBILE_PRIMARY.includes(p.href)),
-        ...SECONDARY,
-        ...TERTIARY,
-      ].map((item) => {
-        const active = isActive(pathname, item.href);
-        return (
-          <Link
-            key={item.href}
-            href={item.href}
-            aria-label={item.label}
-            aria-current={active ? "page" : undefined}
-            className={`grid size-9 place-items-center rounded-lg transition-colors ${
-              active ? "bg-accent-soft text-accent-text" : "text-ink-3 hover:bg-panel-2"
-            }`}
-          >
-            {item.icon}
-          </Link>
-        );
-      })}
-    </div>
-  );
+  return null;
 }
 
 /**
