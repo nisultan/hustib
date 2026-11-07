@@ -270,8 +270,7 @@ export function Dictation({
                 onChange={(e) => saveVocab(e.target.value)}
                 rows={6}
                 spellCheck={false}
-                placeholder={"IELTS: yelts, aisles
-Nazarbayev University"}
+                placeholder={"IELTS: yelts, aisles\nNazarbayev University"}
                 className="mt-2 w-full resize-y rounded-lg border border-line bg-panel-2 px-2.5 py-2 font-mono text-[12px] leading-relaxed text-ink outline-none focus:border-[var(--accent)]"
               />
               <div className="mt-2 flex justify-end">
