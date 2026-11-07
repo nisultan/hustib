@@ -23,9 +23,15 @@ export async function POST(request: Request) {
   });
   const commands = await tg("setMyCommands", {
     commands: [
-      { command: "today", description: "Today's brief" },
-      { command: "next", description: "Next block and most pressing task" },
-      { command: "week", description: "Deadlines in the next 7 days" },
+      { command: "today", description: "Full brief for today" },
+      { command: "plan", description: "Today's plan" },
+      { command: "tomorrow", description: "Tomorrow's plan" },
+      { command: "next", description: "What's now and most pressing" },
+      { command: "tasks", description: "Open tasks — tick them here" },
+      { command: "week", description: "Next 7 days" },
+      { command: "goals", description: "Goals and push streaks" },
+      { command: "habits", description: "Tick today's habits" },
+      { command: "block", description: "Add a plan block: /block gym 18:00 60" },
       { command: "add", description: "Add a task" },
       { command: "pause", description: "Pause reminders" },
       { command: "resume", description: "Resume reminders" },

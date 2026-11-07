@@ -55,7 +55,12 @@ export function send(chatId: number, text: string, buttons?: InlineButton[][]) {
 }
 
 /** Constant-time-ish comparison for shared secrets. */
-export function sameSecret(a: string | null | undefined, b: string | undefined): boolean {
+export function sameSecret(raw: string | null | undefined, expected: string | undefined): boolean {
+  // Pasted secrets often pick up a space, a newline or quotes on the way into
+  // a dashboard; none of that is part of the secret.
+  const clean = (s: string | null | undefined) => (s ?? "").trim().replace(/^["']|["']$/g, "");
+  const a = clean(raw);
+  const b = clean(expected);
   if (!a || !b || a.length !== b.length) return false;
   let diff = 0;
   for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
