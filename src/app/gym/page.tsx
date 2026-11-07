@@ -53,7 +53,7 @@ export default function GymPage() {
         <div className="grid grid-cols-2 gap-3">
           <Stat value={stats.weekStreak} unit={stats.weekStreak === 1 ? "week" : "weeks"} label="Streak" hint={`weeks in a row at ${target}+`} hot={stats.weekStreak > 0} />
           <Stat value={stats.bestWeekStreak} unit={stats.bestWeekStreak === 1 ? "week" : "weeks"} label="Best streak" hint="your record so far" />
-          <Stat value={stats.last30} unit="sessions" label="Last 30 days" hint={`≈ ${(stats.last30 / 4.3).toFixed(1)} a week`} />
+          <Stat value={stats.last30} unit="sessions" label="Last 30 days" hint={perWeek(stats.last30, stats.first, today)} />
           <Stat
             value={stats.total}
             unit="total"
@@ -119,6 +119,13 @@ export default function GymPage() {
   );
 }
 
+function perWeek(n: number, first: string | null, today: string): string {
+  if (!first) return "nothing logged yet";
+  const days = Math.min(30, Math.round((Date.parse(`${today}T12:00:00`) - Date.parse(`${first}T12:00:00`)) / 86_400_000) + 1);
+  if (days < 7) return `in your first ${days} ${days === 1 ? "day" : "days"}`;
+  return `≈ ${((n / days) * 7).toFixed(1)} a week`;
+}
+
 /* ------------------------------- Today's card ------------------------------ */
 
 function TrainCard({
@@ -181,25 +188,21 @@ function TrainCard({
           <AnimatePresence mode="wait" initial={false}>
             {trained ? (
               <motion.svg
-                key="tick"
+                key="done"
                 viewBox="0 0 24 24"
-                className="size-11 text-white"
-                initial={{ scale: 0.4, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                exit={{ scale: 0.4, opacity: 0 }}
+                className="size-12 text-white"
+                initial={{ scale: 0.5, rotate: -20, opacity: 0 }}
+                animate={{ scale: 1, rotate: 0, opacity: 1 }}
+                exit={{ scale: 0.5, opacity: 0 }}
                 transition={springSnappy}
               >
-                <motion.path
-                  d="M5 12.5l4.5 4.5L19 7.5"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2.6"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  initial={{ pathLength: 0 }}
-                  animate={{ pathLength: 1 }}
-                  transition={{ duration: 0.35, delay: 0.05 }}
-                />
+                <g fill="currentColor" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round">
+                  <rect x="3.2" y="8" width="3" height="8" rx="1" />
+                  <rect x="17.8" y="8" width="3" height="8" rx="1" />
+                  <rect x="6.2" y="9.5" width="2" height="5" rx=".6" />
+                  <rect x="15.8" y="9.5" width="2" height="5" rx=".6" />
+                  <rect x="8.2" y="11.1" width="7.6" height="1.8" rx=".5" />
+                </g>
               </motion.svg>
             ) : (
               <motion.svg
@@ -226,7 +229,7 @@ function TrainCard({
         <div className="min-w-0 flex-1">
           <p className="text-[12px] font-semibold uppercase tracking-[0.08em] text-ink-3">Today</p>
           <p className="mt-0.5 text-[20px] font-bold leading-tight tracking-tight">
-            {trained ? "Trained ✓" : "Went to the gym?"}
+            {trained ? "Trained today" : "Went to the gym?"}
           </p>
           <p className="mt-1 text-[13px] text-ink-2">{message}</p>
           <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px] text-ink-3">
@@ -236,7 +239,7 @@ function TrainCard({
               className="rounded-md border border-line px-2 py-0.5 font-medium transition-colors hover:bg-panel-2 hover:text-ink"
               style={trainedYesterday ? { color: GREEN, borderColor: GREEN } : undefined}
             >
-              {trainedYesterday ? "✓ Yesterday" : "+ Yesterday"}
+              {trainedYesterday ? "Yesterday logged" : "+ Yesterday"}
             </button>
           </div>
         </div>
@@ -402,7 +405,7 @@ function GymGrid({
     setWidth(el.clientWidth);
     return () => ro.disconnect();
   }, []);
-  const cell = width ? Math.max(width < 520 ? 20 : 12, Math.min(22, Math.floor((width - GAP * (weeks.length - 1)) / weeks.length))) : 14;
+  const cell = width ? Math.max(width < 520 ? 20 : 12, Math.min(22, Math.floor((width - 12 - GAP * (weeks.length - 1)) / weeks.length))) : 14;
   const step = cell + GAP;
   useEffect(() => {
     const el = strip.current;
@@ -429,7 +432,7 @@ function GymGrid({
         </span>
       </div>
 
-      <div ref={strip} className="min-w-0 flex-1 overflow-x-auto pb-1">
+      <div ref={strip} className="min-w-0 flex-1 overflow-x-auto pb-1 pl-1.5 pr-1">
         <div className="relative" style={{ width: weeks.length * step - GAP }}>
           {/* Months, each with a tick where it starts. */}
           <div className="relative h-[22px] text-[11px] text-ink-3">
@@ -503,9 +506,9 @@ function GymGrid({
             <div className="relative mt-1 h-4">
               <span
                 className="absolute top-0 text-[10px] font-bold uppercase tracking-wider text-accent-text"
-                style={{ left: todayCol * step + cell / 2, transform: "translateX(-50%)" }}
+                style={todayCol < 2 ? { left: 0 } : { left: todayCol * step + cell / 2, transform: "translateX(-50%)" }}
               >
-                ▲ today
+                today
               </span>
             </div>
           )}
