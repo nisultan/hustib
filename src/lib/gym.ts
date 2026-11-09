@@ -11,16 +11,82 @@ import type { Day } from "./types";
  * then it is still in play and does not break anything.
  */
 
-export const GYM_TARGET_KEY = "lockin.gym.target";
-export const DEFAULT_TARGET = 4;
+export const GYM_PLAN_KEY = "lockin.gym.plan";
 
-export function readTarget(): number {
+/**
+ * Your gym days, in two seasons. During school you might go Tue, Thu, Sat and
+ * Sun; in the summer every day. A week's target is how many days you planned
+ * for it, and any session counts towards it, planned day or not: a Wednesday
+ * instead of a Thursday still fills the week.
+ *
+ * A week belongs to whichever season its Thursday falls in, so a week that
+ * straddles the switch is judged by most of its days.
+ */
+export interface GymPlan {
+  /** Weekdays, 0 = Monday .. 6 = Sunday. */
+  schoolDays: number[];
+  summerDays: number[];
+  /** Month-day, "MM-DD", inclusive. */
+  summerFrom: string;
+  summerTo: string;
+}
+
+export const DEFAULT_PLAN: GymPlan = {
+  schoolDays: [1, 3, 5, 6],
+  summerDays: [0, 1, 2, 3, 4, 5, 6],
+  summerFrom: "06-05",
+  summerTo: "08-31",
+};
+
+const isMonthDay = (v: unknown): v is string => typeof v === "string" && /^\d{2}-\d{2}$/.test(v);
+const isDays = (v: unknown): v is number[] =>
+  Array.isArray(v) && v.length > 0 && v.every((n) => Number.isInteger(n) && n >= 0 && n <= 6);
+const clean = (v: number[]) => [...new Set(v)].sort((x, y) => x - y);
+
+/** The saved plan, or null when the days were never chosen. */
+export function readPlan(): GymPlan | null {
   try {
-    const n = Number(localStorage.getItem(GYM_TARGET_KEY));
-    return n >= 1 && n <= 7 ? n : DEFAULT_TARGET;
-  } catch {
-    return DEFAULT_TARGET;
-  }
+    const saved = JSON.parse(localStorage.getItem(GYM_PLAN_KEY) ?? "null");
+    if (saved && typeof saved === "object" && isDays(saved.schoolDays)) {
+      return {
+        schoolDays: clean(saved.schoolDays),
+        summerDays: isDays(saved.summerDays) ? clean(saved.summerDays) : DEFAULT_PLAN.summerDays,
+        summerFrom: isMonthDay(saved.summerFrom) ? saved.summerFrom : DEFAULT_PLAN.summerFrom,
+        summerTo: isMonthDay(saved.summerTo) ? saved.summerTo : DEFAULT_PLAN.summerTo,
+      };
+    }
+  } catch {}
+  return null;
+}
+
+export function savePlan(plan: GymPlan) {
+  try {
+    localStorage.setItem(GYM_PLAN_KEY, JSON.stringify({ ...plan, schoolDays: clean(plan.schoolDays), summerDays: clean(plan.summerDays) }));
+  } catch {}
+}
+
+/** 0 = Monday .. 6 = Sunday. */
+export const weekdayIndex = (date: string) => (new Date(`${date}T12:00:00`).getDay() + 6) % 7;
+
+/** Whether a week (given by its Monday) is a summer week. */
+export function isSummerWeek(monday: string, plan: GymPlan): boolean {
+  const md = addDays(monday, 3).slice(5);
+  return plan.summerFrom <= plan.summerTo
+    ? md >= plan.summerFrom && md <= plan.summerTo
+    : md >= plan.summerFrom || md <= plan.summerTo;
+}
+
+export function daysFor(monday: string, plan: GymPlan): number[] {
+  return isSummerWeek(monday, plan) ? plan.summerDays : plan.schoolDays;
+}
+
+export function targetFor(monday: string, plan: GymPlan): number {
+  return daysFor(monday, plan).length;
+}
+
+/** Whether a date is one of the planned gym days of its season. */
+export function isPlanned(date: string, plan: GymPlan): boolean {
+  return daysFor(startOfWeek(date), plan).includes(weekdayIndex(date));
 }
 
 export function gymSet(days: Day[]): Set<string> {
@@ -29,6 +95,11 @@ export function gymSet(days: Day[]): Set<string> {
 
 export interface GymStats {
   thisWeek: number;
+  /** This week's target, by season. */
+  target: number;
+  summer: boolean;
+  /** Mon..Sun, planned gym days this week. */
+  planned: boolean[];
   /** Mon..Sun of this week, trained or not; null for days still ahead. */
   weekDays: (boolean | null)[];
   weekStreak: number;
@@ -49,7 +120,7 @@ function countWeek(set: Set<string>, monday: string): number {
   return n;
 }
 
-export function gymStats(days: Day[], target: number, today = todayISO()): GymStats {
+export function gymStats(days: Day[], plan: GymPlan, today = todayISO()): GymStats {
   const set = gymSet(days);
   const dates = [...set].sort();
   const monday = startOfWeek(today);
@@ -59,11 +130,13 @@ export function gymStats(days: Day[], target: number, today = todayISO()): GymSt
     return d > today ? null : set.has(d);
   });
   const thisWeek = weekDays.filter(Boolean).length;
+  const target = targetFor(monday, plan);
+  const hit = (w: string) => countWeek(set, w) >= targetFor(w, plan);
 
   // Current streak: this week if already hit, then back week by week.
   let weekStreak = thisWeek >= target ? 1 : 0;
   for (let w = addDays(monday, -7); dates.length && w >= startOfWeek(dates[0]); w = addDays(w, -7)) {
-    if (countWeek(set, w) >= target) weekStreak += 1;
+    if (hit(w)) weekStreak += 1;
     else break;
   }
 
@@ -71,7 +144,7 @@ export function gymStats(days: Day[], target: number, today = todayISO()): GymSt
   if (dates.length) {
     let run = 0;
     for (let w = startOfWeek(dates[0]); w <= monday; w = addDays(w, 7)) {
-      if (countWeek(set, w) >= target) {
+      if (hit(w)) {
         run += 1;
         bestWeekStreak = Math.max(bestWeekStreak, run);
       } else if (w !== monday) run = 0;
@@ -85,6 +158,9 @@ export function gymStats(days: Day[], target: number, today = todayISO()): GymSt
   const last = dates.at(-1) ?? null;
   return {
     thisWeek,
+    target,
+    summer: isSummerWeek(monday, plan),
+    planned: Array.from({ length: 7 }, (_, i) => daysFor(monday, plan).includes(i)),
     weekDays,
     weekStreak,
     bestWeekStreak,
@@ -102,6 +178,11 @@ export interface GymCell {
   trained: boolean;
   /** The week this day sits in hit the target. */
   fullWeek: boolean;
+  /** That week's target and season. */
+  target: number;
+  summer: boolean;
+  /** One of the planned days of its season. */
+  planned: boolean;
   future: boolean;
 }
 
@@ -111,7 +192,7 @@ export interface GymCell {
  */
 export function gymWall(
   days: Day[],
-  target: number,
+  plan: GymPlan,
   today = todayISO(),
 ): { weeks: GymCell[][]; months: { label: string; column: number }[] } {
   const set = gymSet(days);
@@ -126,11 +207,14 @@ export function gymWall(
   const months: { label: string; column: number }[] = [];
   let lastMonth = -1;
   for (let w = start, col = 0; w < end; w = addDays(w, 7), col++) {
+    const planDays = daysFor(w, plan);
+    const target = planDays.length;
+    const summer = isSummerWeek(w, plan);
     const full = countWeek(set, w) >= target;
     weeks.push(
       Array.from({ length: 7 }, (_, i) => {
         const date = addDays(w, i);
-        return { date, trained: set.has(date), fullWeek: full, future: date > today };
+        return { date, trained: set.has(date), fullWeek: full, target, summer, planned: planDays.includes(i), future: date > today };
       }),
     );
     const m = new Date(`${w}T12:00:00`).getMonth();

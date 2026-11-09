@@ -6,7 +6,7 @@ import { useStore } from "@/lib/store";
 import { addDays, formatDate, pastLabel, todayISO } from "@/lib/dates";
 import { startOfWeek } from "@/lib/calendar";
 import { Day } from "@/lib/types";
-import { DEFAULT_TARGET, GYM_TARGET_KEY, GymCell, gymStats, gymWall, readTarget } from "@/lib/gym";
+import { DEFAULT_PLAN, GymCell, GymPlan, gymStats, gymWall, isPlanned, readPlan, savePlan } from "@/lib/gym";
 import { WeighIn, WeightSummary, trendColor } from "@/components/WeightPanel";
 import { EmptyState, PageHeader, Panel, SectionTitle } from "@/components/ui";
 import { springSnappy } from "@/lib/motion";
@@ -19,17 +19,18 @@ export default function GymPage() {
   const store = useStore();
   const today = todayISO();
   const [date, setDate] = useState(today);
-  const [target, setTargetState] = useState(DEFAULT_TARGET);
-  useEffect(() => setTargetState(readTarget()), []);
-  const setTarget = (n: number) => {
-    setTargetState(n);
-    try {
-      localStorage.setItem(GYM_TARGET_KEY, String(n));
-    } catch {}
+  // undefined while loading, null until the days have been chosen once.
+  const [saved, setSaved] = useState<GymPlan | null | undefined>(undefined);
+  useEffect(() => setSaved(readPlan()), []);
+  const plan = saved ?? DEFAULT_PLAN;
+  const setPlan = (next: GymPlan) => {
+    setSaved(next);
+    savePlan(next);
   };
 
-  const stats = useMemo(() => gymStats(store.days, target, today), [store.days, target, today]);
-  const wall = useMemo(() => gymWall(store.days, target, today), [store.days, target, today]);
+  const stats = useMemo(() => gymStats(store.days, plan, today), [store.days, plan, today]);
+  const wall = useMemo(() => gymWall(store.days, plan, today), [store.days, plan, today]);
+  const target = stats.target;
 
   if (!store.ready) return <div className="h-64" aria-busy="true" />;
 
@@ -38,7 +39,9 @@ export default function GymPage() {
 
   return (
     <div className="page-in">
-      <PageHeader title="Gym" subtitle="Show up, tap the button. Weeks that hit your target light up." />
+      <PageHeader title="Gym" subtitle="Show up, tap the button. A week that hits its target is a full week, rest days included." />
+
+      {saved === null && <PlanSetup onSave={setPlan} />}
 
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)]">
         <TrainCard
@@ -49,9 +52,10 @@ export default function GymPage() {
           onToggleDay={toggle}
           stats={stats}
           target={target}
+          plannedToday={isPlanned(today, plan)}
         />
         <div className="grid grid-cols-2 gap-3">
-          <Stat value={stats.weekStreak} unit={stats.weekStreak === 1 ? "week" : "weeks"} label="Streak" hint={`weeks in a row at ${target}+`} hot={stats.weekStreak > 0} />
+          <Stat value={stats.weekStreak} unit={stats.weekStreak === 1 ? "week" : "weeks"} label="Streak" hint={`full weeks in a row · ${stats.summer ? "summer" : "school"} target ${target}`} hot={stats.weekStreak > 0} />
           <Stat value={stats.bestWeekStreak} unit={stats.bestWeekStreak === 1 ? "week" : "weeks"} label="Best streak" hint="your record so far" />
           <Stat value={stats.last30} unit="sessions" label="Last 30 days" hint={perWeek(stats.last30, stats.first, today)} />
           <Stat
@@ -73,25 +77,9 @@ export default function GymPage() {
                 : "Tap any past square to fix it."}
             </p>
           </div>
-          <div className="flex items-center gap-2 text-xs text-ink-3">
-            <span>Target</span>
-            <div className="flex gap-0.5 rounded-lg border border-line bg-panel-2 p-0.5">
-              {[2, 3, 4, 5, 6].map((n) => (
-                <button
-                  key={n}
-                  onClick={() => setTarget(n)}
-                  className={`nums h-6 w-7 rounded-md text-[12px] font-semibold transition-colors ${
-                    n === target ? "bg-panel text-ink shadow-[var(--shadow),var(--edge)]" : "hover:text-ink"
-                  }`}
-                >
-                  {n}
-                </button>
-              ))}
-            </div>
-            <span>/ week</span>
-          </div>
+          <PlanPicker plan={plan} onChange={setPlan} />
         </div>
-        <GymGrid weeks={wall.weeks} months={wall.months} today={today} target={target} onToggle={toggle} />
+        <GymGrid weeks={wall.weeks} months={wall.months} today={today} onToggle={toggle} />
         <div className="mt-5 grid gap-5 border-t border-line pt-4 md:grid-cols-[minmax(0,1fr)_auto] md:items-end">
           <WeekdayBars counts={stats.byWeekday} />
           <Summary weeks={wall.weeks} today={today} total={stats.total} first={stats.first} />
@@ -126,6 +114,127 @@ function perWeek(n: number, first: string | null, today: string): string {
   return `≈ ${((n / days) * 7).toFixed(1)} a week`;
 }
 
+/* ------------------------------ Seasonal targets ----------------------------- */
+
+const DAY_NAMES = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+
+function daysText(days: number[]): string {
+  if (days.length === 7) return "every day";
+  if (days.length === 5 && [0, 1, 2, 3, 4].every((d) => days.includes(d))) return "weekdays";
+  return days.map((d) => DAY_NAMES[d]).join(" ");
+}
+
+function DayChips({ value, onChange, label }: { value: number[]; onChange: (v: number[]) => void; label: string }) {
+  const flip = (d: number) => {
+    const next = value.includes(d) ? value.filter((x) => x !== d) : [...value, d].sort((x, y) => x - y);
+    if (next.length) onChange(next);
+  };
+  return (
+    <div className="flex items-center gap-2">
+      <span className="w-14 shrink-0 text-[12px] font-semibold text-ink-2">{label}</span>
+      <div className="flex gap-1">
+        {DAY_NAMES.map((name, d) => {
+          const on = value.includes(d);
+          return (
+            <button
+              key={d}
+              type="button"
+              onClick={() => flip(d)}
+              aria-pressed={on}
+              className={`h-7 w-9 rounded-md text-[11.5px] font-semibold transition-colors ${
+                on ? "text-white" : "bg-panel-2 text-ink-3 hover:text-ink"
+              }`}
+              style={on ? { background: GREEN } : undefined}
+            >
+              {name}
+            </button>
+          );
+        })}
+      </div>
+      <span className="nums text-[11px] text-ink-3">{value.length}/wk</span>
+    </div>
+  );
+}
+
+function PlanEditor({ plan, onChange }: { plan: GymPlan; onChange: (p: GymPlan) => void }) {
+  const year = new Date().getFullYear();
+  const date =
+    "h-7 rounded-md border border-line bg-panel-2 px-1.5 text-[12px] text-ink outline-none focus:border-[var(--accent)] [color-scheme:dark]";
+  return (
+    <div className="grid gap-2.5">
+      <DayChips label="School" value={plan.schoolDays} onChange={(v) => onChange({ ...plan, schoolDays: v })} />
+      <DayChips label="Summer" value={plan.summerDays} onChange={(v) => onChange({ ...plan, summerDays: v })} />
+      <div className="flex flex-wrap items-center gap-2 text-[12px] text-ink-3">
+        <span className="w-14 shrink-0 font-semibold text-ink-2">Dates</span>
+        <input
+          type="date"
+          aria-label="Summer starts"
+          value={`${year}-${plan.summerFrom}`}
+          onChange={(e) => e.target.value && onChange({ ...plan, summerFrom: e.target.value.slice(5) })}
+          className={date}
+        />
+        –
+        <input
+          type="date"
+          aria-label="Summer ends"
+          value={`${year}-${plan.summerTo}`}
+          onChange={(e) => e.target.value && onChange({ ...plan, summerTo: e.target.value.slice(5) })}
+          className={date}
+        />
+        <span className="text-[11px]">summer, every year</span>
+      </div>
+    </div>
+  );
+}
+
+/** Shown once, before the days were ever chosen. */
+function PlanSetup({ onSave }: { onSave: (p: GymPlan) => void }) {
+  const [draft, setDraft] = useState<GymPlan>(DEFAULT_PLAN);
+  return (
+    <Panel className="mb-4 p-5">
+      <h2 className="text-[15px] font-bold tracking-tight">Which days do you train?</h2>
+      <p className="mb-4 mt-1 max-w-xl text-[13px] text-ink-2">
+        Pick your gym days for the school year and for the summer. The number of days is the week&apos;s target, and a
+        session on any other day still counts. You can change this any time.
+      </p>
+      <PlanEditor plan={draft} onChange={setDraft} />
+      <button
+        type="button"
+        onClick={() => onSave(draft)}
+        className="mt-4 rounded-lg px-4 py-2 text-[13px] font-semibold text-white transition-opacity hover:opacity-90"
+        style={{ background: "var(--accent)" }}
+      >
+        Save my days
+      </button>
+    </Panel>
+  );
+}
+
+function PlanPicker({ plan, onChange }: { plan: GymPlan; onChange: (p: GymPlan) => void }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="flex flex-col items-end gap-2 text-xs text-ink-3">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        className="rounded-md px-2 py-1 text-right transition-colors hover:bg-panel-2 hover:text-ink"
+        title="Change your gym days"
+      >
+        School <b className="font-semibold text-ink-2">{daysText(plan.schoolDays)}</b>
+        <span className="mx-1.5">·</span>
+        Summer <b className="font-semibold text-ink-2">{daysText(plan.summerDays)}</b>
+        <span className="ml-1.5 underline decoration-dotted underline-offset-2">{open ? "done" : "edit"}</span>
+      </button>
+      {open && (
+        <div className="rounded-xl border border-line bg-panel-2/40 p-3">
+          <PlanEditor plan={plan} onChange={onChange} />
+        </div>
+      )}
+    </div>
+  );
+}
+
 /* ------------------------------- Today's card ------------------------------ */
 
 function TrainCard({
@@ -136,6 +245,7 @@ function TrainCard({
   onToggleDay,
   stats,
   target,
+  plannedToday,
 }: {
   today: string;
   trained: boolean;
@@ -144,6 +254,7 @@ function TrainCard({
   onToggleDay: (date: string) => void;
   stats: ReturnType<typeof gymStats>;
   target: number;
+  plannedToday: boolean;
 }) {
   const left = Math.max(0, target - stats.thisWeek);
   const message = trained
@@ -156,7 +267,9 @@ function TrainCard({
       ? `${stats.sinceLast} days since the last one. Today fixes that.`
       : left === 0
         ? "Week's target is done — anything now is extra."
-        : `${left} to go this week.`;
+        : plannedToday
+          ? `Gym day today. ${left} to go this week.`
+          : `Rest day by plan — a session still counts. ${left} to go.`;
 
   return (
     <Panel className="relative overflow-hidden p-5">
@@ -268,11 +381,16 @@ function TrainCard({
                 className="block h-7 w-full rounded-md disabled:cursor-default"
                 style={{
                   background: d ? GREEN : d === null ? "transparent" : "var(--panel-2)",
-                  border: d === null ? "1.5px dashed var(--border)" : "none",
+                  border:
+                    d === null
+                      ? `1.5px dashed ${stats.planned[i] ? `color-mix(in srgb, ${GREEN} 60%, transparent)` : "var(--border)"}`
+                      : "none",
                   boxShadow: date === today ? "0 0 0 2px var(--panel), 0 0 0 3.5px var(--accent)" : undefined,
                 }}
               />
-              <span className="mt-1 block text-[10px] font-medium text-ink-3">{WEEK[i]}</span>
+              <span className={`mt-1 block text-[10px] ${stats.planned[i] ? "font-bold text-ink-2" : "font-medium text-ink-3"}`}>
+                {WEEK[i]}
+              </span>
             </div>
             );
           })}
@@ -355,15 +473,16 @@ function Summary({ weeks, today, total, first }: { weeks: GymCell[][]; today: st
   const tracked = first ? Math.round((Date.parse(`${today}T12:00:00`) - Date.parse(`${first}T12:00:00`)) / 86_400_000) + 1 : 0;
   return (
     <div className="flex flex-wrap items-end gap-6">
-      <Figure value={`${hit}/${past.length}`} label="target weeks" />
+      <Figure value={`${hit}/${past.length}`} label="full weeks" />
       <Figure value={avg.toFixed(1)} label="avg / week" />
       <Figure value={String(tracked)} label="days tracked" />
       <div className="flex items-center gap-1.5 text-[11px] text-ink-3">
         <span>Rest</span>
         <span className="size-3 rounded-[3px] bg-panel-2" />
         <span className="size-3 rounded-[3px]" style={{ background: `color-mix(in srgb, ${GREEN} 45%, transparent)` }} />
+        <span className="size-3 rounded-[3px]" style={{ background: COVERED }} />
         <span className="size-3 rounded-[3px]" style={{ background: GREEN }} />
-        <span>Target week</span>
+        <span>Full week</span>
       </div>
     </div>
   );
@@ -381,18 +500,29 @@ function Figure({ value, label }: { value: string; label: string }) {
 /* ---------------------------------- The wall -------------------------------- */
 
 const GAP = 4;
+const COVERED = `color-mix(in srgb, ${GREEN} 22%, var(--panel-2))`;
+const SUMMER = "#e0a84a";
+
+function seasonRuns(weeks: GymCell[][]): { start: number; length: number; target: number }[] {
+  const runs: { start: number; length: number; target: number }[] = [];
+  weeks.forEach((w, i) => {
+    if (!w[0].summer) return;
+    const last = runs.at(-1);
+    if (last && last.start + last.length === i) last.length += 1;
+    else runs.push({ start: i, length: 1, target: w[0].target });
+  });
+  return runs;
+}
 
 function GymGrid({
   weeks,
   months,
   today,
-  target,
   onToggle,
 }: {
   weeks: GymCell[][];
   months: { label: string; column: number }[];
   today: string;
-  target: number;
   onToggle: (date: string) => void;
 }) {
   const strip = useRef<HTMLDivElement>(null);
@@ -421,7 +551,7 @@ function GymGrid({
   return (
     <div className="flex gap-2.5">
       {/* Every weekday named, aligned to its row. */}
-      <div className="flex shrink-0 flex-col text-[11px] text-ink-3" style={{ gap: GAP, paddingTop: 22 }}>
+      <div className="flex shrink-0 flex-col text-[11px] text-ink-3" style={{ gap: GAP, paddingTop: 38 }}>
         {WEEKDAY.map((d, i) => (
           <span key={d} className={`flex items-center ${i >= 5 ? "text-ink-2" : ""}`} style={{ height: cell }}>
             {d}
@@ -434,6 +564,22 @@ function GymGrid({
 
       <div ref={strip} className="min-w-0 flex-1 overflow-x-auto pb-1 pl-1.5 pr-1">
         <div className="relative" style={{ width: weeks.length * step - GAP }}>
+          {/* Summer runs, so the higher bar shows where it applies. */}
+          <div className="relative h-4">
+            {seasonRuns(weeks).map((r) => (
+              <span
+                key={r.start}
+                className="absolute top-0 flex h-4 items-center gap-1.5"
+                style={{ left: r.start * step, width: r.length * step - GAP }}
+                title={`Summer: ${r.target} a week`}
+              >
+                <span className="whitespace-nowrap text-[10px] font-semibold leading-none" style={{ color: SUMMER }}>
+                  summer · {r.target === 7 ? "daily" : `${r.target}/wk`}
+                </span>
+                <span className="h-[2px] min-w-0 flex-1 rounded-full" style={{ background: SUMMER, opacity: 0.6 }} />
+              </span>
+            ))}
+          </div>
           {/* Months, each with a tick where it starts. */}
           <div className="relative h-[22px] text-[11px] text-ink-3">
             {months.map((m) => (
@@ -448,18 +594,33 @@ function GymGrid({
             {weeks.map((week, w) => {
               const started = week[0].date <= today;
               const n = week.filter((c) => c.trained).length;
+              const target = week[0].target;
               return (
                 <div key={w} className="flex flex-col" style={{ gap: GAP }}>
                   {week.map((c) => {
                     const isToday = c.date === today;
-                    const bg = c.future
-                      ? "color-mix(in srgb, var(--panel-2) 45%, transparent)"
-                      : c.trained
-                        ? c.fullWeek
-                          ? GREEN
-                          : `color-mix(in srgb, ${GREEN} 45%, transparent)`
-                        : "var(--panel-2)";
-                    const label = `${dayLabel(c.date)} · ${c.future ? "ahead" : c.trained ? "trained — tap to undo" : "rest — tap if you trained"}`;
+                    // A week that hit its target is a full week: its rest days
+                    // are part of it, not gaps, so they carry the colour too.
+                    const bg = c.trained
+                      ? c.fullWeek
+                        ? GREEN
+                        : `color-mix(in srgb, ${GREEN} 45%, transparent)`
+                      : c.fullWeek
+                        ? COVERED
+                        : c.future
+                          ? "color-mix(in srgb, var(--panel-2) 45%, transparent)"
+                          : "var(--panel-2)";
+                    const label = `${dayLabel(c.date)} · ${
+                      c.trained
+                        ? "trained — tap to undo"
+                        : c.fullWeek
+                          ? `rest — week already at ${c.target}`
+                          : c.future
+                            ? c.planned
+                              ? "planned gym day"
+                              : "ahead"
+                            : "rest — tap if you trained"
+                    }`;
                     return (
                       <motion.button
                         key={c.date}
@@ -476,7 +637,11 @@ function GymGrid({
                           width: cell,
                           height: cell,
                           background: bg,
-                          boxShadow: isToday ? "0 0 0 2px var(--panel), 0 0 0 3.5px var(--accent)" : undefined,
+                          boxShadow: isToday
+                            ? "0 0 0 2px var(--panel), 0 0 0 3.5px var(--accent)"
+                            : c.planned && !c.trained && !c.fullWeek && c.future
+                              ? `inset 0 0 0 1.5px color-mix(in srgb, ${GREEN} 45%, transparent)`
+                              : undefined,
                         }}
                       />
                     );
@@ -486,7 +651,7 @@ function GymGrid({
                   <div
                     className="mt-1 flex items-end overflow-hidden rounded-[3px]"
                     style={{ width: cell, height: 16, background: started ? "var(--panel-2)" : "transparent" }}
-                    title={started ? `Week of ${dayLabel(week[0].date)}: ${n}/${target}` : undefined}
+                    title={`Week of ${dayLabel(week[0].date)} · ${week[0].summer ? "summer" : "school"}: ${started ? `${n}/` : "target "}${target}`}
                   >
                     {started && n > 0 && (
                       <div

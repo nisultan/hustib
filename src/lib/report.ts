@@ -90,7 +90,14 @@ export interface Report {
 const GOOD_RANKS: RankKey[] = ["prime", "locked", "rising"];
 
 export function firstActiveDay(data: AppData, today: string): string | null {
-  return activityRange(data, addDays(today, -730), today).find((d) => d.total > 0)?.date ?? null;
+  const active = activityRange(data, addDays(today, -730), today).find((d) => d.total > 0)?.date ?? null;
+  // Gym days, weigh-ins and journal entries are activity too.
+  const logged = data.days
+    .filter((d) => d.date <= today && (d.gym || d.weight != null || d.reflection.some((b) => b.text.trim() !== "")))
+    .map((d) => d.date)
+    .sort()[0];
+  if (!logged) return active;
+  return !active || logged < active ? logged : active;
 }
 
 export function buildReport(data: AppData, p: Period, span: Span, today: string): Report {

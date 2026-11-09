@@ -71,13 +71,23 @@ export default function ReportPage() {
   const report = useMemo(() => buildReport(store, p, span, today), [store, p, span, today]);
   const start = useMemo(() => firstActiveDay(store, today), [store, today]);
   const canBack = start != null && p.from > start;
+  const choices = useMemo(() => {
+    const out: { offset: number; label: string }[] = [];
+    for (let o = 0; o < 400; o++) {
+      const q = period(span, o, today);
+      if (o > 0 && (start == null || q.to < start)) break;
+      out.push({ offset: o, label: o === 0 ? `${q.label} · this ${span}` : q.label });
+    }
+    if (!out.some((c) => c.offset === offset)) out.push({ offset, label: p.label });
+    return out;
+  }, [span, today, start, offset, p.label]);
   /*
-    Reports are a ritual, not a dashboard: weekly and two-week reports open
-    only on Sunday, monthly ones only on the last day of the month. A report
-    you opened on its day stays open to you afterwards.
+    Reports are a ritual, not a dashboard: a period's report opens on its
+    last day (Sunday for a week, the last of the month for a month). Once a
+    period is over it stays open for good, so any past week can be looked at
+    whenever you like.
   */
   const nextUnlock = period(span, 0, today).to;
-  const unlockDay = today === nextUnlock;
   const seenKey = `${span}:${p.from}`;
   const [seen, setSeen] = useState<string[]>(() => {
     try {
@@ -96,7 +106,8 @@ export default function ReportPage() {
       // Private mode: remembered for this visit only.
     }
   };
-  const locked = p.to > today || !(unlockDay || seen.includes(seenKey));
+  // Only a period still running is locked; its last day opens it.
+  const locked = p.to > today;
 
   // A new period is a new sealed card. Reset in the same update as the
   // period change, so the card swap is a single transition.
@@ -128,12 +139,25 @@ export default function ReportPage() {
         />
         <div className="flex items-center gap-1">
           <NavArrow dir="left" disabled={!canBack} onClick={() => go({ offset: offset + 1 })} />
-          <span className="nums min-w-[150px] text-center text-[13.5px] font-semibold">
-            {p.label}
-            {p.current && (
-              <span className="ml-1.5 text-[11px] font-medium text-ink-3">so far</span>
-            )}
-          </span>
+          <label className="relative">
+            <span className="sr-only">Pick a {span}</span>
+            <select
+              value={offset}
+              onChange={(e) => go({ offset: Number(e.target.value) })}
+              title={`Pick any ${span}`}
+              className="nums h-8 min-w-[170px] cursor-pointer appearance-none rounded-lg border border-transparent bg-transparent pl-3 pr-7 text-center text-[13.5px] font-semibold text-ink outline-none transition-colors hover:border-line hover:bg-panel-2 focus:border-[var(--accent)]"
+            >
+              {choices.map((c) => (
+                <option key={c.offset} value={c.offset}>
+                  {c.label}
+                </option>
+              ))}
+            </select>
+            <svg viewBox="0 0 16 16" aria-hidden className="pointer-events-none absolute right-2 top-1/2 size-3 -translate-y-1/2 text-ink-3">
+              <path d="m4 6 4 4 4-4" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </label>
+          {p.current && <span className="text-[11px] font-medium text-ink-3">so far</span>}
           <NavArrow
             dir="right"
             disabled={offset === 0}
