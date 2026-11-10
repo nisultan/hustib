@@ -1100,3 +1100,23 @@ summary {
 @media (prefers-reduced-motion: reduce) {
   .shimmer-text { animation: none; color: var(--text-2); background: none; }
 }
+
+/* Birthday: a rainbow that keeps flowing through the letters. */
+.rainbow-text {
+  background-image: linear-gradient(90deg, #ff3b6b, #ff8a00, #ffd60a, #3ddc84, #22b8ff, #8b5cf6, #ff4fd8, #ff3b6b);
+  background-size: 300% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: rainbow-flow 3.2s linear infinite;
+}
+@keyframes rainbow-flow {
+  to {
+    background-position: 300% 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .rainbow-text {
+    animation: none;
+  }
+}

@@ -49,6 +49,7 @@ export function ActivityTrend({ weeks: all, height = 150 }: { weeks: WeekBar[]; 
   const peak = Math.max(1, ...weeks.map((w) => w.total), stats.projected ?? 0);
   const shownIndex = hover ?? weeks.length - 1;
   const shown = weeks[shownIndex];
+  const latest = weeks.at(-1);
   const previous = weeks[shownIndex - 1];
 
   const delta =
@@ -101,8 +102,13 @@ export function ActivityTrend({ weeks: all, height = 150 }: { weeks: WeekBar[]; 
               </span>
             )}
           </div>
-          {shown?.partial && stats.projected != null && hover == null && (
-            <p className="mt-1.5 text-[12px] text-ink-3">
+          {/*
+            Hidden rather than removed while hovering: taking the line out
+            moved the chart up under the pointer, so pointing low on a short
+            bar left the chart, brought the line back, and it flickered.
+          */}
+          {latest?.partial && stats.projected != null && (
+            <p className="mt-1.5 text-[12px] text-ink-3" style={{ visibility: hover == null ? "visible" : "hidden" }}>
               On pace for <span className="nums font-semibold text-ink-2">{stats.projected}</span>
               {stats.avg != null && (
                 <>
@@ -110,7 +116,7 @@ export function ActivityTrend({ weeks: all, height = 150 }: { weeks: WeekBar[]; 
                   {stats.projected >= stats.avg ? (
                     <span style={{ color: "var(--up)" }}>above your average</span>
                   ) : (
-                    <span>{Math.ceil(stats.avg - (shown.total ?? 0))} more to reach your average</span>
+                    <span>{Math.ceil(stats.avg - (latest.total ?? 0))} more to reach your average</span>
                   )}
                 </>
               )}

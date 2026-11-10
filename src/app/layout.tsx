@@ -14,6 +14,7 @@ import { Main } from "@/components/Main";
 import { APPEARANCE_INIT_SCRIPT } from "@/lib/appearance";
 import { Logo } from "@/components/Logo";
 import { MotionProvider } from "@/lib/motion";
+import { BirthdayParty } from "@/components/BirthdayParty";
 
 export const metadata: Metadata = {
   title: "Lock In",
@@ -78,6 +79,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 
               <MobileNav />
               <TourHost />
+              <BirthdayParty />
             </Lock>
           </StoreProvider>
         </MotionProvider>

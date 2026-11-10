@@ -13,6 +13,7 @@ import { MemorySection } from "@/components/MemorySection";
 import { CategorySection } from "@/components/CategorySection";
 import { AccountSection } from "@/components/AccountSection";
 import { TelegramSection } from "@/components/TelegramSection";
+import { MY_BIRTHDAY_TITLE, myBirthday } from "@/lib/birthdays";
 
 export default function SettingsPage() {
   const store = useStore();
@@ -53,6 +54,31 @@ export default function SettingsPage() {
               placeholder="Sultan"
             />
           </Field>
+          <div className="mt-4">
+            <Field label="Your birthday" hint="On the day, the site throws you a party when you open it.">
+              <div className="flex flex-wrap items-center gap-2">
+                <Input
+                  type="date"
+                  value={myBirthday(store.importantDays, store.profile.name)?.date ?? ""}
+                  onChange={(e) => {
+                    const date = e.target.value;
+                    const mine = myBirthday(store.importantDays, store.profile.name);
+                    if (!date) {
+                      if (mine) store.deleteImportantDay(mine.id);
+                    } else if (mine) {
+                      store.updateImportantDay(mine.id, { date, repeatsYearly: true });
+                    } else {
+                      store.addImportantDay({ title: MY_BIRTHDAY_TITLE, date, kind: "birthday", note: "", repeatsYearly: true });
+                    }
+                  }}
+                  className="max-w-[200px]"
+                />
+                <Button size="sm" onClick={() => window.dispatchEvent(new Event("lockin:birthday-preview"))}>
+                  Preview the party
+                </Button>
+              </div>
+            </Field>
+          </div>
         </Panel>
       </section>
 
