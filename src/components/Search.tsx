@@ -91,7 +91,7 @@ const PAGES: { title: string; detail: string; href: string; icon: string }[] = [
   { title: "Progress", detail: "The year, day by day", href: "/progress", icon: ICON.progress },
   { title: "Gym", detail: "Gym days and weight", href: "/gym", icon: ICON.weight },
   { title: "Reflection", detail: "The journal", href: "/reflection", icon: ICON.journal },
-  { title: "Recommendations", detail: "What your week says", href: "/recommendations", icon: ICON.recs },
+  { title: "Advice", detail: "Your next move and what else is worth doing", href: "/recommendations", icon: ICON.recs },
   { title: "Settings", detail: "Appearance, data, account", href: "/settings", icon: ICON.settings },
 ];
 

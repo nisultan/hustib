@@ -155,7 +155,7 @@ const SECONDARY: NavItem[] = [
   },
   {
     href: "/recommendations",
-    label: "Recommendations",
+    label: "Advice",
     icon: (
       <Icon>
         <circle cx="10" cy="10" r="7" {...soft} />

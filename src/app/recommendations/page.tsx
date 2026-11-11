@@ -1,209 +1,412 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { AnimatePresence, motion } from "motion/react";
 import { useStore } from "@/lib/store";
-import { recommend, RecKind } from "@/lib/recommendations";
+import { AREA_LABEL, RecArea, Recommendation, recommend } from "@/lib/recommendations";
 import { productivity } from "@/lib/productivity";
 import { habitPatterns, HabitPattern, planPatterns, weekdayNames } from "@/lib/consistency";
 import { daysUntil, todayISO } from "@/lib/dates";
-import { EmptyState, SectionTitle } from "@/components/ui";
+import { SectionTitle } from "@/components/ui";
 import { Insights } from "@/components/Insights";
 import { Flame } from "@/components/Flame";
 
 /**
- * What the week actually says.
+ * Advice: one clear next move, then everything else worth doing.
  *
- * Was a single reading-width column: a score, three counters and a list of
- * sentences, every one the same white card. It held the right information and
- * gave none of it a shape, so the page read as a report to get through rather
- * than something to look at.
- *
- * Now it is a board. The top row is the answer at a glance — one score and the
- * three numbers it is made of. Below, the left column is what to *do* (what
- * Lifee noticed, what the rules suggest), and the right is the evidence: which
- * habits are holding and which are slipping, and which part of the planned day
- * actually happens. Someone who reads only the top row has the gist; someone
- * who wants to argue with it has the working on the right.
+ * The old page was a board of numbers with the suggestions squeezed into
+ * one-line rows, so the most useful thing on it was the least visible. Now
+ * the strongest suggestion is the page: what to do, why, the numbers behind
+ * it and a button that goes and does it. The rest follow as cards that can be
+ * filtered by area and put off until later or marked done. The evidence the
+ * suggestions come from sits on the right, for anyone who wants to check it.
  */
+
+const AREA_TONE: Record<RecArea, string> = {
+  school: "var(--accent)",
+  body: "var(--up)",
+  habits: "var(--high)",
+  life: "#e879f9",
+};
+
+const HIDDEN_KEY = "lockin.advice.hidden";
+const LATER_MS = 20 * 3600_000;
+const DONE_MS = 7 * 86_400_000;
+
+function useHidden() {
+  const [hidden, setHidden] = useState<Record<string, number>>({});
+  useEffect(() => {
+    try {
+      setHidden(JSON.parse(localStorage.getItem(HIDDEN_KEY) ?? "{}"));
+    } catch {}
+  }, []);
+  const save = (next: Record<string, number>) => {
+    setHidden(next);
+    try {
+      localStorage.setItem(HIDDEN_KEY, JSON.stringify(next));
+    } catch {}
+  };
+  const now = Date.now();
+  return {
+    isHidden: (id: string) => (hidden[id] ?? 0) > now,
+    hide: (id: string, ms: number) => save({ ...hidden, [id]: Date.now() + ms }),
+    restore: () => save({}),
+  };
+}
+
 export default function RecommendationsPage() {
   const store = useStore();
   const today = todayISO();
-
-  const recs = useMemo(() => recommend(store, 8), [store]);
+  const all = useMemo(() => (store.ready ? recommend(store, 14) : []), [store]);
   const score = useMemo(() => productivity(store), [store]);
   const habits = useMemo(() => habitPatterns(store, today), [store, today]);
   const plan = useMemo(() => planPatterns(store, today), [store, today]);
+  const { isHidden, hide, restore } = useHidden();
+  const [area, setArea] = useState<RecArea | "all">("all");
 
   if (!store.ready) return <div className="h-64" aria-busy="true" />;
 
+  const visible = all.filter((r) => !isHidden(r.id));
+  const hiddenCount = all.length - visible.length;
+  const [hero, ...rest] = visible;
+  const areas = (Object.keys(AREA_LABEL) as RecArea[]).filter((a) => rest.some((r) => r.area === a));
+  const list = area === "all" ? rest : rest.filter((r) => r.area === area);
+  const urgent = visible.filter((r) => r.weight >= 70).length;
+
   const open = store.tasks.filter((t) => t.status !== "completed");
   const overdue = open.filter((t) => t.dueDate != null && daysUntil(t.dueDate) < 0).length;
-  const week = open.filter((t) => {
-    if (t.dueDate == null) return false;
-    const d = daysUntil(t.dueDate);
-    return d >= 0 && d <= 7;
-  }).length;
-
-  // Habits across the board, last fortnight against the one before.
-  const sum = (key: "recent" | "before") => {
-    let kept = 0;
-    let due = 0;
-    for (const h of habits) {
-      const rate = h[key];
-      if (rate == null) continue;
-      // The halves are fourteen calendar days each; weighting by how often the
-      // habit was actually due keeps a weekly habit from counting like a daily.
-      const n = h.due / 2;
-      kept += rate * n;
-      due += n;
-    }
-    return due === 0 ? null : kept / due;
-  };
-  const habitsNow = sum("recent");
-  const habitsBefore = sum("before");
+  const week = open.filter((t) => t.dueDate != null && daysUntil(t.dueDate) >= 0 && daysUntil(t.dueDate) <= 7).length;
 
   return (
     <div className="page-in">
       <header className="mb-6">
-        <h1 className="text-2xl font-semibold tracking-tight">Recommendations</h1>
-        <p className="mt-1 text-sm text-ink-2">What your week actually says — and what to do about it.</p>
+        <p className="text-[12px] font-semibold uppercase tracking-[0.12em] text-ink-3">
+          {new Date(`${today}T12:00:00`).toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}
+        </p>
+        <h1 className="mt-1 text-[28px] font-bold tracking-tight">Advice</h1>
+        <p className="mt-1 text-[14px] text-ink-2">
+          {visible.length === 0
+            ? "Nothing left to act on. Enjoy it."
+            : urgent > 0
+              ? `${urgent} ${urgent === 1 ? "thing needs" : "things need"} you soon. ${Math.max(0, visible.length - urgent)} more can wait.`
+              : `Nothing urgent. ${visible.length} ${visible.length === 1 ? "idea" : "ideas"} for making the week better.`}
+        </p>
       </header>
 
-      {/* ---- the answer at a glance ------------------------------------- */}
-      <div className="mb-8 grid gap-3 sm:grid-cols-3 xl:grid-cols-[1.5fr_1fr_1fr_1fr]">
-        <ScoreTile
-          score={score.score}
-          delta={score.delta}
-          streak={score.streak}
-          best={score.bestStreak}
-        />
-        <Stat
-          label="Habits kept"
-          value={habitsNow == null ? "—" : `${Math.round(habitsNow * 100)}%`}
-          hint="last 14 days"
-          trend={habitsNow != null && habitsBefore != null ? habitsNow - habitsBefore : null}
-        />
-        <Stat
-          label="Plan done"
-          value={plan.planned === 0 ? "—" : `${Math.round((plan.done / plan.planned) * 100)}%`}
-          hint={plan.planned === 0 ? "nothing planned yet" : `${plan.done} of ${plan.planned} blocks`}
-        />
-        <Stat
-          label="Due this week"
-          value={String(week)}
-          hint={overdue > 0 ? `${overdue} already late` : "nothing late"}
-          alarm={overdue > 0}
-        />
-      </div>
-
-      <div className="grid gap-x-6 gap-y-8 lg:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)] lg:items-start">
-        {/* ---- what to do --------------------------------------------- */}
-        <div className="grid min-w-0 grid-cols-1 gap-2">
-          <Insights />
-
-          <section>
-            <SectionTitle right={<span className="text-xs text-ink-3">{recs.length}</span>}>
-              Suggestions
-            </SectionTitle>
-            {recs.length === 0 ? (
-              <EmptyState
-                title="Nothing to suggest yet"
-                hint="Add tasks and deadlines and suggestions will appear here."
-              />
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,1.65fr)_minmax(0,1fr)] lg:items-start">
+        <div className="grid min-w-0 gap-6">
+          <AnimatePresence mode="popLayout" initial={false}>
+            {hero ? (
+              <Hero key={hero.id} rec={hero} onLater={() => hide(hero.id, LATER_MS)} onDone={() => hide(hero.id, DONE_MS)} />
             ) : (
-              <Suggestions recs={recs} />
+              <motion.div
+                key="empty"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                className="rounded-2xl border border-dashed border-line px-6 py-12 text-center"
+              >
+                <p className="text-[18px] font-semibold">You are clear</p>
+                <p className="mt-1 text-[13.5px] text-ink-3">New advice shows up as your week changes.</p>
+              </motion.div>
             )}
-          </section>
+          </AnimatePresence>
+
+          {rest.length > 0 && (
+            <section>
+              <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+                <h2 className="text-[15px] font-bold tracking-tight">Also worth doing</h2>
+                <div className="flex flex-wrap gap-1">
+                  <Chip on={area === "all"} onClick={() => setArea("all")} label="All" n={rest.length} />
+                  {areas.map((a) => (
+                    <Chip
+                      key={a}
+                      on={area === a}
+                      onClick={() => setArea(a)}
+                      label={AREA_LABEL[a]}
+                      n={rest.filter((r) => r.area === a).length}
+                      tone={AREA_TONE[a]}
+                    />
+                  ))}
+                </div>
+              </div>
+              <motion.div layout className="grid gap-3 sm:grid-cols-2">
+                <AnimatePresence initial={false}>
+                  {list.map((r, i) => (
+                    <Card key={r.id} rec={r} i={i} onLater={() => hide(r.id, LATER_MS)} onDone={() => hide(r.id, DONE_MS)} />
+                  ))}
+                </AnimatePresence>
+              </motion.div>
+            </section>
+          )}
+
+          {hiddenCount > 0 && (
+            <button
+              type="button"
+              onClick={restore}
+              className="justify-self-start text-[12.5px] font-medium text-ink-3 underline decoration-dotted underline-offset-2 hover:text-ink"
+            >
+              {hiddenCount} put aside · bring back
+            </button>
+          )}
         </div>
 
-        {/* ---- the evidence ------------------------------------------- */}
-        <div className="grid min-w-0 grid-cols-1 gap-8">
+        <aside className="grid min-w-0 gap-6">
+          <ScoreCard
+            score={score.score}
+            delta={score.delta}
+            streak={score.streak}
+            best={score.bestStreak}
+            habits={habitsRate(habits)}
+            plan={plan.planned === 0 ? null : plan.done / plan.planned}
+            week={week}
+            overdue={overdue}
+          />
+          <Insights />
           <HoldingSlipping habits={habits} />
           <Rhythm plan={plan} />
           <Signals signals={score.signals} />
-        </div>
+        </aside>
       </div>
     </div>
   );
 }
 
-/* -------------------------------------------------------------------------- */
-/* The top row                                                                */
-/* -------------------------------------------------------------------------- */
+function habitsRate(habits: HabitPattern[]): number | null {
+  let kept = 0;
+  let due = 0;
+  for (const h of habits) {
+    if (h.recent == null) continue;
+    const n = h.due / 2;
+    kept += h.recent * n;
+    due += n;
+  }
+  return due === 0 ? null : kept / due;
+}
+
+/* ------------------------------- The next move ------------------------------- */
+
+function AreaTag({ area }: { area: RecArea }) {
+  const tone = AREA_TONE[area];
+  return (
+    <span className="inline-flex items-center gap-1.5 text-[11.5px] font-semibold uppercase tracking-[0.1em]" style={{ color: tone }}>
+      <span className="size-1.5 rounded-full" style={{ background: tone }} />
+      {AREA_LABEL[area]}
+    </span>
+  );
+}
+
+function Facts({ facts, big = false }: { facts?: string[]; big?: boolean }) {
+  if (!facts?.length) return null;
+  return (
+    <div className="flex flex-wrap gap-1.5">
+      {facts.map((f) => (
+        <span
+          key={f}
+          className={`nums rounded-md bg-panel-2 font-medium text-ink-2 ${big ? "px-2.5 py-1 text-[12.5px]" : "px-2 py-0.5 text-[11.5px]"}`}
+        >
+          {f}
+        </span>
+      ))}
+    </div>
+  );
+}
+
+function Hero({ rec, onLater, onDone }: { rec: Recommendation; onLater: () => void; onDone: () => void }) {
+  return (
+    <motion.section
+      layout
+      initial={{ opacity: 0, y: 14, scale: 0.985 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      exit={{ opacity: 0, y: -10, scale: 0.98 }}
+      transition={{ type: "spring", stiffness: 320, damping: 30 }}
+      className="relative overflow-hidden rounded-2xl border border-line bg-panel p-6 shadow-[var(--shadow-lg),var(--edge)] sm:p-8"
+    >
+      <div className="relative">
+        <div className="flex items-center justify-between gap-3">
+          <p className="text-[12px] font-semibold uppercase tracking-[0.12em] text-ink-3">Your next move</p>
+          <AreaTag area={rec.area} />
+        </div>
+        <h2 className="mt-3 text-[clamp(22px,3vw,30px)] font-bold leading-tight tracking-tight">{rec.title}</h2>
+        <p className="mt-2 max-w-2xl text-[15px] leading-relaxed text-ink-2">{rec.text}</p>
+        <div className="mt-4">
+          <Facts facts={rec.facts} big />
+        </div>
+        <div className="mt-6 flex flex-wrap items-center gap-2">
+          <Link
+            href={rec.href}
+            className="group inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-[14px] font-semibold text-white transition-transform active:scale-[0.97]"
+            style={{ background: "var(--accent)" }}
+          >
+            {rec.action}
+            <span aria-hidden className="transition-transform group-hover:translate-x-0.5">
+              →
+            </span>
+          </Link>
+          <button
+            type="button"
+            onClick={onDone}
+            className="rounded-xl border border-line px-4 py-2.5 text-[13.5px] font-semibold text-ink-2 transition-colors hover:bg-panel-2 hover:text-ink"
+          >
+            Done
+          </button>
+          <button
+            type="button"
+            onClick={onLater}
+            className="rounded-xl px-3 py-2.5 text-[13.5px] font-medium text-ink-3 transition-colors hover:bg-panel-2 hover:text-ink"
+          >
+            Later
+          </button>
+        </div>
+      </div>
+    </motion.section>
+  );
+}
+
+function Chip({ on, onClick, label, n, tone }: { on: boolean; onClick: () => void; label: string; n: number; tone?: string }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={on}
+      className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[12px] font-medium transition-colors ${
+        on ? "border-transparent bg-ink text-bg" : "border-line text-ink-2 hover:bg-panel-2"
+      }`}
+    >
+      {tone && <span className="size-1.5 rounded-full" style={{ background: tone }} />}
+      {label}
+      <span className={`nums ${on ? "opacity-70" : "text-ink-3"}`}>{n}</span>
+    </button>
+  );
+}
+
+function Card({ rec, i, onLater, onDone }: { rec: Recommendation; i: number; onLater: () => void; onDone: () => void }) {
+  return (
+    <motion.article
+      layout
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0, transition: { delay: Math.min(i, 8) * 0.03 } }}
+      exit={{ opacity: 0, scale: 0.96, transition: { duration: 0.18 } }}
+      className="group flex flex-col rounded-2xl border border-line bg-panel p-4 shadow-[var(--shadow),var(--edge)] transition-colors hover:bg-[color-mix(in_srgb,var(--panel-2)_45%,var(--panel))]"
+    >
+      <AreaTag area={rec.area} />
+      <h3 className="mt-2 text-[15px] font-semibold leading-snug tracking-tight">{rec.title}</h3>
+      <p className="mt-1 line-clamp-3 text-[13px] leading-relaxed text-ink-2" title={rec.text}>
+        {rec.text}
+      </p>
+      {rec.facts?.length ? (
+        <div className="mt-3">
+          <Facts facts={rec.facts} />
+        </div>
+      ) : null}
+      <div className="mt-auto flex items-center gap-1 pt-4">
+        <Link href={rec.href} className="mr-auto inline-flex items-center gap-1 text-[13px] font-semibold text-accent-text hover:underline">
+          {rec.action}
+          <span aria-hidden>→</span>
+        </Link>
+        <button
+          type="button"
+          onClick={onLater}
+          className="rounded-md px-2 py-1 text-[12px] font-medium text-ink-3 transition-colors hover:bg-panel-2 hover:text-ink"
+        >
+          Later
+        </button>
+        <button
+          type="button"
+          onClick={onDone}
+          className="rounded-md px-2 py-1 text-[12px] font-medium text-ink-3 transition-colors hover:bg-panel-2 hover:text-ink"
+        >
+          Done
+        </button>
+      </div>
+    </motion.article>
+  );
+}
+
+/* ------------------------------- The evidence ------------------------------- */
 
 const RING = 2 * Math.PI * 34;
 
-function ScoreTile({
+function ScoreCard({
   score,
   delta,
   streak,
   best,
+  habits,
+  plan,
+  week,
+  overdue,
 }: {
   score: number | null;
   delta: number | null;
   streak: number;
   best: number;
+  habits: number | null;
+  plan: number | null;
+  week: number;
+  overdue: number;
 }) {
-  const tone =
-    score == null
-      ? "var(--text-3)"
-      : score >= 70
-        ? "var(--up)"
-        : score >= 45
-          ? "var(--high)"
-          : "var(--urgent)";
-
+  const tone = score == null ? "var(--text-3)" : score >= 70 ? "var(--up)" : score >= 45 ? "var(--high)" : "var(--urgent)";
+  const pct = (v: number | null) => (v == null ? "—" : `${Math.round(v * 100)}%`);
   return (
-    <div className="relative flex items-center gap-4 overflow-hidden rounded-2xl border border-line bg-panel p-4 shadow-[var(--shadow),var(--edge)] sm:col-span-3 xl:col-span-1">
-      <span
-        aria-hidden
-        className="pointer-events-none absolute inset-0"
-        style={{
-          background: `radial-gradient(220px 140px at 10% 50%, color-mix(in srgb, ${tone} 12%, transparent), transparent 70%)`,
-        }}
-      />
-
-      <span className="relative grid size-[84px] shrink-0 place-items-center">
-        <svg viewBox="0 0 80 80" className="absolute inset-0 size-full -rotate-90">
-          <circle cx="40" cy="40" r="34" fill="none" stroke={tone} strokeWidth="7" opacity="0.14" />
-          {score != null && (
-            <circle
-              cx="40"
-              cy="40"
-              r="34"
-              fill="none"
-              stroke={tone}
-              strokeWidth="7"
-              strokeLinecap="round"
-              strokeDasharray={RING}
-              strokeDashoffset={RING * (1 - score / 100)}
-              className="transition-[stroke-dashoffset] duration-1000 ease-out"
-            />
-          )}
-        </svg>
-        <span className="nums relative text-[26px] font-semibold tracking-tight" style={{ color: tone }}>
-          {score ?? "—"}
+    <section className="rounded-2xl border border-line bg-panel p-5 shadow-[var(--shadow),var(--edge)]">
+      <div className="flex items-center gap-4">
+        <span className="relative grid size-[76px] shrink-0 place-items-center">
+          <svg viewBox="0 0 80 80" className="absolute inset-0 size-full -rotate-90">
+            <circle cx="40" cy="40" r="34" fill="none" stroke={tone} strokeWidth="7" opacity="0.14" />
+            {score != null && (
+              <motion.circle
+                cx="40"
+                cy="40"
+                r="34"
+                fill="none"
+                stroke={tone}
+                strokeWidth="7"
+                strokeLinecap="round"
+                strokeDasharray={RING}
+                initial={{ strokeDashoffset: RING }}
+                animate={{ strokeDashoffset: RING * (1 - score / 100) }}
+                transition={{ duration: 1.1, ease: [0.16, 1, 0.3, 1] }}
+              />
+            )}
+          </svg>
+          <span className="nums relative text-[24px] font-bold tracking-tight" style={{ color: tone }}>
+            {score ?? "—"}
+          </span>
         </span>
-      </span>
-
-      <div className="relative min-w-0">
-        <p className="text-[12.5px] font-semibold tracking-[0.08em] text-ink-3">Consistency</p>
-        <p className="mt-1 text-[14px] font-medium leading-snug">{verdict(score)}</p>
-        <p className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11.5px] text-ink-3">
-          {delta != null && delta !== 0 && (
-            <span style={{ color: delta > 0 ? "var(--up)" : "var(--urgent)" }}>
-              {delta > 0 ? "▲" : "▼"} {Math.abs(delta)} vs before
-            </span>
-          )}
-          {streak > 0 && (
-            <span className="inline-flex items-center gap-0.5">
-              {streak}-day streak <Flame streak={streak} />
-              {best > streak && <span className="ml-1 opacity-70">· best {best}</span>}
-            </span>
-          )}
-        </p>
+        <div className="min-w-0">
+          <p className="text-[12px] font-semibold uppercase tracking-[0.1em] text-ink-3">Consistency</p>
+          <p className="mt-0.5 text-[14px] font-medium leading-snug">{verdict(score)}</p>
+          <p className="mt-1 flex flex-wrap items-center gap-x-2 text-[11.5px] text-ink-3">
+            {delta != null && delta !== 0 && (
+              <span style={{ color: delta > 0 ? "var(--up)" : "var(--urgent)" }}>
+                {delta > 0 ? "▲" : "▼"} {Math.abs(delta)} vs before
+              </span>
+            )}
+            {streak > 0 && (
+              <span className="inline-flex items-center gap-0.5">
+                {streak}-day streak <Flame streak={streak} />
+                {best > streak && <span className="ml-1 opacity-70">· best {best}</span>}
+              </span>
+            )}
+          </p>
+        </div>
       </div>
+      <div className="mt-4 grid grid-cols-3 gap-2 border-t border-line pt-4">
+        <Mini label="Habits kept" value={pct(habits)} />
+        <Mini label="Plan done" value={pct(plan)} />
+        <Mini label="Due in 7 days" value={String(week)} hint={overdue > 0 ? `${overdue} late` : undefined} />
+      </div>
+    </section>
+  );
+}
+
+function Mini({ label, value, hint }: { label: string; value: string; hint?: string }) {
+  return (
+    <div>
+      <p className="nums text-[19px] font-bold leading-none tracking-tight">{value}</p>
+      <p className="mt-1 text-[11px] text-ink-3">{label}</p>
+      {hint && <p className="text-[11px] font-medium text-[var(--urgent)]">{hint}</p>}
     </div>
   );
 }
@@ -216,170 +419,6 @@ function verdict(score: number | null): string {
   if (score >= 30) return "Slipping. Pick one thing to keep daily.";
   return "Mostly not logging. Start with one thing.";
 }
-
-function Stat({
-  label,
-  value,
-  hint,
-  trend = null,
-  alarm = false,
-}: {
-  label: string;
-  value: string;
-  hint: string;
-  trend?: number | null;
-  alarm?: boolean;
-}) {
-  const moved = trend != null && Math.abs(trend) >= 0.05;
-  return (
-    <div className="rounded-2xl border border-line bg-panel p-4 shadow-[var(--shadow),var(--edge)]">
-      <p className="text-[12.5px] font-semibold tracking-[0.08em] text-ink-3">{label}</p>
-      <p className="mt-2 flex items-baseline gap-2">
-        <span
-          className="nums text-[28px] font-semibold leading-none tracking-tight"
-          style={alarm ? { color: "var(--urgent)" } : undefined}
-        >
-          {value}
-        </span>
-        {moved && (
-          <span
-            className="nums text-[12px] font-medium"
-            style={{ color: (trend as number) > 0 ? "var(--up)" : "var(--urgent)" }}
-          >
-            {(trend as number) > 0 ? "▲" : "▼"} {Math.round(Math.abs(trend as number) * 100)}
-          </span>
-        )}
-      </p>
-      <p className="mt-1.5 text-[11.5px] text-ink-3" style={alarm ? { color: "var(--urgent)" } : undefined}>
-        {hint}
-      </p>
-    </div>
-  );
-}
-
-/* -------------------------------------------------------------------------- */
-/* Suggestions                                                                */
-/* -------------------------------------------------------------------------- */
-
-/**
- * Each rule gets its own mark and colour, instead of the same lightbulb on
- * every line. Eight identical bulbs say "here are some sentences"; a red mark
- * on the overdue one and a green one on "you're ahead" lets the list be read
- * as a shape before it is read as words.
- */
-const KIND: Record<RecKind, { label: string; tone: string; glyph: string }> = {
-  overdue: { label: "Overdue", tone: "var(--urgent)", glyph: "!" },
-  focus: { label: "Focus", tone: "var(--accent)", glyph: "◎" },
-  test: { label: "Test soon", tone: "var(--high)", glyph: "✎" },
-  deadline: { label: "Deadline", tone: "var(--high)", glyph: "◷" },
-  university: { label: "Application", tone: "var(--accent)", glyph: "◆" },
-  ahead: { label: "Ahead", tone: "var(--up)", glyph: "✓" },
-  clear: { label: "All clear", tone: "var(--up)", glyph: "✓" },
-  declining: { label: "Sliding", tone: "var(--urgent)", glyph: "↘" },
-  cluster: { label: "Busy stretch", tone: "var(--high)", glyph: "▤" },
-  thin: { label: "Thin evidence", tone: "var(--medium)", glyph: "…" },
-  stale: { label: "Gathering dust", tone: "var(--medium)", glyph: "◌" },
-  untested: { label: "No grades", tone: "var(--medium)", glyph: "?" },
-  momentum: { label: "Momentum", tone: "var(--up)", glyph: "↗" },
-  journal: { label: "Journal", tone: "var(--accent)", glyph: "✍" },
-  weight: { label: "Weight", tone: "var(--accent)", glyph: "⚖" },
-};
-
-/**
- * The rule-based suggestions: three lines, the rest on request.
- *
- * Eight full sentences in separate cards was the "too much information" this
- * page was called out for. Each is now a single line in one list — its mark,
- * its sentence cut to fit, an arrow — and "Show all" opens the rest. Hovering
- * a cut line shows the whole sentence; opening it goes where it points.
- */
-const READ_KEY = "lockedin.recs.read";
-/** A read suggestion stays hidden this long, then returns if it still applies. */
-const READ_DAYS = 7;
-
-function Suggestions({ recs: all0 }: { recs: { id: string; kind: RecKind; text: string; href: string }[] }) {
-  const [all, setAll] = useState(false);
-  const [read, setRead] = useState<Record<string, number>>(() => {
-    try {
-      return JSON.parse(localStorage.getItem(READ_KEY) ?? "{}") as Record<string, number>;
-    } catch {
-      return {};
-    }
-  });
-  const markRead = (id: string) => {
-    const next = { ...read, [id]: Date.now() };
-    setRead(next);
-    try {
-      localStorage.setItem(READ_KEY, JSON.stringify(next));
-    } catch {
-      // Private mode: hidden for this visit only.
-    }
-  };
-  const recs = all0.filter((r) => !(read[r.id] && Date.now() - read[r.id] < READ_DAYS * 86_400_000));
-  const shown = all ? recs : recs.slice(0, 3);
-  if (recs.length === 0) {
-    return (
-      <p className="rounded-xl border border-dashed border-line px-3.5 py-5 text-center text-[13px] text-ink-3">
-        All read. New ones show up as things change.
-      </p>
-    );
-  }
-  return (
-    <div className="overflow-hidden rounded-xl border border-line bg-panel">
-      {shown.map((r) => {
-        const k = KIND[r.kind];
-        return (
-          <Link
-            key={r.id}
-            href={r.href}
-            title={r.text}
-            className="group flex items-center gap-3 border-b border-line px-3 py-2.5 transition-colors last:border-b-0 hover:bg-panel-2"
-          >
-            <span
-              aria-hidden
-              className="grid size-7 shrink-0 place-items-center rounded-lg text-[13px] font-semibold"
-              style={{ background: `color-mix(in srgb, ${k.tone} 14%, transparent)`, color: k.tone }}
-            >
-              {k.glyph}
-            </span>
-            <span className={`min-w-0 flex-1 text-[13.5px] text-ink ${all ? "" : "truncate"}`}>{r.text}</span>
-            <button
-              type="button"
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                markRead(r.id);
-              }}
-              title="Mark as read — hides it for a week"
-              className="flex shrink-0 items-center gap-1 rounded-md px-2 py-1 text-[11.5px] font-medium text-ink-3 transition-colors hover:bg-[color-mix(in_srgb,var(--up)_14%,transparent)] hover:text-[var(--up)]"
-            >
-              <svg viewBox="0 0 16 16" aria-hidden className="size-3.5">
-                <path d="m3.5 8.5 3 3 6-7" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-              Read
-            </button>
-            <span aria-hidden className="shrink-0 text-ink-3 transition-transform group-hover:translate-x-0.5">
-              →
-            </span>
-          </Link>
-        );
-      })}
-      {recs.length > 3 && (
-        <button
-          type="button"
-          onClick={() => setAll((v) => !v)}
-          className="w-full border-t border-line px-4 py-2.5 text-left text-[13px] font-medium text-accent-text transition-colors hover:bg-panel-2"
-        >
-          {all ? "Show fewer" : `Show all ${recs.length}`}
-        </button>
-      )}
-    </div>
-  );
-}
-
-/* -------------------------------------------------------------------------- */
-/* The evidence                                                               */
-/* -------------------------------------------------------------------------- */
 
 /**
  * Which habits are holding and which are not.
